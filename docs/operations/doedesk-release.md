@@ -1,22 +1,23 @@
 # Releasing DoeDesk
 
-How the DoeDesk builds are made today. Each step runs on a Mac with Xcode, the repository's
-dependencies (`vp i`), and the signing identities in the login keychain.
+How the DoeDesk builds are made today. The Mac and iPhone apps are built on the owner's Mac, with
+Xcode, the repository's dependencies (`vp i`), and the signing identities in the login keychain.
+GitHub Actions builds the Windows and Linux apps from the same tag.
 
 ## Versions and when to release
 
 DoeDesk is a fork of T3 Code (`upstream` = pingdotgg/t3code, `origin` = accelerate-sa/doedesk, work
 on the `doedesk` branch; `main` on the fork follows upstream).
 
-- A DoeDesk release carries the version of the T3 Code desktop release it is built on. DoeDesk
-  0.1.10 is T3 Code v0.1.10 plus DoeDesk's changes.
-- Release when a T3 Code release has been merged in, not for each change in between. If a fix
-  cannot wait, say so in the notes; do not invent a version T3 Code has not used.
-- The first line of every release's notes names the base: `Based on T3 Code v0.1.10.`
-- The updater downloads from `releases/download/v<version>/`, so the tag must be `v<version>`. The
-  fork inherits upstream's tag of that name; move it to the DoeDesk commit when releasing:
-  `git tag -f v0.1.10 && git push -f origin v0.1.10`. Never push tags to `upstream`.
-- GitHub Actions stay off on the fork: upstream's workflows would deploy and publish.
+- DoeDesk uses calendar versions `YYYY.M.N`: the year, the month without a leading zero (semver
+  forbids `2026.01.0`), then a counter from 0 within the month: `2026.11.0`, `2026.11.1`,
+  `2026.12.0`. Decided on 19 November 2026; `0.1.10` was the last release numbered after T3 Code.
+- Releases are not tied to T3 Code's: release when the owner decides. Every release's notes still
+  start by naming the base: `Based on T3 Code v0.1.10.`
+- The updater downloads from `releases/download/v<version>/`, so the tag is `v<version>`
+  (`v2026.11.0`), which never collides with T3 Code's `v0.x` tags. Tag a commit on `doedesk` and
+  push the tag: `git tag v2026.11.0 && git push origin v2026.11.0`. Never push tags to `upstream`.
+- GitHub Actions run only DoeDesk's own workflows (see [CI and Actions](#ci-and-actions)).
 
 **Nothing goes to T3 Code.** Three guards, set up on 19 November 2026:
 
@@ -32,7 +33,75 @@ on the `doedesk` branch; `main` on the fork follows upstream).
 GitHub also refuses pushes to pingdotgg/t3code from this account (it has read access only).
 
 To take in a T3 Code release: `git fetch upstream --tags`, `git merge v<version>` into `doedesk`,
-resolve, run the checks, then build with `--build-version <version>`.
+resolve, delete every workflow the merge brought back (`git rm` anything in `.github/workflows/`
+not named `doedesk-*.yml`; the pre-push hook refuses to push them), and run the checks.
+Merging T3 Code does not by itself make a release.
+
+## CI and Actions
+
+Set up on 19 November 2026. All jobs run on [Blacksmith](https://blacksmith.sh) runners (the
+`blacksmith-sh` GitHub app is installed on the org): `blacksmith-{2,4,8,16}vcpu-ubuntu-2404` for
+Linux x64, `blacksmith-16vcpu-ubuntu-2404-arm` for Linux arm64, `blacksmith-4vcpu-windows-2025`
+(public beta) for the Windows checks.
+
+- `doedesk-ci.yml`: lint, format, knip, build, typecheck, tests, Rust, release smoke, on every
+  push to `doedesk` and `ci-blacksmith`. Pull requests are off on the fork, so there is no PR run.
+- `doedesk-release.yml` (with `doedesk-release-desktop.yml`): the Windows and Linux apps, on a
+  pushed `v2026.11.0`-style tag or by hand. It builds only tags whose commit is on `doedesk`.
+- `doedesk-windows-tests.yml`: by hand, T3 Code's Windows test lane.
+
+Repository settings: Actions allow only GitHub's own actions plus `voidzero-dev/setup-vp`,
+`dtolnay/rust-toolchain` and `taiki-e/install-action`, each pinned by commit SHA (required);
+the workflow token is read-only and only the release's upload job gets `contents: write`.
+T3 Code's 27 workflows are registered on the fork from its mirrored branches and are disabled
+one by one (`gh workflow list --all`); keep them disabled. Pushing a branch or tag still runs
+that commit's own workflow files, so never push T3 Code's branches or tags to `origin`.
+
+## Windows and Linux apps
+
+Push the release tag (above), or run the workflow for an existing tag:
+
+```sh
+gh workflow run doedesk-release.yml -R accelerate-sa/doedesk --ref doedesk -f version=2026.11.0
+gh run watch -R accelerate-sa/doedesk      # add -f upload=false above to build without uploading
+```
+
+It builds the JS bundle once, packages Linux x64 and arm64 (AppImage and deb) and Windows x64
+(NSIS, built on Linux and checked on a Windows runner), checks that each app carries the original
+brand fonts and reads updates from `accelerate-sa/doedesk`, checks every update manifest's sha512
+and size, and attaches to the tag's release:
+
+| File                                                         | What                                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `DoeDesk-<version>-x64.exe`, `.exe.blockmap`, `latest.yml`   | Windows installer and its update feed                               |
+| `DoeDesk-x86_64.AppImage`, `DoeDesk-arm64.AppImage`          | AppImages (no version in the name, so the updater can replace them) |
+| `latest-linux.yml`, `latest-linux-arm64.yml`                 | Linux update feeds                                                  |
+| `DoeDesk-<version>-amd64.deb`, `DoeDesk-<version>-arm64.deb` | Debian packages                                                     |
+| `DoeDesk-x64.exe`, `DoeDesk-amd64.deb`, `DoeDesk-arm64.deb`  | Copies with fixed names for `doedesk.com/download`                  |
+
+It uploads only these names, never replaces or deletes the Mac files, and re-running it replaces
+its own files. If the tag has no release yet it creates one as a **draft** with the notes
+`Based on T3 Code vX.Y.Z.` (the workflow cannot know the base): fill in the version and the notes,
+add the Mac files, then publish it yourself. Re-run a failed job
+from the run's page or with `gh run rerun <id> --failed`.
+
+The Windows installer is **not code-signed**: there is no certificate yet, and SmartScreen warns
+on first run ("More info", "Run anyway"). The place to add signing is marked `WINDOWS CODE
+SIGNING` in `doedesk-release-desktop.yml`.
+
+Secrets: `DOEDESK_BRAND_FONTS_01` to `_10` hold the six Thmanyah files as one base64 `tar.xz`,
+split because a secret holds at most 48 KB (the workflow reads up to `_12`). The jobs unpack them
+in the runner's temp folder; the JS bundle artifact is uploaded without them. To replace them,
+from the folder with the six files:
+
+```sh
+COPYFILE_DISABLE=1 tar --format=ustar --uid 0 --gid 0 --uname root --gname root -cf - thmanyah-serif-*.otf \
+  | xz -9e | base64 | tr -d '\n' > /tmp/fonts.b64 && split -b 45000 -a 2 /tmp/fonts.b64 /tmp/fonts.part.
+i=1; for f in /tmp/fonts.part.*; do gh secret set "DOEDESK_BRAND_FONTS_$(printf %02d $i)" -R accelerate-sa/doedesk < "$f"; i=$((i+1)); done
+rm /tmp/fonts.b64 /tmp/fonts.part.*
+```
+
+Delete any higher-numbered part left from a longer earlier set.
 
 ## Brand fonts
 
@@ -64,7 +133,7 @@ work around it.
 T3CODE_DESKTOP_UPDATE_REPOSITORY=accelerate-sa/doedesk \
 DOEDESK_BRAND_FONTS_DIR=<folder with the Thmanyah files> \
   node scripts/build-desktop-artifact.ts --platform mac --target dmg --arch arm64 \
-  --signed --build-version 0.1.10 --output-dir release
+  --signed --build-version 2026.11.0 --output-dir release
 ```
 
 `--signed` signs with the Developer ID Application identity. No provisioning profile is needed;
@@ -73,15 +142,15 @@ set `T3CODE_MACOS_PROVISIONING_PROFILE` only to enable passkeys in the in-app br
 Then notarize and staple the disk image, and check Gatekeeper accepts the app:
 
 ```sh
-asc notarization submit --file release/DoeDesk-0.1.10-arm64.dmg --wait
-xcrun stapler staple release/DoeDesk-0.1.10-arm64.dmg
+asc notarization submit --file release/DoeDesk-2026.11.0-arm64.dmg --wait
+xcrun stapler staple release/DoeDesk-2026.11.0-arm64.dmg
 spctl -a -t exec -vv /Volumes/<mounted image>/DoeDesk.app   # "source=Notarized Developer ID"
 ```
 
 Stapling changes the disk image, so update its `sha512` and `size` in `release/latest-mac.yml`.
-Upload the disk image, the zip, both blockmaps and `latest-mac.yml` to a GitHub release, plus a
-copy of the disk image named `DoeDesk-arm64.dmg`: `doedesk.com/download` points at that name on
-the latest release.
+Upload the disk image, the zip, both blockmaps and `latest-mac.yml` to the tag's GitHub release
+(the draft the release workflow made, if it ran first), plus a copy of the disk image named
+`DoeDesk-arm64.dmg`: `doedesk.com/download` links to the fixed names on the latest release.
 
 ## iPhone app
 

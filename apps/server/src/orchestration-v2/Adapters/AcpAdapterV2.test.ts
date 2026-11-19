@@ -4559,7 +4559,7 @@ describe("AcpAdapterV2", () => {
         results: [{ url: "https://t3.codes" }, { url: "https://github.com/pingdotgg/t3code" }],
       });
       assert.deepEqual(webItem("grok-web-fetch", "completed")?.results, [
-        { url: "https://t3.codes", snippet: "DoeDesk page" },
+        { url: "https://t3.codes", snippet: "T3 Code page" },
       ]);
       const completedCompaction = items.find(
         (item) =>

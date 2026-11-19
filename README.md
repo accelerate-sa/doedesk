@@ -7,7 +7,7 @@
 <p align="center">Use AI on confidential files.</p>
 
 <p align="center">
-  <a href="https://doedesk.com/download">Download for Mac</a> ·
+  <a href="https://doedesk.com/download">Download</a> ·
   <a href="https://doedesk.com">Website</a> ·
   <a href="./docs/user/privacy.md">How masking works</a>
 </p>
@@ -33,8 +33,17 @@ AI model sees them, and puts the real values back on your screen and in the file
 
 ## Install
 
-Download [DoeDesk for Mac](https://doedesk.com/download) (Apple silicon), open it, and drag
-DoeDesk to Applications. Sign in with a phone number in Saudi Arabia, or by email anywhere.
+Download DoeDesk from [doedesk.com/download](https://doedesk.com/download), or from the
+[latest release](https://github.com/accelerate-sa/doedesk/releases/latest):
+
+- **Mac** (Apple silicon): open `DoeDesk-arm64.dmg` and drag DoeDesk to Applications.
+- **Windows** (x64): run `DoeDesk-x64.exe`. The installer is not code-signed yet, so Windows
+  SmartScreen warns about an unrecognised app: choose **More info**, then **Run anyway**.
+- **Linux** (x64 or arm64): make `DoeDesk-x86_64.AppImage` or `DoeDesk-arm64.AppImage`
+  executable and run it, or install `DoeDesk-amd64.deb` / `DoeDesk-arm64.deb` with `apt`.
+
+The Mac app, the Windows app and the AppImage update themselves. Sign in with a phone number in
+Saudi Arabia, or by email anywhere.
 
 ## Run your own detection
 
