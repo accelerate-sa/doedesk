@@ -53,9 +53,11 @@ Linux x64, `blacksmith-16vcpu-ubuntu-2404-arm` for Linux arm64, `blacksmith-4vcp
 Repository settings: Actions allow only GitHub's own actions plus `voidzero-dev/setup-vp`,
 `dtolnay/rust-toolchain` and `taiki-e/install-action`, each pinned by commit SHA (required);
 the workflow token is read-only and only the release's upload job gets `contents: write`.
-T3 Code's 27 workflows are registered on the fork from its mirrored branches and are disabled
-one by one (`gh workflow list --all`); keep them disabled. Pushing a branch or tag still runs
-that commit's own workflow files, so never push T3 Code's branches or tags to `origin`.
+Pushing a branch or tag runs that commit's own workflow files, and the fork's other branches
+(including `main`) still carry T3 Code's. So never push T3 Code's branches or tags to `origin`,
+and do not use GitHub's "Sync fork" on `main`: it would run T3 Code's CI and bots here. Most of
+their deploy and release jobs check for T3 Code's repository and skip, and the action allowlist
+blocks many of their steps, but nothing disables them.
 
 ## Windows and Linux apps
 
