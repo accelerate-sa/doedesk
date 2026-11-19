@@ -1,10 +1,11 @@
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
+import { developerMode } from "../../../test/developerMode";
 import { act, render } from "../../../test/render";
 import { SidebarProvider } from "../ui/sidebar";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
-import { SETTINGS_NAV_GROUPS, SETTINGS_SECTION_LABELS } from "./settingsSearch";
+import { SETTINGS_NAV_GROUPS, SETTINGS_SECTION_LABELS, settingsNavGroups } from "./settingsSearch";
 
 vi.mock("./useAvailableSettingsSearchItems", () => ({
   useAvailableSettingsSearchItems: () => [
@@ -91,9 +92,11 @@ it("moves Tab through every settings section", async () => {
 
 it.each([1280, 390])("names each group by a heading outside it at %ipx wide", async (width) => {
   await page.viewport(width, 800);
+  // The Code group is a Developer mode one.
+  using _developer = developerMode();
   await using _screen = await renderNav();
 
-  for (const name of ["Agents", "Code", "Connections"]) {
+  for (const name of ["AI", "Code", "Connections"]) {
     const heading = page.getByRole("heading", { name, level: 3 });
     await expect.element(heading).toBeInTheDocument();
     const group = page.getByRole("group", { name }).element();
@@ -103,7 +106,7 @@ it.each([1280, 390])("names each group by a heading outside it at %ipx wide", as
     );
   }
   const groups = page.getByRole("group").elements();
-  expect(groups).toHaveLength(SETTINGS_NAV_GROUPS.length);
+  expect(groups).toHaveLength(settingsNavGroups(true).length);
   for (const group of groups) {
     const first = group.querySelector("[data-settings-section]")?.textContent;
     const heading = document.getElementById(group.getAttribute("aria-labelledby") ?? "");

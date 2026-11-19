@@ -13,6 +13,7 @@ import {
 } from "../../navigationHistory";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { cn } from "../../lib/utils";
+import { useDeveloperMode } from "~/doedesk/product";
 import { usePullRequestsSupported } from "../../state/environments";
 import { BrandMark } from "../BrandMark";
 import {
@@ -220,7 +221,10 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const isOnUtilityPage = useLocation({
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
-  const pullRequestsSupported = usePullRequestsSupported();
+  // Pull requests are a Developer mode tool. The check lives here, not in state/environments:
+  // product.ts reads settings, whose module imports state/environments.
+  const developerMode = useDeveloperMode();
+  const pullRequestsSupported = usePullRequestsSupported() && developerMode;
   const closeMobileSidebar = () => {
     if (isMobile) {
       setOpenMobile(false);

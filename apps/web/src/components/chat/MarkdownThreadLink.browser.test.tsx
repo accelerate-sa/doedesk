@@ -76,11 +76,11 @@ it.each([
       </RegistryContext>,
     );
     await expect
-      .element(screen.getByRole("link", { name: "Thread, Thread", exact: true }))
+      .element(screen.getByRole("link", { name: "Chat, Chat", exact: true }))
       .toBeVisible();
     await act(() => registry.set(reply, AsyncResult.failure(Cause.fail("offline"))));
     await expect
-      .element(screen.getByRole("link", { name: "Thread, Thread", exact: true }))
+      .element(screen.getByRole("link", { name: "Chat, Chat", exact: true }))
       .toBeVisible();
     await act(() =>
       registry.set(
@@ -133,7 +133,7 @@ it.each([
       );
     } else {
       await expect
-        .element(screen.getByText("Chat no longer available", { exact: true }))
+        .element(screen.getByText("Thread no longer available", { exact: true }))
         .toBeVisible();
     }
   },
@@ -151,6 +151,8 @@ it("names a thread on a machine this client has no connection to, without waitin
       />
     </RegistryContext>,
   );
-  await expect.element(screen.getByText("Chat on another machine", { exact: true })).toBeVisible();
+  await expect
+    .element(screen.getByText("Thread on another machine", { exact: true }))
+    .toBeVisible();
   await expect.element(screen.getByRole("link")).not.toBeInTheDocument();
 });

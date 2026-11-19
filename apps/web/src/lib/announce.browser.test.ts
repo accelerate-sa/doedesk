@@ -16,7 +16,7 @@ describe("announce", () => {
     document.body.append(composer);
     using _composer = { [Symbol.dispose]: () => composer.remove() };
 
-    announce("Settled 1 thread, Ctrl+Z to undo");
+    announce("Settled 1 chat, Ctrl+Z to undo");
     announce("Model: Claude Sonnet 5.5");
     vi.advanceTimersByTime(200);
     composer.focus();
@@ -45,14 +45,14 @@ describe("announce", () => {
   it("replaces a waiting message from the same source", () => {
     using _timers = fakeTimers();
 
-    announce("Settled 1 thread, Ctrl+Z to undo", "undo");
+    announce("Settled 1 chat, Ctrl+Z to undo", "undo");
     announce("Opening in VS Code");
-    announce("Settled 2 threads, Ctrl+Z to undo", "undo");
+    announce("Settled 2 chats, Ctrl+Z to undo", "undo");
     vi.runAllTimers();
 
     expect(spokenText()).toEqual(["Opening in VS Code. Settled 2 chats, Ctrl+Z to undo"]);
 
-    announce("Settled 1 thread, Ctrl+Z to undo", "undo");
+    announce("Settled 1 chat, Ctrl+Z to undo", "undo");
     announce("Opening in Zed");
     cancelAnnouncement("undo");
     vi.runAllTimers();

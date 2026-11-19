@@ -19,6 +19,7 @@ vi.mock(import("./useScopedSettings"), async (original) => ({
 vi.mock(import("./SettingsFontPreviews"), () => ({
   CodeFontPreview: () => <div />,
   PromptFontPreview: () => <div />,
+  ReadingFontPreview: () => <div />,
   TerminalFontPreview: () => <div />,
 }));
 vi.mock(import("./settingsLayout"), async (original) => ({

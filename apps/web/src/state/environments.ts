@@ -1,5 +1,4 @@
 import { useAtomValue } from "@effect/atom-react";
-import { useDeveloperMode } from "~/doedesk/product";
 import {
   connectionCatalogDisplayUrl,
   hasRelayRoute,
@@ -111,9 +110,7 @@ export function useEnvironmentIdentities() {
 }
 
 export function usePullRequestsSupported() {
-  const supported = useAtomValue(environmentSummaries.pullRequestsSupportedAtom);
-  const developerMode = useDeveloperMode();
-  return developerMode && supported;
+  return useAtomValue(environmentSummaries.pullRequestsSupportedAtom);
 }
 
 export function useEnvironmentMachines() {
