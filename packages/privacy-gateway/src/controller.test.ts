@@ -107,16 +107,16 @@ describe("what a provider's process is given", () => {
 });
 
 describe("how images are sent, and the reading tool", () => {
-  it("sends images as masked text and offers the tool until the user says otherwise, and remembers", async () => {
+  it("sends images redacted and offers the tool until the user says otherwise, and remembers", async () => {
     await using harness = await makeController({ mode: "unconfigured" });
     expect(harness.controller.status()).toMatchObject({
-      imageHandling: "text",
+      imageHandling: "redacted",
       readingTool: true,
     });
-    harness.controller.setPreference({ kind: "imageHandling", handling: "redacted" });
+    harness.controller.setPreference({ kind: "imageHandling", handling: "text" });
     harness.controller.setPreference({ kind: "readingTool", offered: false });
     expect(harness.controller.status()).toMatchObject({
-      imageHandling: "redacted",
+      imageHandling: "text",
       readingTool: false,
     });
     // Neither choice changes how an agent's process is started.
@@ -124,7 +124,7 @@ describe("how images are sent, and the reading tool", () => {
     await harness.controller.configure({ mode: "off" });
     await harness.controller.configure({ mode: "unconfigured" });
     expect(harness.controller.status()).toMatchObject({
-      imageHandling: "redacted",
+      imageHandling: "text",
       readingTool: false,
     });
   });
