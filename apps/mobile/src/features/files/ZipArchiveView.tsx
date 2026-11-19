@@ -86,7 +86,7 @@ const CANCELLED: ZipFailure = {
 };
 const NETWORK: ZipFailure = {
   title: "Couldn't download this ZIP",
-  detail: "Check the connection to this environment and try again.",
+  detail: "Check the connection to this computer and try again.",
   retry: true,
 };
 

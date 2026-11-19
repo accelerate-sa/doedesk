@@ -164,7 +164,7 @@ function AgentRow(props: {
         accessibilityHint={
           subagent.remoteChild === undefined
             ? "Provider-managed agent. Its work appears in the transcript."
-            : `Runs on ${subagent.remoteChild.label}. Connect to it to open its thread.`
+            : `Runs on ${subagent.remoteChild.label}. Connect to it to open its chat.`
         }
       >
         {row}
@@ -172,7 +172,7 @@ function AgentRow(props: {
     ) : (
       <Pressable
         accessibilityRole="link"
-        accessibilityHint="Opens this agent's thread"
+        accessibilityHint="Opens this agent's chat"
         onPress={() => props.onOpen(target)}
         className="min-w-0 flex-1 active:opacity-70"
       >

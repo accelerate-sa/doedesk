@@ -211,8 +211,8 @@ function ConfiguredConnectOnboardingDialog() {
       type: "success",
       title: "T3 Connect enabled",
       description: exposeEnvironment
-        ? "This environment is available to your other devices through T3 Connect."
-        : "This environment publishes agent activity to your mobile clients.",
+        ? "This computer is available to your other devices through T3 Connect."
+        : "This computer publishes agent activity to your mobile clients.",
     });
     setStep("devices");
   };
@@ -238,7 +238,7 @@ function ConfiguredConnectOnboardingDialog() {
           title="Set up T3 Connect"
           description={
             <>
-              Mesh your devices together. Publish this environment and connect the rest, all in one
+              Mesh your devices together. Publish this computer and connect the rest, all in one
               place.
             </>
           }
@@ -368,15 +368,15 @@ function PublishStep({
     <div className="space-y-3">
       <div className="rounded-lg border">
         <OnboardingToggleRow
-          title="Publish this environment"
-          description="Make this environment available to your other devices through T3 Connect."
+          title="Publish this computer"
+          description="Make this computer available to your other devices through T3 Connect."
           checked={exposeEnvironment}
           disabled={disabled}
           onCheckedChange={onExposeEnvironmentChange}
         />
         <OnboardingToggleRow
           title="Publish agent activity"
-          description="Send activity from this environment to your mobile clients for push notifications and Live Activities."
+          description="Send activity from this computer to your mobile clients for push notifications and Live Activities."
           checked={publishAgentActivity}
           disabled={disabled}
           onCheckedChange={onPublishAgentActivityChange}
@@ -458,7 +458,7 @@ function DevicesStep() {
         showSavedEnvironments
         empty={
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-            No other environments are published to your account yet. Publish one from another device
+            No other computers are published to your account yet. Publish one from another device
             and it will show up here.
           </p>
         }

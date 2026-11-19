@@ -229,7 +229,7 @@ it.each(["a", "b", "navigation"] as const)(
 );
 
 it.each(["Success", "Failure"] as const)(
-  "keeps background stop requests per thread after %s",
+  "keeps background stop requests per chat after %s",
   async (outcome) => {
     setup();
     const completions: Array<(result: unknown) => void> = [];

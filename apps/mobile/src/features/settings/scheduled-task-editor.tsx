@@ -19,7 +19,7 @@ import {
   type ScheduledTaskEditor,
 } from "./scheduled-task-editor-state";
 
-export const NEW_THREAD_DESTINATION_LABEL = "New thread each run";
+export const NEW_THREAD_DESTINATION_LABEL = "New chat each run";
 
 export function useScheduledTaskThread(
   environmentId: EnvironmentId | null,

@@ -17,6 +17,25 @@ export const DEFAULT_SANS_FONT_STACK =
 export const DEFAULT_CODE_FONT_STACK =
   '"SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
 
+const DEFAULT_READING_FONT_STACK =
+  '"DoeDesk Figures", "Redaction", "Thmanyah Serif Text", "Noto Naskh Arabic", "Iowan Old Style", "Palatino Linotype", Georgia, serif';
+
+const DEFAULT_DISPLAY_FONT_STACK =
+  '"DoeDesk Figures", "Redaction", "Thmanyah Serif Display", "Noto Naskh Arabic", "Iowan Old Style", "Palatino Linotype", Georgia, serif';
+
+/** Loads the brand serif at startup, so the first title or answer does not swap faces. */
+export function preloadReadingFonts(): void {
+  const requests: ReadonlyArray<readonly [font: string, sample?: string]> = [
+    ['400 1em "Redaction"'],
+    ['700 1em "Redaction"'],
+    ['400 1em "DoeDesk Figures"', "1"],
+    [`400 1em ${DEFAULT_READING_FONT_STACK}`, "ع"],
+  ];
+  for (const [font, sample] of requests) {
+    document.fonts?.load(font, sample).catch(() => undefined);
+  }
+}
+
 export const TYPOGRAPHY_ADVANCED_STORAGE_KEY = "t3code:typography-advanced";
 
 export function resolveTerminalFontPreference(input: {
@@ -62,6 +81,7 @@ export interface AppearanceFontPreferences {
   readonly sans: string;
   readonly code: string;
   readonly composer: string;
+  readonly reading: string;
   readonly sizeInterface: number;
   readonly sizePrompt: number;
   readonly sizeCode: number;
@@ -78,6 +98,8 @@ export function applyAppearanceFontVariables(
     ["--font-sans", preferences.sans, DEFAULT_SANS_FONT_STACK],
     ["--font-mono", preferences.code, DEFAULT_CODE_FONT_STACK],
     ["--font-composer", preferences.separate ? preferences.composer : "", "var(--font-sans)"],
+    ["--font-reading", preferences.reading, DEFAULT_READING_FONT_STACK],
+    ["--font-display", preferences.reading, DEFAULT_DISPLAY_FONT_STACK],
   ];
   for (const [variable, custom, fallback] of families) {
     const list = cssFontFamilies(custom);

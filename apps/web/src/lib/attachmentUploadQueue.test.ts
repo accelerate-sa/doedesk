@@ -816,7 +816,7 @@ describe("attachmentUploadQueue", () => {
   });
 
   it.each(["image", "file"] as const)(
-    "restores the previous environment after a replacement upload fails: %s",
+    "restores the previous computer after a replacement upload fails: %s",
     async (kind) => {
       const draftId = DraftId.make("draft-environment-roundtrip");
       const store = useComposerDraftStore.getState();

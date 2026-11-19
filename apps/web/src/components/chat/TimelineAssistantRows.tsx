@@ -52,7 +52,7 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
   return (
     <>
       <div className="relative min-w-0 px-1 py-0.5">
-        <MessageAuthorHeading>T3 Code</MessageAuthorHeading>
+        <MessageAuthorHeading>DoeDesk</MessageAuthorHeading>
         <div data-thread-find-text="true">
           <AssistantCitationSource
             messageId={row.message.id}
@@ -62,6 +62,7 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
             listRef={ctx.listRef}
           >
             <ChatMarkdown
+              className="reading-prose"
               text={messageText}
               renderInsights
               cwd={ctx.markdownCwd}
@@ -118,7 +119,7 @@ export function SentMessageTimelineRow({
 
   return (
     <div className="min-w-0 px-1 py-0.5">
-      <MessageAuthorHeading>T3 Code</MessageAuthorHeading>
+      <MessageAuthorHeading>DoeDesk</MessageAuthorHeading>
       {/* Sent messages have no message id; citations name their turn item instead. */}
       <AssistantCitationSource
         messageId={MessageId.make(row.id)}
@@ -128,6 +129,7 @@ export function SentMessageTimelineRow({
         listRef={ctx.listRef}
       >
         <ChatMarkdown
+          className="reading-prose"
           text={row.text}
           cwd={ctx.markdownCwd}
           threadRef={ctx.threadRef ?? undefined}

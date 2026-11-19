@@ -15,7 +15,7 @@ describe("thread composer errors", () => {
   it("clears every thread's error for a removed environment and no others", () => {
     setThreadComposerError("environment-1:thread-1", "one");
     setThreadComposerError("environment-1:thread-2", "two");
-    setThreadComposerError("environment-10:thread-1", "other environment");
+    setThreadComposerError("environment-10:thread-1", "other computer");
 
     clearThreadComposerErrorsForEnvironment("environment-1");
 

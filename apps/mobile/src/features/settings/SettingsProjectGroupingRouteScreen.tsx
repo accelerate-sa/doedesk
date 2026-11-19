@@ -12,6 +12,7 @@ import {
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { ListChoiceRow as SettingsChoiceRow } from "../../components/ui/ListChoiceRow";
 import { SettingsSection } from "./components/SettingsSection";
+import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 import { LanguageSettingsSection } from "./SettingsLanguageRouteScreen";
 import { NewThreadSettingsSection, WorkingSectionSettings } from "./ThreadSettingsSections";
 
@@ -23,7 +24,7 @@ const GROUPING_OPTIONS: ReadonlyArray<{
   {
     mode: "repository",
     label: "Group by repository",
-    description: "Matching repositories appear as one project.",
+    description: "Matching repositories appear as one folder.",
   },
   {
     mode: "repository_path",
@@ -33,7 +34,7 @@ const GROUPING_OPTIONS: ReadonlyArray<{
   {
     mode: "separate",
     label: "Keep separate",
-    description: "Show every workspace as its own project.",
+    description: "Show every workspace as its own folder.",
   },
 ];
 
@@ -56,7 +57,7 @@ export function SettingsProjectGroupingRouteScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
         <LanguageSettingsSection />
-        <SettingsSection title="Project grouping">
+        <SettingsSection title="Folder grouping">
           {GROUPING_OPTIONS.map((option, index) => (
             <SettingsChoiceRow
               key={option.mode}
@@ -71,6 +72,18 @@ export function SettingsProjectGroupingRouteScreen() {
         </SettingsSection>
         <WorkingSectionSettings />
         <NewThreadSettingsSection />
+        <SettingsSection title="Advanced">
+          <SettingsSwitchRow
+            icon="terminal"
+            label="Developer mode"
+            subtitle="Shows the terminal, git and pull requests."
+            value={
+              AsyncResult.isSuccess(preferencesResult) &&
+              preferencesResult.value.developerMode === true
+            }
+            onValueChange={(value) => savePreferences({ developerMode: value })}
+          />
+        </SettingsSection>
       </ScrollView>
     </SettingsScreen>
   );

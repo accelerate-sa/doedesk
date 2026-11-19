@@ -297,7 +297,7 @@ export async function prepareTurnAttachments(input: {
     environmentSession.preparedConnectionValueAtom(environmentId),
   );
   if (Option.isNone(connection)) {
-    throw new Error("The environment is not connected.");
+    throw new Error("The computer is not connected.");
   }
 
   const uploadedAttachments: UploadedMobileAttachment[] = [];

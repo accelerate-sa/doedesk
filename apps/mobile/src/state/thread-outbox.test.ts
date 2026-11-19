@@ -1296,10 +1296,10 @@ describe("thread outbox", () => {
         message: "temporarily unavailable",
       }),
     ).toBe(true);
-    expect(shouldRetryThreadOutboxDelivery(new Error("Thread no longer exists"))).toBe(false);
+    expect(shouldRetryThreadOutboxDelivery(new Error("Chat no longer exists"))).toBe(false);
     expect(
       shouldRetryThreadOutboxDelivery(
-        new OrchestrationDispatchCommandError({ message: "Thread no longer exists" }),
+        new OrchestrationDispatchCommandError({ message: "Chat no longer exists" }),
       ),
     ).toBe(false);
     expect(
@@ -1352,7 +1352,7 @@ describe("thread outbox", () => {
   });
 
   it("retains queued messages when settings synchronization fails before startTurn", () => {
-    const deterministicFailure = new Error("Thread no longer exists");
+    const deterministicFailure = new Error("Chat no longer exists");
 
     expect(
       resolveThreadOutboxFailureAction({

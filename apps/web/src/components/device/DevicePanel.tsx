@@ -306,7 +306,7 @@ export function DevicePanel(props: {
                     >
                       {state.hostStatus === "failed"
                         ? (state.hostStatusDetail ?? "The device hub failed to start.")
-                        : "No simulators or emulators were found on this environment."}
+                        : "No simulators or emulators were found on this computer."}
                     </p>
                   </>
                 ) : null}

@@ -10,6 +10,24 @@ import * as HttpServerRespondable from "effect/http/HttpServerRespondable";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 
 import {
+  PrivacyAccountRequest,
+  PrivacyAccountResult,
+  PrivacyActivity,
+  PrivacyConfigureRequest,
+  PrivacyConfigureResult,
+  PrivacyPreferenceRequest,
+  PrivacyProfileRequest,
+  PrivacyRedactionFile,
+  PrivacyRedactionFileRequest,
+  PrivacyRedactions,
+  PrivacySignInRequest,
+  PrivacySignInResult,
+  PrivacyStatus,
+  PrivacyVault,
+  UsageDataRequest,
+  UsageDataStatus,
+} from "./privacy.ts";
+import {
   AuthAccessTokenResult,
   AuthBrowserSessionRequest,
   AuthBrowserSessionResult,
@@ -1063,6 +1081,109 @@ class EnvironmentWebhooksHttpApi extends HttpApiGroup.make("webhooks")
   .add(HttpApiEndpoint.patch("webhookPatch", WEBHOOK_PATH, webhookEndpoint))
   .add(HttpApiEndpoint.get("webhookGet", WEBHOOK_PATH, webhookEndpoint)) {}
 
+const EnvironmentPrivacyErrors = [EnvironmentScopeRequiredError, EnvironmentInternalError] as const;
+
+/** The privacy gateway: how personal data is masked before a request reaches a model. */
+class EnvironmentPrivacyHttpApi extends HttpApiGroup.make("privacy")
+  .add(
+    HttpApiEndpoint.get("status", "/api/privacy/status", {
+      headers: OptionalBearerHeaders,
+      success: PrivacyStatus,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("configure", "/api/privacy/configure", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyConfigureRequest,
+      success: PrivacyConfigureResult,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("signIn", "/api/privacy/sign-in", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacySignInRequest,
+      success: PrivacySignInResult,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("profile", "/api/privacy/profile", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyProfileRequest,
+      success: PrivacyStatus,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("preference", "/api/privacy/preference", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyPreferenceRequest,
+      success: PrivacyStatus,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("account", "/api/privacy/account", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyAccountRequest,
+      success: PrivacyAccountResult,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("usageData", "/api/privacy/usage-data", {
+      headers: OptionalBearerHeaders,
+      success: UsageDataStatus,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("setUsageData", "/api/privacy/usage-data", {
+      headers: OptionalBearerHeaders,
+      payload: UsageDataRequest,
+      success: UsageDataStatus,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("activity", "/api/privacy/activity", {
+      headers: OptionalBearerHeaders,
+      success: PrivacyActivity,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("vault", "/api/privacy/vault", {
+      headers: OptionalBearerHeaders,
+      success: PrivacyVault,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("redactions", "/api/privacy/redactions", {
+      headers: OptionalBearerHeaders,
+      success: PrivacyRedactions,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("redactionFile", "/api/privacy/redactions/file", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyRedactionFileRequest,
+      success: PrivacyRedactionFile,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("clearRedactions", "/api/privacy/redactions/clear", {
+      headers: OptionalBearerHeaders,
+      success: PrivacyRedactions,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
@@ -1072,4 +1193,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentProjectsHttpApi)
   .add(EnvironmentVoiceHttpApi)
   .add(EnvironmentConnectHttpApi)
+  .add(EnvironmentPrivacyHttpApi)
   .add(EnvironmentWebhooksHttpApi) {}

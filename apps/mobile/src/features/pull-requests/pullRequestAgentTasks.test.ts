@@ -36,15 +36,15 @@ describe("PR agent tasks", () => {
     expect(pullRequestAgentThread([thread, archived], archived.id)).toBe(archived);
     const actions = pullRequestAgentThreadActions([settled, archived], "ask", true);
     expect(actions.map((action) => action.title)).toEqual([
-      "Start a new thread",
+      "Start a new chat",
       "Existing work",
-      "Settled threads",
+      "Settled chats",
     ]);
     expect(actions[2]?.subactions).toMatchObject([
-      { id: `ask:${settled.id}`, subtitle: "Settled thread" },
+      { id: `ask:${settled.id}`, subtitle: "Settled chat" },
     ]);
     expect(pullRequestAgentThreadActions([thread], "ask", false)).toMatchObject([
-      { id: `ask:${thread.id}`, subtitle: "Continue thread" },
+      { id: `ask:${thread.id}`, subtitle: "Continue chat" },
     ]);
     expect(
       pullRequestAgentThreadActions([settled], "feedback", false)[0]?.subactions,
@@ -77,12 +77,12 @@ describe("PR agent tasks", () => {
   });
   it("names the change request with its host's term", () => {
     expect(pullRequestAgentPrompt("conflicts", GITHUB)).toContain(
-      "Resolve this pull request's conflicts with its base branch. First confirm this thread is on the PR's branch; if it isn't, prepare the PR in its own worktree.",
+      "Resolve this pull request's conflicts with its base branch. First confirm this chat is on the PR's branch; if it isn't, prepare the PR in its own worktree.",
     );
     expect(
       pullRequestAgentPrompt("conflicts", sourceControlClients.get("gitlab").changeRequest),
     ).toContain(
-      "Resolve this merge request's conflicts with its base branch. First confirm this thread is on the MR's branch; if it isn't, prepare the MR in its own worktree.",
+      "Resolve this merge request's conflicts with its base branch. First confirm this chat is on the MR's branch; if it isn't, prepare the MR in its own worktree.",
     );
   });
 });

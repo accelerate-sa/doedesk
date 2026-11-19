@@ -28,7 +28,7 @@ export const ADD_TO_MACHINE_LABEL_CLASS =
 export const EnvMode = Schema.Literals(["local", "worktree"]);
 export type EnvMode = typeof EnvMode.Type;
 
-const GENERIC_LOCAL_ENVIRONMENT_LABELS = new Set(["local", "local environment"]);
+const GENERIC_LOCAL_ENVIRONMENT_LABELS = new Set(["local", "local computer"]);
 
 function normalizeDisplayLabel(value: string | null | undefined): string | null {
   const trimmed = value?.trim();

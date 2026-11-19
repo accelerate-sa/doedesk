@@ -123,7 +123,7 @@ function UpdateEverythingDialogContent({
     ),
   );
   const running = stopped + continuing;
-  const threads = `${running} running ${running === 1 ? "thread" : "threads"}`;
+  const threads = `${running} running ${running === 1 ? "chat" : "chats"}`;
   const restarting = new Set(restarts.map((machine) => machine.environmentId));
   const updating = rows.filter((row) => row.app !== null || row.providers.length > 0);
   const skipped = rows.filter((row) => row.skipped !== null);
@@ -137,7 +137,7 @@ function UpdateEverythingDialogContent({
         <AlertDialogDescription>
           {version !== null ? (
             <>
-              T3 Code <span className="font-mono text-xs">{version}</span>
+              DoeDesk <span className="font-mono text-xs">{version}</span>
             </>
           ) : null}
           {version !== null && providerCount > 0 ? " · " : null}
@@ -166,7 +166,7 @@ function UpdateEverythingDialogContent({
               className="col-span-full grid grid-cols-subgrid border-b pb-1.5 text-muted-foreground text-xs"
             >
               <span role="columnheader">Machine</span>
-              <span role="columnheader">T3 Code</span>
+              <span role="columnheader">DoeDesk</span>
               <span role="columnheader">Providers</span>
               <span role="columnheader" />
             </div>

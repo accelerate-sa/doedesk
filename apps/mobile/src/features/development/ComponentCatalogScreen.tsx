@@ -114,11 +114,11 @@ export function ComponentCatalogScreen() {
                     role="tab"
                   />
                 </View>
-                <ListRow icon="folder" label="Projects" detail="4" onPress={() => setSheet(true)} />
+                <ListRow icon="folder" label="Folders" detail="4" onPress={() => setSheet(true)} />
                 <ListToggleRow
                   icon="bell.badge"
                   label="Notifications"
-                  description="Updates from your active threads"
+                  description="Updates from your active chats"
                   value={enabled}
                   onValueChange={setEnabled}
                 />
@@ -262,7 +262,7 @@ export function ComponentCatalogScreen() {
             <Progress label="Connecting" />
             <View className="items-start">
               <FloatingActionButton
-                label="New thread"
+                label="New chat"
                 icon="plus"
                 variant="extended"
                 tone="primary"

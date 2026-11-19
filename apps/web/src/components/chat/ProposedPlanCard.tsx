@@ -102,7 +102,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
         stackedThreadToast({
           type: "error",
           title: "Workspace path is unavailable",
-          description: "This thread does not have a workspace path to save into.",
+          description: "This chat does not have a workspace path to save into.",
         }),
       );
       return;
@@ -196,6 +196,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
         >
           {showPreview ? (
             <ChatMarkdown
+              className="reading-prose"
               text={collapsedPreview ?? ""}
               cwd={cwd}
               environmentId={environmentId}
@@ -205,6 +206,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
             />
           ) : (
             <ChatMarkdown
+              className="reading-prose"
               text={displayedPlanMarkdown}
               cwd={cwd}
               environmentId={environmentId}

@@ -157,7 +157,7 @@ function SecretCheckButton(props: {
 
   if (!supported) return null;
   const description = !canCheck
-    ? "You cannot check secrets on this environment"
+    ? "You cannot check secrets on this computer"
     : state === undefined
       ? "Check that the secret resolves"
       : state.status === "checking"

@@ -38,13 +38,13 @@ function workspaceState(overrides: Partial<WorkspaceState> = {}): WorkspaceState
   };
 }
 
-const RETAINED_FAILURE = "Environment did not respond before the connection timeout.";
+const RETAINED_FAILURE = "Computer did not respond before the connection timeout.";
 const reconnecting = connectingEnvironment("reconnecting", RETAINED_FAILURE);
 
 describe("home empty state", () => {
   it.each([
     [
-      "waits while a saved environment retries after a retained failure",
+      "waits while a saved computer retries after a retained failure",
       workspaceState({
         hasLoadedShellSnapshot: false,
         hasPendingShellSnapshot: true,
@@ -55,20 +55,20 @@ describe("home empty state", () => {
         connectionError: RETAINED_FAILURE,
       }),
       1,
-      { title: "Connecting to environment", loading: true, showsAddEnvironment: false },
+      { title: "Connecting to computer", loading: true, showsAddEnvironment: false },
     ],
     [
-      "waits for a connected environment's first shell snapshot",
+      "waits for a connected computer's first shell snapshot",
       workspaceState({
         hasLoadedShellSnapshot: false,
         hasPendingShellSnapshot: true,
         hasSyncingConnectedEnvironment: true,
       }),
       0,
-      { title: "Loading threads", loading: true, showsAddEnvironment: false },
+      { title: "Loading chats", loading: true, showsAddEnvironment: false },
     ],
     [
-      "waits while another environment is still connecting after one loaded empty",
+      "waits while another computer is still connecting after one loaded empty",
       workspaceState({
         hasPendingShellSnapshot: true,
         hasConnectingEnvironment: true,
@@ -76,13 +76,13 @@ describe("home empty state", () => {
         connectionError: RETAINED_FAILURE,
       }),
       0,
-      { title: "Loading threads", loading: true, showsAddEnvironment: false },
+      { title: "Loading chats", loading: true, showsAddEnvironment: false },
     ],
     [
-      "reports no threads once every environment has resolved",
+      "reports no chats once every computer has resolved",
       workspaceState(),
       1,
-      { title: "No threads yet", loading: false, showsAddEnvironment: false },
+      { title: "No chats yet", loading: false, showsAddEnvironment: false },
     ],
     [
       "does not wait on retries while the device is offline",
@@ -95,7 +95,7 @@ describe("home empty state", () => {
         networkStatus: "offline",
       }),
       1,
-      { title: "No threads yet", loading: false, showsAddEnvironment: true },
+      { title: "No chats yet", loading: false, showsAddEnvironment: true },
     ],
   ] as const)("%s", (_name, state, projectCount, expected) => {
     const { title, loading, showsAddEnvironment } = deriveHomeEmptyState(state, projectCount);

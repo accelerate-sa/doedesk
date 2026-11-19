@@ -29,7 +29,7 @@ vi.mock(import("../../state/environments"), () => ({
 }));
 vi.mock(import("../ProjectFavicon"), () => ({
   ProjectFavicon: () => (
-    <span role="img" aria-label="Essays project icon">
+    <span role="img" aria-label="Essays folder icon">
       P
     </span>
   ),
@@ -49,7 +49,7 @@ function setup() {
   state.remote = {
     environmentId: EnvironmentId.make("remote"),
     id: ThreadId.make("older-thread"),
-    title: "Remote thread",
+    title: "Remote chat",
     projectId: ProjectId.make("essay-project"),
   };
   return { reply, registry: AtomRegistry.make() };
@@ -60,7 +60,7 @@ it.each([
   { legacy: true, encoded: false },
   { legacy: false, encoded: true },
 ])(
-  "resolves an unloaded thread with its icon and the correct destination, %j",
+  "resolves an unloaded chat with its icon and the correct destination, %j",
   async ({ legacy, encoded }) => {
     const { reply, registry } = setup();
     using _registry = { [Symbol.dispose]: () => registry.dispose() };
@@ -98,9 +98,9 @@ it.each([
         }),
       ),
     );
-    const link = screen.getByRole("link", { name: "Thread, Older essay" });
+    const link = screen.getByRole("link", { name: "Chat, Older essay" });
     await expect.element(link).toBeVisible();
-    await expect.element(screen.getByRole("img", { name: "Essays project icon" })).toBeVisible();
+    await expect.element(screen.getByRole("img", { name: "Essays folder icon" })).toBeVisible();
     await link.click();
     await vi.waitFor(() =>
       expect(screen.router?.state.location.pathname).toBe(
@@ -116,7 +116,7 @@ it.each([
           }),
         ),
       );
-      const decoded = screen.getByRole("link", { name: "Thread, Decoded essay" });
+      const decoded = screen.getByRole("link", { name: "Chat, Decoded essay" });
       await expect.element(decoded).toBeVisible();
       await decoded.click();
       await vi.waitFor(() =>
@@ -125,7 +125,7 @@ it.each([
     }
     await act(() => registry.set(reply, AsyncResult.success({})));
     if (legacy) {
-      const remote = screen.getByRole("link", { name: "Thread, Remote thread" });
+      const remote = screen.getByRole("link", { name: "Chat, Remote chat" });
       await expect.element(remote).toBeVisible();
       await remote.click();
       await vi.waitFor(() =>
@@ -133,7 +133,7 @@ it.each([
       );
     } else {
       await expect
-        .element(screen.getByText("Thread no longer available", { exact: true }))
+        .element(screen.getByText("Chat no longer available", { exact: true }))
         .toBeVisible();
     }
   },
@@ -151,8 +151,6 @@ it("names a thread on a machine this client has no connection to, without waitin
       />
     </RegistryContext>,
   );
-  await expect
-    .element(screen.getByText("Thread on another machine", { exact: true }))
-    .toBeVisible();
+  await expect.element(screen.getByText("Chat on another machine", { exact: true })).toBeVisible();
   await expect.element(screen.getByRole("link")).not.toBeInTheDocument();
 });

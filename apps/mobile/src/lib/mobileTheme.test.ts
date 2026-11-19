@@ -3,9 +3,7 @@ import {
   BUILT_IN_THEME_IDS,
   BUILT_IN_THEMES,
   T3_CHAT_THEME,
-  T3_CODE_LIGHT_THEME_COLORS,
-  T3_CODE_DARK_THEME_COLORS,
-  MOBILE_THEME_IDS,
+  DOEDESK_THEME,
   getThemeColorsForAppearance,
 } from "@t3tools/shared/themePalettes";
 import {
@@ -18,12 +16,16 @@ import {
   createMobileThemeSelectionPatch,
   createMobileThemeVariables,
   DEFAULT_MOBILE_THEME_ID,
+  MOBILE_THEME_IDS as ALL_MOBILE_THEME_IDS,
   flattenThemeColor,
   getMobileThemeVariables,
   resolveMobileThemeIds,
   themeColorWithAlpha,
   themeColorToNativeColor,
 } from "./mobileTheme";
+
+// Material You takes its colors from the phone, so it has no fixed palette to check.
+const MOBILE_THEME_IDS = ALL_MOBILE_THEME_IDS.filter((id) => id !== "material-you");
 
 function relativeLuminance(hex: string): number {
   const channels = hex
@@ -72,9 +74,7 @@ describe("mobile themes", () => {
       const theme = BUILT_IN_THEMES.find((candidate) => candidate.id === themeId);
       const colors = theme
         ? getThemeColorsForAppearance(theme, appearance)!
-        : appearance === "dark"
-          ? T3_CODE_DARK_THEME_COLORS
-          : T3_CODE_LIGHT_THEME_COLORS;
+        : getThemeColorsForAppearance(DOEDESK_THEME, appearance)!;
       const variables =
         themeId === DEFAULT_MOBILE_THEME_ID
           ? readDefaultMobileThemeVariables(appearance)

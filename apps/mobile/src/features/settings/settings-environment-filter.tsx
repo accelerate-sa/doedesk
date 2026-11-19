@@ -108,7 +108,7 @@ export function SettingsEnvironmentFilterProvider(props: {
 
 export function useSettingsEnvironmentFilter() {
   const selection = useContext(SettingsEnvironmentSelectionContext);
-  if (selection === null) throw new Error("Settings environment filter provider is missing.");
+  if (selection === null) throw new Error("Settings computer filter provider is missing.");
   const { selectedIds, selectedProjectKey, setSelectedIds, selectProject, getSelectedProjectKey } =
     selection;
   const { environments } = useEnvironments();

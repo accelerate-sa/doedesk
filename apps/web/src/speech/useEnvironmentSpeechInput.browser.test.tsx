@@ -309,7 +309,7 @@ it.each([
 });
 
 it.each([true, false])(
-  "sends audio with silence filtering %s only to the chosen environment",
+  "sends audio with silence filtering %s only to the chosen computer",
   async (speechSilenceFiltering) => {
     setup({ destination: "env-a" });
     mocks.settings = { speechSilenceFiltering };
@@ -333,22 +333,19 @@ it.each([
   ["is disconnected", () => mocks.connected.delete("env-a")],
   ["cannot operate", () => mocks.canDictate.delete("env-a")],
   ["does not support transcription", () => mocks.voiceCapable.delete("env-a")],
-])(
-  "does not fall back to another environment when the chosen one %s",
-  async (_, breakDestination) => {
-    setup({ destination: "env-a" });
-    breakDestination();
-    await using _screen = await render(<Probe />);
-    await act(() => mocks.voice.start());
-    expectNoAudioSent();
-    expect(mocks.voice.available).toBe(false);
-  },
-);
+])("does not fall back to another computer when the chosen one %s", async (_, breakDestination) => {
+  setup({ destination: "env-a" });
+  breakDestination();
+  await using _screen = await render(<Probe />);
+  await act(() => mocks.voice.start());
+  expectNoAudioSent();
+  expect(mocks.voice.available).toBe(false);
+});
 
 it.each([
   ["revoked", null],
-  ["moved to another environment", "env-b"],
-  ["renewed for the same environment", "env-a"],
+  ["moved to another computer", "env-b"],
+  ["renewed for the same computer", "env-a"],
 ])("abandons an in-progress recording when consent is %s", async (_, next) => {
   setup({ destination: "env-a" });
   await using screen = await render(<Probe />);
@@ -550,7 +547,7 @@ it.each([
     "reports a failed selection apart from the download",
     "installed",
     ["german"],
-    "The model downloaded, but this environment could not select it. Try again.",
+    "The model downloaded, but this computer could not select it. Try again.",
   ],
 ] as const)("%s", async (_, landedState, selected, error) => {
   setup({ destination: "env-a" });

@@ -23,7 +23,7 @@ import { useOrchestrationCommand } from "./use-orchestration-command";
 const first = EnvironmentId.make("primary");
 const second = EnvironmentId.make("secondary");
 type Target = { environmentId: EnvironmentId; input: { threadId: string } };
-const command: AtomCommand<Target, string, Error> = { label: "thread mutation", run: state.run };
+const command: AtomCommand<Target, string, Error> = { label: "chat mutation", run: state.run };
 const target = (environmentId: EnvironmentId): Target => ({
   environmentId,
   input: { threadId: "thread-1" },

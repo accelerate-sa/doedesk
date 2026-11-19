@@ -110,7 +110,7 @@ export function TunnelLimitAlert({
           ? "Switch to Tailscale or get more tunnels by linking your T3 Chat sub (sorry!)"
           : upgrade
             ? "Switch to Tailscale or get more tunnels by upgrading your T3 Chat sub (sorry!)"
-            : "Switch to Tailscale or deregister an environment you no longer use (sorry!)"}
+            : "Switch to Tailscale or deregister a computer you no longer use (sorry!)"}
       </AlertDescription>
       {action ? <AlertAction>{action}</AlertAction> : null}
     </Alert>

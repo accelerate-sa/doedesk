@@ -209,7 +209,7 @@ const readyClaude: ServerProvider = {
   slashCommands: [],
   skills: [],
 };
-const permissionMessage = "This connection cannot import projects or thread history.";
+const permissionMessage = "This connection cannot import folders or chat history.";
 
 function session(scopes: ReadonlyArray<AuthEnvironmentScope>): AuthSessionState {
   return {
@@ -379,7 +379,7 @@ it("rechecks after project creation and can retry its history without recreating
     return recordProject(input);
   });
   await using _screen = await mountWelcome();
-  await click("Import 2 projects and start");
+  await click("Import 2 folders and start");
   expect(state.createProject).toHaveBeenCalledOnce();
   await act(async () => {
     setGrant(primaryId, false);
@@ -393,7 +393,7 @@ it("rechecks after project creation and can retry its history without recreating
 
   await act(async () => setGrant(primaryId, true));
   // The first project now exists, so only the second counts as new.
-  await click("Import 1 project and start");
+  await click("Import 1 folder and start");
   expect(state.createProject).toHaveBeenCalledTimes(2);
   expect(state.importThreads).toHaveBeenCalledTimes(2);
   expect(state.onDone).toHaveBeenCalledOnce();
@@ -407,7 +407,7 @@ it("completes accepted imports when permission is revoked after the final server
     AsyncResult.success(await imported.promise),
   );
   await using _screen = await mountWelcome();
-  await click("Import 1 project and start");
+  await click("Import 1 folder and start");
   await act(async () => {
     setGrant(primaryId, false);
     imported.resolve({ importedCount: 1, skippedCount: 0 });
@@ -424,18 +424,18 @@ it("finishes setup without landing when the imported project never reaches the c
   appAtomRegistry.set(candidatesAtom(), [candidate("/projects/first")]);
   // The server accepts the project, but it never shows up in the client's projects.
   state.createProject.mockResolvedValue(AsyncResult.success(undefined));
-  state.waitForProject.mockRejectedValue(new Error("The project did not appear."));
+  state.waitForProject.mockRejectedValue(new Error("The folder did not appear."));
   state.completeOnboarding.mockRejectedValueOnce(new Error("offline"));
   await using _screen = await mountWelcome();
   using toastAdd = vi.spyOn(toastManager, "add");
 
-  await click("Import 1 project and start");
+  await click("Import 1 folder and start");
   await vi.waitFor(() => expect(state.completeOnboarding).toHaveBeenCalledOnce());
   // A failed completion hands the step back instead of leaving it importing.
-  await vi.waitFor(() => expect(button("Import 1 project and start").disabled).toBe(false));
+  await vi.waitFor(() => expect(button("Import 1 folder and start").disabled).toBe(false));
   expect(state.onDone).not.toHaveBeenCalled();
 
-  await click("Import 1 project and start");
+  await click("Import 1 folder and start");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
   expect(state.onDone).toHaveBeenCalledWith(undefined);
   // The retry skips the project it already imported, but still counts its thread.
@@ -450,7 +450,7 @@ it("waits for a ready agent to start, and Start without an agent still finishes 
   using _now = setup();
   appAtomRegistry.set(state.providers as Atom.Writable<ReadonlyArray<ServerProvider>>, []);
   await using _screen = await mountWelcome();
-  expect(button("Import 2 projects and start").disabled).toBe(true);
+  expect(button("Import 2 folders and start").disabled).toBe(true);
 
   await click("Start without an agent");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
@@ -472,7 +472,7 @@ it("blocks leaving the page until the imported projects have landed", async () =
     },
   );
   await using screen = await mountWelcome();
-  await click("Import 2 projects and start");
+  await click("Import 2 folders and start");
 
   // A blocked navigation never settles, so it is not awaited.
   const leave = () =>
@@ -522,7 +522,7 @@ it("gives projects a later scan finds the default, unless the main box was unche
   await click("Review all 2");
   await click("Select none");
   await findProject("/projects/third");
-  await vi.waitFor(() => expect(button("Import 1 project and start").disabled).toBe(false));
+  await vi.waitFor(() => expect(button("Import 1 folder and start").disabled).toBe(false));
 
   const importProjects = document.querySelector<HTMLElement>('[role="checkbox"]');
   await act(async () => importProjects?.click());
@@ -547,7 +547,7 @@ it("keeps the project choice across a visit to Settings until setup finishes", a
     expect(state.createProject).not.toHaveBeenCalled();
   }
   await using _third = await mountWelcome();
-  expect(button("Import 2 projects and start").disabled).toBe(false);
+  expect(button("Import 2 folders and start").disabled).toBe(false);
 });
 
 it("stays busy while setup saves after an import with nothing to open", async () => {
@@ -558,7 +558,7 @@ it("stays busy while setup saves after an import with nothing to open", async ()
   state.completeOnboarding.mockImplementationOnce(() => saved.promise);
   await using _screen = await mountWelcome();
 
-  await click("Import 1 project and start");
+  await click("Import 1 folder and start");
   await vi.waitFor(() => expect(state.completeOnboarding).toHaveBeenCalledOnce());
   expect(button("Importing…").disabled).toBe(true);
   await act(async () => {
@@ -569,7 +569,7 @@ it("stays busy while setup saves after an import with nothing to open", async ()
   expect(state.createProject).toHaveBeenCalledOnce();
 });
 
-it("leaves projects already in T3 Code out of the default import, unless the box is checked", async () => {
+it("leaves projects already in DoeDesk out of the default import, unless the box is checked", async () => {
   using _now = setup();
   const existing = ProjectId.make("existing");
   const justAdded = ProjectId.make("just-added");
@@ -585,16 +585,16 @@ it("leaves projects already in T3 Code out of the default import, unless the box
   ]);
   {
     await using _screen = await mountWelcome();
-    await vi.waitFor(() => expect(pageText()).toContain("Import 1 project and their threads"));
+    await vi.waitFor(() => expect(pageText()).toContain("Import 1 folder and their chats"));
   }
 
-  // With every project already in T3 Code, checking the box still picks them.
+  // With every project already in DoeDesk, checking the box still picks them.
   appAtomRegistry.set(candidatesAtom(), appAtomRegistry.get(candidatesAtom()).slice(0, 2));
   await using _screen = await mountWelcome();
   const importProjects = document.querySelector<HTMLElement>('[role="checkbox"]');
   await act(async () => importProjects?.click());
-  await vi.waitFor(() => expect(pageText()).toContain("Import 2 projects and their threads"));
-  expect(button("Import threads and start").disabled).toBe(false);
+  await vi.waitFor(() => expect(pageText()).toContain("Import 2 folders and their chats"));
+  expect(button("Import chats and start").disabled).toBe(false);
 });
 
 it("keeps the started projects checked when the page opens again after a quit", async () => {
@@ -605,17 +605,17 @@ it("keeps the started projects checked when the page opens again after a quit", 
   );
   {
     await using _first = await mountWelcome();
-    await click("Import 2 projects and start");
+    await click("Import 2 folders and start");
     await vi.waitFor(() => expect(state.importThreads).toHaveBeenCalledOnce());
   }
-  // The app quit during the first project's history; it now exists in T3 Code.
+  // The app quit during the first project's history; it now exists in DoeDesk.
   const [first] = appAtomRegistry.get(projectsAtom());
   appAtomRegistry.set(candidatesAtom(), [
     candidate("/projects/first", { alreadyImported: true, projectId: first!.id }),
     candidate("/projects/second"),
   ]);
   await using _second = await mountWelcome();
-  await vi.waitFor(() => expect(pageText()).toContain("Import 2 projects and their threads"));
+  await vi.waitFor(() => expect(pageText()).toContain("Import 2 folders and their chats"));
 });
 
 it("keeps the project controls when a later scan fails", async () => {
@@ -625,8 +625,8 @@ it("keeps the project controls when a later scan fails", async () => {
   await act(async () =>
     appAtomRegistry.set(candidatesAtom(), [...appAtomRegistry.get(candidatesAtom())]),
   );
-  await vi.waitFor(() => expect(pageText()).toContain("Could not check projects again."));
-  expect(button("Import 2 projects and start").disabled).toBe(false);
+  await vi.waitFor(() => expect(pageText()).toContain("Could not check folders again."));
+  expect(button("Import 2 folders and start").disabled).toBe(false);
   expect(button("Retry").disabled).toBe(false);
 });
 
@@ -662,7 +662,7 @@ it("offers Update for a signed-in agent whose version is broken, and keeps Start
     (element) => element.textContent?.trim() === "Update",
   );
   expect(update?.getAttribute("href")).toContain("/settings/providers");
-  expect(button("Import 2 projects and start").disabled).toBe(true);
+  expect(button("Import 2 folders and start").disabled).toBe(true);
 });
 
 it("checks an agent again once its install command finishes in the setup terminal", async () => {

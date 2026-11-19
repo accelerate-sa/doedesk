@@ -202,7 +202,7 @@ describe("resource monitor retry", () => {
   });
 
   it.each([false, true])(
-    "refreshes the changed history window only in the retry environment (switch environment: %s)",
+    "refreshes the changed history window only in the retry computer (switch computer: %s)",
     async (switchEnvironment) => {
       using fixture = setup({ holdRetry: true });
       const view = (selectedEnvironment: EnvironmentId) => (

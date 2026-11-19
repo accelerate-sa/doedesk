@@ -314,10 +314,10 @@ it("opens the thread actions menu for an older settled thread the shell leaves o
   });
   await expect.element(page.getByText("older-settled: question 0")).toBeVisible();
 
-  await page.getByRole("button", { name: `Thread actions for ${thread.title}` }).click();
+  await page.getByRole("button", { name: `Chat actions for ${thread.title}` }).click();
   // Without a bound the poll runs to the test deadline and reports a bare timeout.
   await expect
-    .element(page.getByRole("menuitem", { name: "Rename thread" }), { timeout: 5_000 })
+    .element(page.getByRole("menuitem", { name: "Rename chat" }), { timeout: 5_000 })
     .toBeVisible();
 });
 
@@ -472,7 +472,7 @@ it("Enter on an empty prompt resumes an interrupted thread", async () => {
     // AppRoot brings its own router.
     router: false,
   });
-  await expect.element(page.getByRole("button", { name: "Resume thread" })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "Resume chat" })).toBeVisible();
 
   await userEvent.click(page.getByTestId("composer-editor"));
   await userEvent.keyboard("{Enter}");

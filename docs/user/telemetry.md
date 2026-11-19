@@ -1,16 +1,29 @@
 # Product usage data
 
-The T3 Code server sends product usage events to T3 Code's own endpoint at `ingest.t3.codes`,
-associated with a hashed account or installation identifier. To count how many installations one person
-uses, the server also sends hashed account identifiers: your T3 Connect account, your OpenAI and
-Claude accounts when you are signed in, and a random identifier for each device that connects. The endpoint keeps a copy of each
-event and forwards events to PostHog. Events include the provider, model, reasoning effort,
-permission mode, turn and request results, duration, release channel, and token counts when
-available. Child-agent token counts are reported separately from the main agent's. Model names
-are sent only when they appear in a provider's public model list.
+Usage data tells DoeDesk which features are used. The DoeDesk server sends it to DoeDesk Cloud at
+`api.doedesk.com/ingest`; DoeDesk Cloud stores the events itself and does not forward them to an
+analytics company.
 
-Product events do not include prompts, responses, file contents, authentication tokens, conversation IDs,
-raw provider events, or child-agent output.
+Nothing is sent until you have seen the choice. Where the law requires your agreement first,
+DoeDesk asks at first run with an unticked box, and sends nothing unless you tick it. Elsewhere it
+tells you at first run that usage data is on and shows the switch. DoeDesk decides which applies
+from the country of your connection, your system's region and its time zone, and asks first
+whenever one of them points to a place that requires it or the country cannot be told.
+
+Each event carries a random installation identifier. DoeDesk makes it on your computer the first
+time usage data is on. It is not derived from your DoeDesk account, your AI provider account or
+your device, and turning usage data off discards it. **Settings > Privacy > Usage data** shows the
+identifier, so you can quote it in a privacy request.
+
+Events include the provider, model, reasoning effort, permission mode, turn and request results,
+duration, release channel, and token counts when available. Model names are sent only when they
+appear in a provider's public model list. Events do not include prompts, responses, file contents,
+names or other masked values, authentication tokens, conversation IDs, raw provider events,
+child-agent output, your phone number, your email address or your answers to the two questions.
+
+To stop sending them, turn off **Send usage data** in **Settings > Privacy**. The setting takes
+effect at once. Setting `T3CODE_TELEMETRY_ENABLED=false` in the server's environment, or a
+[managed policy](./managed-policy.md#other-capabilities), turns them off as well.
 
 ## Relay connection diagnostics
 

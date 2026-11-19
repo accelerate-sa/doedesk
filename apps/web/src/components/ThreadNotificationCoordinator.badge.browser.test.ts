@@ -111,7 +111,7 @@ class TestNotification extends EventTarget {
 
 const thread = {
   id: "thread",
-  title: "Test thread",
+  title: "Test chat",
   archivedAt: null as string | null,
   hasPendingApprovals: false,
   hasPendingUserInput: false,
@@ -289,7 +289,7 @@ it("presents completion notifications and sound as soon as the shell completes",
       latestTurn: { turnId: "turn", state: "completed", completedAt: "2026-09-13T07:00:01.000Z" },
     }),
   );
-  expect(TestNotification.sent.map((sent) => sent.title)).toEqual(["Thread completed"]);
+  expect(TestNotification.sent.map((sent) => sent.title)).toEqual(["Chat completed"]);
   expect(state.sound).toHaveBeenCalledWith("completion", expect.any(Function));
 });
 
@@ -327,31 +327,31 @@ it.each([false, true])(
       "one",
       watching("turn", "completed", "2026-09-13T07:00:01.000Z", false, monitor),
     );
-    expect(titles()).toEqual(["Thread completed"]);
+    expect(titles()).toEqual(["Chat completed"]);
 
     state.shells.set("one", watching("wake", "running", null, true, monitor));
     state.shells.set(
       "one",
       watching("wake", "completed", "2026-09-13T07:00:09.000Z", true, monitor),
     );
-    expect(titles()).toEqual(["Thread completed"]);
+    expect(titles()).toEqual(["Chat completed"]);
 
     // The adapter drains the roster before the final wake starts.
     state.shells.set("one", watching("wake", "completed", "2026-09-13T07:00:09.000Z", true, []));
-    expect(titles()).toEqual(["Thread completed"]);
+    expect(titles()).toEqual(["Chat completed"]);
     if (disconnect) {
       state.shells.set("one", {
         ...watching("wake", "completed", "2026-09-13T07:00:09.000Z", true, []),
         status: "cached",
       });
       vi.advanceTimersByTime(RELEASED_COMPLETION_GRACE_MS);
-      expect(titles()).toEqual(["Thread completed"]);
+      expect(titles()).toEqual(["Chat completed"]);
     }
 
     state.shells.set("one", watching("final", "running", null, false, []));
     vi.advanceTimersByTime(RELEASED_COMPLETION_GRACE_MS);
     state.shells.set("one", watching("final", "completed", "2026-09-13T07:00:11.000Z", false, []));
-    expect(titles()).toEqual(["Thread completed", "Thread completed"]);
+    expect(titles()).toEqual(["Chat completed", "Chat completed"]);
     expect(state.sound).toHaveBeenCalledTimes(2);
   },
 );
@@ -390,14 +390,14 @@ it.each(["hasPendingApprovals", "hasPendingUserInput"] as const)(
 
     expect(TestNotification.sent.map(({ title }) => title)).toEqual([
       "Approval needed",
-      "Thread completed",
+      "Chat completed",
       flag === "hasPendingApprovals" ? "Approval needed" : "Input needed",
     ]);
     state.shells.set("one", { ...shell(completed, asking, offline, done), status: "cached" });
     state.shells.set("one", shell(completed, asking, offline, done));
     expect(TestNotification.sent.map(({ title }) => title)).toEqual([
       "Approval needed",
-      "Thread completed",
+      "Chat completed",
       flag === "hasPendingApprovals" ? "Approval needed" : "Input needed",
     ]);
   },
@@ -413,9 +413,9 @@ it.each([false, true])(
     });
     state.shells.set("one", completed);
     state.shells.set("one", { ...completed, status: "cached" });
-    expect(TestNotification.sent.map(({ title }) => title)).toEqual(["Thread completed"]);
+    expect(TestNotification.sent.map(({ title }) => title)).toEqual(["Chat completed"]);
     state.shells.set("one", continued ? shell() : completed);
-    expect(TestNotification.sent.map(({ title }) => title)).toEqual(["Thread completed"]);
+    expect(TestNotification.sent.map(({ title }) => title)).toEqual(["Chat completed"]);
   },
 );
 

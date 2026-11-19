@@ -106,6 +106,7 @@ import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { observeResize } from "~/lib/observeResize";
 import { surfaceShortcutKey } from "~/lib/surfaceShortcutKey";
+import { useDeveloperMode } from "~/doedesk/product";
 
 export interface RightPanelTabsProps {
   mode: PreviewPanelMode;
@@ -174,13 +175,13 @@ function shouldOpenDefaultBrowserProfileFromMenuClick(pointerType: string | unde
 }
 
 const SURFACE_DISABLED_REASONS = {
-  browser: "Browser previews are only available in the T3 Code desktop app.",
-  terminal: "Terminal surfaces are only available from a project thread.",
-  files: "Files are only available when a project is open.",
-  diff: "Diff is only available for server threads in Git repositories.",
-  pullRequest: "This thread's branch has no pull request yet.",
-  pullRequests: "No linked pull requests are available for this thread.",
-  device: "Devices are only available from a thread.",
+  browser: "Browser previews are only available in the DoeDesk desktop app.",
+  terminal: "Terminal surfaces are only available from a folder chat.",
+  files: "Files are only available when a folder is open.",
+  diff: "Diff is only available for server chats in Git repositories.",
+  pullRequest: "This chat's branch has no pull request yet.",
+  pullRequests: "No linked pull requests are available for this chat.",
+  device: "Devices are only available from a chat.",
   sideChat: "Side chats start after the first message.",
 } as const;
 
@@ -200,12 +201,12 @@ const LAUNCHER_SHORTCUT_BLOCKING_LAYERS = [
 
 const SURFACE_UNAVAILABLE_HINTS = {
   browser: "Only available in the desktop app.",
-  terminal: "Available when a project is open.",
-  files: "Available when a project is open.",
+  terminal: "Available when a folder is open.",
+  files: "Available when a folder is open.",
   diff: "Available for Git repositories.",
   pullRequest: "No pull request on this branch yet.",
   pullRequests: "No linked pull requests available.",
-  device: "Available from a thread.",
+  device: "Available from a chat.",
   sideChat: "Available after the first message.",
 } as const;
 
@@ -261,6 +262,14 @@ type SurfaceShortcutEvent = Pick<
   "altKey" | "ctrlKey" | "defaultPrevented" | "isComposing" | "key" | "metaKey"
 > &
   Partial<Pick<KeyboardEvent, "code" | "getModifierState">>;
+
+/** Surfaces that only make sense for source code. Shown in Developer mode. */
+const DEVELOPER_SURFACE_LABELS: ReadonlySet<string> = new Set([
+  "Terminal",
+  "Pull request",
+  "Linked pull requests",
+  "Device",
+]);
 
 export function surfaceShortcutActionForKey<
   const Action extends { available: boolean; shortcut: string },
@@ -337,8 +346,9 @@ function RightPanelEmptyState(props: {
   sideChatDisabledReason: string | null;
 }) {
   const [highlight, setHighlight] = useState(-1);
+  const developerMode = useDeveloperMode();
 
-  const actions = [
+  const allActions = [
     {
       label: "Browser",
       icon: Globe2,
@@ -364,7 +374,7 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddFiles,
     },
     {
-      label: "Diff",
+      label: "Changes",
       icon: FileDiff,
       shortcut: "D",
       available: props.diffAvailable,
@@ -400,7 +410,7 @@ function RightPanelEmptyState(props: {
       ? [
           {
             label: "Side chat",
-            description: "Ask a side question while this thread keeps working.",
+            description: "Ask a side question while this chat keeps working.",
             icon: MessagesSquare,
             shortcut: "S",
             available: props.sideChatAvailable && !props.sideChatDisabledReason,
@@ -411,8 +421,12 @@ function RightPanelEmptyState(props: {
       : []),
   ] as const;
 
-  type SurfaceAction = (typeof actions)[number];
+  type SurfaceAction = (typeof allActions)[number];
 
+  // Programming surfaces are listed, even as unavailable, only in Developer mode.
+  const actions = developerMode
+    ? allActions
+    : allActions.filter((action) => !DEVELOPER_SURFACE_LABELS.has(action.label));
   const availableActions = actions.filter((action) => action.available);
   const highlightIndex =
     availableActions.length === 0 ? -1 : Math.min(highlight, availableActions.length - 1);
@@ -576,7 +590,7 @@ function surfaceTitle(
 ): string {
   switch (surface.kind) {
     case "diff":
-      return "Diff";
+      return "Changes";
     case "files":
       return "Files";
     case "file":
@@ -1092,7 +1106,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     });
   };
 
-  const addSurfaceActions = [
+  const developerMode = useDeveloperMode();
+  const allAddSurfaceActions = [
     {
       label: "Browser",
       icon: Globe2,
@@ -1118,7 +1133,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddFiles,
     },
     {
-      label: "Diff",
+      label: "Changes",
       icon: FileDiff,
       shortcut: "D",
       available: props.diffAvailable,
@@ -1162,6 +1177,9 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
         ]
       : []),
   ] as const;
+  const addSurfaceActions = developerMode
+    ? allAddSurfaceActions
+    : allAddSurfaceActions.filter((action) => !DEVELOPER_SURFACE_LABELS.has(action.label));
 
   const handleAddSurfaceMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const action = surfaceShortcutActionForKey(addSurfaceActions, event.nativeEvent);

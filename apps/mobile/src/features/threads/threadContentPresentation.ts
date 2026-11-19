@@ -22,8 +22,8 @@ export function projectThreadContentPresentation(input: {
   if (input.detailDeleted) {
     return {
       kind: "unavailable",
-      title: "Thread unavailable",
-      detail: "This thread was deleted or is no longer available.",
+      title: "Chat unavailable",
+      detail: "This chat was deleted or is no longer available.",
     };
   }
   if (input.detailError !== null) {
@@ -43,7 +43,7 @@ export function projectThreadContentPresentation(input: {
   return {
     kind: "unavailable",
     title: "Messages not cached",
-    detail: "Reconnect this environment to load the conversation.",
+    detail: "Reconnect this computer to load the conversation.",
   };
 }
 

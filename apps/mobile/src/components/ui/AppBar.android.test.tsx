@@ -52,7 +52,7 @@ it("renders a sheet bar without search outside a navigation container", () => {
   const root = createRoot(container);
   roots.push(root);
 
-  act(() => root.render(<AppBar sheet title="Arrange threads" />));
+  act(() => root.render(<AppBar sheet title="Arrange chats" />));
 
-  expect(container.textContent).toBe("Arrange threads");
+  expect(container.textContent).toBe("Arrange chats");
 });

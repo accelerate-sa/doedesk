@@ -159,6 +159,7 @@ export function makeReplayServerConfig(
       providerEventLogPath: path.join(providerLogsDir, "events.log"),
       terminalLogsDir,
       anonymousIdPath: path.join(stateDir, "anonymous-id"),
+      usageDataPath: path.join(stateDir, "usage-data.json"),
       environmentIdPath: path.join(stateDir, "environment-id"),
       serverRuntimeStatePath: path.join(stateDir, "server-runtime.json"),
       secretsDir: path.join(stateDir, "secrets"),

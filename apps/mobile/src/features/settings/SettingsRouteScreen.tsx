@@ -34,6 +34,7 @@ import { useSettingsEnvironmentFilter } from "./settings-environment-filter";
 import { filterSettingsSections } from "./settings-search";
 import { usePaneRole } from "../../components/ui/Pane";
 import { I18nProvider, useGT } from "../../i18n/I18nProvider";
+import { useDeveloperMode } from "../../doedesk/product";
 
 export function SettingsRouteScreen() {
   const list = useSettingsListPlacement();
@@ -238,6 +239,7 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
 }
 
 function useSettingsIndexSections(): SettingsListSection[] {
+  const developerMode = useDeveloperMode();
   const gt = useGT();
   const { selectedTargets, projectGroups, selectedProjectKey } = useSettingsEnvironmentFilter();
   const noServerTargets = selectedTargets.length === 0;
@@ -255,7 +257,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
           representative: scopedProjectMembers[0]!,
           members: scopedProjectMembers,
         })
-      : (selectedProject?.label ?? gt("Unavailable project"));
+      : (selectedProject?.label ?? gt("Unavailable folder"));
   const page = (
     target: SettingsPageTarget,
     icon: SettingsListRow["icon"],
@@ -264,6 +266,19 @@ function useSettingsIndexSections(): SettingsListSection[] {
   ): SettingsListRow => ({ id: target, icon, label, target, ...extra });
   const serverPage = (target: SettingsPageTarget, icon: SettingsListRow["icon"], label: string) =>
     page(target, icon, label, { disabled: noServerTargets });
+  const codeGroup = {
+    title: gt("Code"),
+    rows: [
+      page(
+        "SettingsProjectOverview",
+        "folder",
+        gt("Projects"),
+        selectedProjectKey !== null ? { value: projectLabel } : undefined,
+      ),
+      serverPage("SettingsEnvironmentSourceControl", "arrow.triangle.branch", gt("Source control")),
+      serverPage("SettingsWorktrees", "square.on.square", gt("Worktrees")),
+    ],
+  };
   // The same pages and groups as Settings on web, minus what mobile has no setting for.
   return [
     {
@@ -279,34 +294,19 @@ function useSettingsIndexSections(): SettingsListSection[] {
       ],
     },
     {
-      title: gt("Agents"),
+      title: gt("AI"),
       rows: [
-        serverPage("SettingsProviderAccounts", "person.crop.circle", gt("Providers")),
+        serverPage("SettingsProviderAccounts", "person.crop.circle", gt("AI accounts")),
         serverPage("SettingsThreads", "text.bubble", gt("Threads")),
         page("SettingsScheduledTasks", "clock", gt("Scheduled tasks")),
       ],
     },
-    {
-      title: gt("Code"),
-      rows: [
-        page(
-          "SettingsProjectOverview",
-          "folder",
-          gt("Projects"),
-          selectedProjectKey !== null ? { value: projectLabel } : undefined,
-        ),
-        serverPage(
-          "SettingsEnvironmentSourceControl",
-          "arrow.triangle.branch",
-          gt("Source control"),
-        ),
-        serverPage("SettingsWorktrees", "square.on.square", gt("Worktrees")),
-      ],
-    },
+    // Folders, source control and worktrees are settings for source code.
+    ...(developerMode ? [codeGroup] : []),
     {
       rows: [
         serverPage("SettingsEnvironmentMaintenance", "arrow.clockwise", gt("Maintenance")),
-        page("SettingsLabs", "flask", gt("Labs")),
+        ...(developerMode ? [page("SettingsLabs", "flask", gt("Labs"))] : []),
         page("SettingsAbout", "info.circle", gt("About")),
         page("SettingsArchive", "archivebox", gt("Archive")),
       ],

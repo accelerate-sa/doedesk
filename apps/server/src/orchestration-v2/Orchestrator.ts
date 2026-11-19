@@ -82,7 +82,7 @@ import {
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { modelSwitchSince } from "./modelSwitch.ts";
-import { isPlaceholderThreadTitle } from "./placeholderThreadTitle.ts";
+import { isNewThreadTitle, isPlaceholderThreadTitle } from "./placeholderThreadTitle.ts";
 import { combinePullRequestWatchWakes, type PullRequestWatchWake } from "./pullRequestWatch.ts";
 import { recordThreadOpen } from "@t3tools/shared/paletteSearch";
 import {
@@ -723,7 +723,7 @@ function pendingThreadTitleGenerationEffect(
   };
 }
 
-// Clients seed a new thread with its first message, and empty threads start as "New thread" or
+// Clients seed a new thread with its first message, and empty threads start as "New chat" or
 // an agent's placeholder. Any other title on a thread without messages was chosen on purpose.
 // Forks and side chats are titled from their source history instead.
 function hasTitleSetBeforeFirstMessage(
@@ -735,7 +735,7 @@ function hasTitleSetBeforeFirstMessage(
     thread.forkedFrom === null &&
     thread.lineage.sideChat !== true &&
     title.length > 0 &&
-    title !== "New thread" &&
+    !isNewThreadTitle(title) &&
     !isPlaceholderThreadTitle(title) &&
     title !== titleSeed?.trim()
   );
@@ -759,7 +759,7 @@ function delegatedTasksStopEffect(command: {
 
 const WORKSPACE_PREPARATION_INPUT = "Preparing workspace";
 const RUNTIME_REQUEST_DELIVERY_FAILED_MESSAGE =
-  "T3 Code could not confirm that your answer reached the agent. If the run stays stuck, stop it and try again.";
+  "DoeDesk could not confirm that your answer reached the agent. If the run stays stuck, stop it and try again.";
 
 function withoutPreparationResult(
   item: Extract<OrchestrationV2TurnItem, { readonly type: "command_execution" }>,

@@ -85,6 +85,7 @@ export const KiroDriver: ProviderDriver<KiroSettings, KiroDriverEnv> = {
     const processEnv = yield* mergeProviderInstanceEnvironment(
       environment,
       yield* HostProcess.Environment,
+      DRIVER_KIND,
     );
     const continuationIdentity = defaultProviderContinuationIdentity({
       driverKind: DRIVER_KIND,

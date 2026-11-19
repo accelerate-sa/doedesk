@@ -142,7 +142,7 @@ export function DesktopWebLinkCoordinator() {
     toastManager.add({
       type: "success",
       title: "Backend added",
-      description: "The environment is saved and will reconnect on app startup.",
+      description: "The computer is saved and will reconnect on app startup.",
     });
   };
 

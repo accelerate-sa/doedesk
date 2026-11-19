@@ -478,16 +478,16 @@ function ProjectDictionaryRow() {
       serverScoped
       settingKeys={["speechProjectCustomWords"]}
       {...searchableSetting("speech-project-dictionary")}
-      title={isProjectScope ? "Project dictionary" : "Shared dictionary"}
+      title={isProjectScope ? "Folder dictionary" : "Shared dictionary"}
       description={
         isProjectScope
           ? `Used by everyone who dictates in ${scope.scope.label}.`
-          : "Used by everyone who dictates on this environment."
+          : "Used by everyone who dictates on this computer."
       }
     >
       <div className="mt-3 pb-2">
         <DictionaryEditor
-          label={isProjectScope ? "project dictionary" : "shared dictionary"}
+          label={isProjectScope ? "folder dictionary" : "shared dictionary"}
           words={words}
           disabled={scope.connectedEnvironments.length === 0}
           onChange={(next) => updateScopedSettings({ speechProjectCustomWords: next })}
@@ -553,10 +553,10 @@ function CleanupModelRow() {
       settingKeys={["speechPostProcessingModelSelection"]}
       {...searchableSetting("speech-post-processing-model")}
       title="Cleanup model"
-      description="Model for transcript cleanup, such as a cheaper or faster one. When disabled, use the text generation model configured for this environment."
+      description="Model for transcript cleanup, such as a cheaper or faster one. When disabled, use the text generation model configured for this computer."
       control={
         connectedEnvironments.length === 0 ? (
-          <span className="text-sm text-muted-foreground">Connect an environment first.</span>
+          <span className="text-sm text-muted-foreground">Connect a computer first.</span>
         ) : (
           <div className="flex min-w-0 flex-wrap items-center gap-2 @min-[32rem]/settings-row:justify-end">
             {dedicated && (!hasProvider || !instanceEntry) ? (
@@ -759,7 +759,7 @@ function AdvancedSpeechSettings({
       <SettingsRow
         {...searchableSetting("speech-hardware")}
         title="Hardware"
-        description="Auto uses the environment’s GPU when it has one."
+        description="Auto uses the computer’s GPU when it has one."
         control={
           <Select
             value={supported.acceleration}
@@ -798,7 +798,7 @@ function AdvancedSpeechSettings({
       />
       <SettingsRow
         title="Unload model"
-        description="Release the model’s memory on the environment after it sits idle."
+        description="Release the model’s memory on the computer after it sits idle."
         control={
           <Select
             value={supported.modelUnloadTimeout}
@@ -891,7 +891,7 @@ function SpeechModelBrowser(props: {
       <SettingsRow
         {...searchableSetting("speech-models")}
         title="Models"
-        description={`This environment can’t transcribe audio: ${status.reason}.`}
+        description={`This computer can’t transcribe audio: ${status.reason}.`}
       />
     );
   return (
@@ -1066,7 +1066,7 @@ function SpeechModelBrowser(props: {
           <div className="w-full min-w-0 flex-1">
             <Input
               size="compact"
-              aria-label="Path to a model file or folder already on this environment"
+              aria-label="Path to a model file or folder already on this computer"
               placeholder="Already downloaded elsewhere? Paste the model file or folder path"
               value={existingPath}
               onChange={(e) => setExistingPath(e.target.value)}
@@ -1147,7 +1147,7 @@ function TranscriptionTest(props: {
               <span className="text-xs text-muted-foreground">
                 {speech.status?.supported === false
                   ? speech.status.reason
-                  : "Waiting for the environment to connect"}
+                  : "Waiting for the computer to connect"}
               </span>
             )}
           </div>
@@ -1426,12 +1426,12 @@ export function VoiceSettingsPanel() {
                         {destination.cloudProvider
                           ? CLOUD_SPEECH_LABELS[destination.cloudProvider]
                           : destination.environmentId
-                            ? (chosenEnvironment?.label ?? "Chosen environment (unavailable)")
+                            ? (chosenEnvironment?.label ?? "Chosen computer (unavailable)")
                             : "Off"}
                         {destination.cloudProvider && (
                           <span className="text-muted-foreground">
                             {" via "}
-                            {chosenEnvironment?.label ?? "unavailable environment"}
+                            {chosenEnvironment?.label ?? "unavailable computer"}
                           </span>
                         )}
                       </span>
@@ -1447,7 +1447,7 @@ export function VoiceSettingsPanel() {
                   </SelectItem>
                   {environmentChoices.length > 0 && (
                     <SelectGroup>
-                      <SelectGroupLabel>On an environment</SelectGroupLabel>
+                      <SelectGroupLabel>On a computer</SelectGroupLabel>
                       {environmentChoices.map(({ environment, value }) => (
                         <SelectItem key={value} value={value}>
                           <span className="flex items-center gap-2">
@@ -1479,9 +1479,7 @@ export function VoiceSettingsPanel() {
                   (!chosenEnvironment ||
                     (destination.cloudProvider &&
                       !cloudChoices.some((option) => option.value === destinationValue))) ? (
-                    <SelectItem value={destinationValue}>
-                      Chosen environment (unavailable)
-                    </SelectItem>
+                    <SelectItem value={destinationValue}>Chosen computer (unavailable)</SelectItem>
                   ) : null}
                 </SelectPopup>
               </Select>

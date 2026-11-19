@@ -20,7 +20,7 @@ import { ChildThreadApprovals } from "./ChildThreadApprovals";
 function setup() {
   state.respond.mockReset();
   state.respond
-    .mockResolvedValueOnce(AsyncResult.failure(Cause.fail(new Error("Child environment offline"))))
+    .mockResolvedValueOnce(AsyncResult.failure(Cause.fail(new Error("Child computer offline"))))
     .mockResolvedValueOnce(AsyncResult.success(undefined));
   const thread = {
     environmentId: EnvironmentId.make("child-env"),
@@ -46,7 +46,7 @@ it("shows a failed decision and clears the error when the user retries", async (
   const thread = setup();
   await using screen = await render(<ChildThreadApprovals threadRef={thread} />);
   await screen.getByRole("button", { name: "Approve", exact: true }).click();
-  await expect.element(screen.getByRole("alert")).toHaveTextContent("Child environment offline");
+  await expect.element(screen.getByRole("alert")).toHaveTextContent("Child computer offline");
   await screen.getByRole("button", { name: "Approve", exact: true }).click();
   await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
 });

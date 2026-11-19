@@ -61,7 +61,7 @@ export class PrimaryEnvironmentRequestError extends Schema.TaggedError<PrimaryEn
   }
 
   override get message(): string {
-    return `Primary environment request failed during ${this.operation} (HTTP ${this.status}).`;
+    return `Primary computer request failed during ${this.operation} (HTTP ${this.status}).`;
   }
 }
 

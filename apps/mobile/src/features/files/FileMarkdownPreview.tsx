@@ -1,3 +1,4 @@
+import { markdownProseDirection } from "@t3tools/shared/textDirection";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { resolveMobileMarkdownMediaSource } from "../../lib/markdownMediaSource";
@@ -9,7 +10,7 @@ import { ScrollView, View } from "react-native";
 import { RefreshControl } from "../../components/ui/RefreshControl";
 
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
-import { FONT_FAMILIES } from "../../lib/fontFamilies";
+import { READING_FONT_FAMILIES, readingTextStyle } from "../../lib/readingFonts";
 import { resolveNativeMarkdownTypography } from "../../lib/appearancePreferences";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import {
@@ -50,8 +51,6 @@ export function useMarkdownPreviewStyles(): MarkdownPreviewStyles {
   const codeBackground = theme["--color-md-code-bg"];
   const codeText = theme["--color-md-code-text"];
   const horizontalRule = theme["--color-md-hr"];
-  const regularFontFamily = FONT_FAMILIES.regular;
-  const boldFontFamily = FONT_FAMILIES.bold;
 
   return {
     nativeTextStyle: {
@@ -69,9 +68,7 @@ export function useMarkdownPreviewStyles(): MarkdownPreviewStyles {
       fontSize: nativeMarkdownTypography.fontSize,
       lineHeight: nativeMarkdownTypography.lineHeight,
       headingFontSizes: nativeMarkdownTypography.headingFontSizes,
-      fontFamily: regularFontFamily,
-      headingFontFamily: boldFontFamily,
-      boldFontFamily,
+      ...READING_FONT_FAMILIES,
     },
   };
 }
@@ -254,7 +251,10 @@ export function FileMarkdownPreview(props: {
           renderImage={renderImage}
           resolveImageSource={resolveImageSource}
           onImagePress={onImagePress}
-          textStyle={styles.nativeTextStyle}
+          textStyle={readingTextStyle(
+            styles.nativeTextStyle,
+            markdownProseDirection(props.markdown),
+          )}
         />
         <FilePreviewModal source={expandedFile} onRequestClose={() => setExpandedFile(null)} />
         <VideoPreviewModal source={expandedVideo} onRequestClose={() => setExpandedVideo(null)} />

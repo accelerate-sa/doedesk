@@ -76,14 +76,14 @@ describe("thread undo notice", () => {
     vi.mocked(cancelAnnouncement).mockClear();
     showThreadUndoNotice(options);
     expect(announce).toHaveBeenCalledExactlyOnceWith(
-      expect.stringMatching(/^Unpinned 1 thread, /),
+      expect.stringMatching(/^Unpinned 1 chat, /),
       "thread-undo-notice",
     );
     ThreadUndo.invalidate("pin", "env/other");
     expect(announce).toHaveBeenCalledOnce();
     showThreadUndoNotice({ ...options, claim: ThreadUndo.begin("pin", "env/second") });
     expect(announce).toHaveBeenLastCalledWith(
-      expect.stringMatching(/^Unpinned 2 threads, /),
+      expect.stringMatching(/^Unpinned 2 chats, /),
       "thread-undo-notice",
     );
     await notice().undo();
@@ -95,7 +95,7 @@ describe("thread undo notice", () => {
     showThreadUndoNotice(options);
     vi.mocked(announce).mockClear();
     await notice().undo();
-    expect(announce).toHaveBeenCalledExactlyOnceWith("Undid unpin of 1 thread");
+    expect(announce).toHaveBeenCalledExactlyOnceWith("Undid unpin of 1 chat");
   });
 
   it("does not announce an undo that failed", async () => {

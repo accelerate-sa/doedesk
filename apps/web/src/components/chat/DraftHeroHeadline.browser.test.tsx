@@ -73,7 +73,7 @@ it("the new-thread project picker follows the manual sidebar project order", asy
   // The shell snapshot has arrived once the sidebar lists the project.
   await expect.element(page.getByText("render", { exact: true }).first()).toBeVisible();
   const trigger = document.querySelector<HTMLElement>("[data-draft-project-trigger]");
-  if (!trigger) throw new Error("The draft project picker did not render.");
+  if (!trigger) throw new Error("The draft folder picker did not render.");
   await userEvent.click(page.elementLocator(trigger));
   await expect.element(page.getByRole("option", { name: "beta" })).toBeVisible();
 
@@ -88,7 +88,7 @@ it("the new-thread project picker follows the manual sidebar project order", asy
       expect.stringMatching(/render$/),
       expect.stringMatching(/beta$/),
       expect.stringMatching(/alpha$/),
-      "Add project",
+      "Add folder",
     ]);
   });
 });

@@ -42,7 +42,7 @@ describe("recordReviewTurnDiffAnswer", () => {
   it.effect("ignores ranges and whitespace-ignoring reads, which no review section shows", () =>
     Effect.gen(function* () {
       const registry = AtomRegistry.make();
-      yield* answer(registry, { fromTurnCount: 0, toTurnCount: 3, diff: "whole thread" });
+      yield* answer(registry, { fromTurnCount: 0, toTurnCount: 3, diff: "whole chat" });
       yield* answer(registry, { fromTurnCount: 1, toTurnCount: 2, diff: "no whitespace" }, true);
 
       expect(registry.get(lastReviewTurnDiffsAtom(environmentId, threadId))).toEqual({});

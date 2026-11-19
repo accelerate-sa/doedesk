@@ -283,7 +283,7 @@ describe("scoped settings writes", () => {
     const unsupported = [
       {
         label: server.label,
-        message: "This environment does not support this setting. Update T3 Code on it.",
+        message: "This computer does not support this setting. Update DoeDesk on it.",
       },
     ];
 
@@ -482,7 +482,7 @@ describe("scoped settings writes", () => {
       planScopedSettingsPatch(project, environments, { enableProviderUpdateChecks: false }),
     ).toMatchObject({
       serverWrites: [],
-      unavailableReason: "This setting is environment-wide and cannot be overridden by a project.",
+      unavailableReason: "This setting is environment-wide and cannot be overridden by a folder.",
     });
   });
 
@@ -497,8 +497,7 @@ describe("scoped settings writes", () => {
         clientPatch: {},
         hasClientWrite: false,
         serverWrites: [],
-        unavailableReason:
-          "This setting is environment-wide and cannot be overridden by a project.",
+        unavailableReason: "This setting is environment-wide and cannot be overridden by a folder.",
       });
       expect(
         planScopedSettingsPatch(

@@ -298,7 +298,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
         return null;
       if (!target)
         return Promise.reject(
-          new Error("The draft's environment is unavailable for transcript cleanup."),
+          new Error("The draft's computer is unavailable for transcript cleanup."),
         );
       return runEnvironmentSpeech(
         postProcessEnvironmentTranscript(
@@ -524,7 +524,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
           setSetup((current) => ({
             ...current,
             downloading: false,
-            error: "The model downloaded, but this environment could not select it. Try again.",
+            error: "The model downloaded, but this computer could not select it. Try again.",
           }));
           return;
         }
@@ -546,7 +546,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
       setSetup((current) => ({
         ...current,
         downloading: false,
-        error: "Could not download the model. Check this environment's connection and try again.",
+        error: "Could not download the model. Check this computer's connection and try again.",
       }));
     }
   });

@@ -52,6 +52,7 @@ import { previewEnvironment } from "../../state/preview";
 import { readEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
 import type { ChatShortcutCommands } from "./useChatShortcuts";
+import { isDeveloperMode } from "~/doedesk/product";
 const SCRIPT_TERMINAL_COLS = 120;
 const SCRIPT_TERMINAL_ROWS = 30;
 
@@ -106,7 +107,7 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
   const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
 
   const hasTerminalWriteAccess = () =>
-    readEnvironmentScope(environmentId, AuthTerminalOperateScope);
+    isDeveloperMode() && readEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const [lastInvokedScriptByProjectId, setLastInvokedScriptByProjectId] = useLocalStorage(
     LAST_INVOKED_SCRIPT_BY_PROJECT_KEY,
     {},
@@ -144,6 +145,8 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
   const toggleTerminalVisibility = () => {
     if (!activeThreadRef) return;
     const nextOpen = !terminalUiState.terminalOpen;
+    // Outside Developer mode the terminal can be closed but not opened.
+    if (nextOpen && !isDeveloperMode()) return;
     if (
       nextOpen &&
       !readEnvironmentScope(environmentId, AuthTerminalReadScope) &&
@@ -413,6 +416,7 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
   // A focused right-panel terminal takes the split/new/close chords; otherwise they act on the drawer.
   const shortcuts = {
     "terminal.toggle": () => {
+      if (!terminalUiState.terminalOpen && !isDeveloperMode()) return false;
       if (
         !terminalUiState.terminalOpen &&
         !readEnvironmentScope(environmentId, AuthTerminalReadScope) &&

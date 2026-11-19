@@ -78,7 +78,7 @@ export function PullRequestEditScreen({ route }: StaticScreenProps<PullRequestEd
       : !permissions.connected
         ? "Reconnect to save changes."
         : !canWrite
-          ? "This device isn't allowed to change source control on this environment."
+          ? "This device isn't allowed to change source control on this computer."
           : params.field === "comment"
             ? "You can't edit this comment."
             : `You can't edit this ${singular}.`;

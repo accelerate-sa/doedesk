@@ -34,9 +34,9 @@ function SidebarColumnHeader(
   });
   const items = createWorkspaceListHeaderItems({
     filter: {
-      accessibilityLabel: "Filter threads",
+      accessibilityLabel: "Filter chats",
       icon: workspaceListFilterIcon(props.filter.customized),
-      title: "Thread list options",
+      title: "Chat list options",
       items: props.filter.items,
     },
     onOpenSettings: props.onOpenSettings,

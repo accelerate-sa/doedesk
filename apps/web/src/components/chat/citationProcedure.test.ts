@@ -122,7 +122,7 @@ describe("citedThreadSnapshot", () => {
   });
 
   it("fails the citation when the thread could not load at all", async () => {
-    const snapshot = citedThreadSnapshot({ ...unloaded, error: "Thread not found." });
+    const snapshot = citedThreadSnapshot({ ...unloaded, error: "Chat not found." });
     expect(snapshot).not.toBeNull();
     await expect(scriptedHistory([snapshot]).run()).resolves.toMatchObject({
       _tag: "failed",

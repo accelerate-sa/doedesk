@@ -26,7 +26,7 @@ export function npmReleaseFailureMessage(cause: Cause.Cause<unknown>): string {
   const error = Option.getOrUndefined(Cause.findErrorOption(cause));
   return isServerNpmReleaseError(error)
     ? error.message
-    : "Could not check this environment's npm registry. Check the connection and registry settings.";
+    : "Could not check this computer's npm registry. Check the connection and registry settings.";
 }
 
 export const npmReleaseAtom = Atom.family((spec: string) =>

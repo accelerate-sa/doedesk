@@ -256,7 +256,7 @@ export function usePullRequestListFilters(props: {
       subactions: choices(
         "project",
         Object.fromEntries([
-          ["", "All projects"],
+          ["", "All folders"],
           ...projects.map((project) => [
             JSON.stringify([project.environmentId, project.id]),
             project.title,
@@ -284,7 +284,7 @@ export function usePullRequestListFilters(props: {
   const environmentActions = choices(
     "environment",
     Object.fromEntries([
-      ["", "All environments"],
+      ["", "All computers"],
       ...props.environments.map((environment) => [environment.id, environment.label]),
     ]),
     props.environmentId ?? "",
@@ -322,7 +322,7 @@ export function usePullRequestListFilters(props: {
     Platform.OS === "android"
       ? {
           actions: [
-            { id: "environment", title: "Environment", subactions: environmentActions },
+            { id: "environment", title: "Computer", subactions: environmentActions },
             { id: "state", title: "State", subactions: stateActions },
             { id: "involvement", title: "Involvement", subactions: involvementActions },
             { id: "labels", title: "Labels", subactions: labelActions },
@@ -343,7 +343,7 @@ export function usePullRequestListFilters(props: {
     environmentLabel:
       props.environments.length > 1
         ? (props.environments.find((environment) => environment.id === props.environmentId)
-            ?.label ?? "All environments")
+            ?.label ?? "All computers")
         : null,
     environmentActions,
     state: value.state,
@@ -389,7 +389,7 @@ export function PullRequestListFilters(props: {
       {props.filters.environmentLabel !== null ? (
         <ListFilterMenu
           label={props.filters.environmentLabel}
-          accessibilityLabel="Choose pull request environment"
+          accessibilityLabel="Choose pull request computer"
           actions={props.filters.environmentActions}
           onSelect={select}
         />

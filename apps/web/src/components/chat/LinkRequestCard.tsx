@@ -120,8 +120,8 @@ function PendingLinkRequest(props: {
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-sm font-medium text-foreground">
           {picksMachine(item)
-            ? "Link a machine to this environment"
-            : `Link ${target} to this environment`}
+            ? "Link a machine to this computer"
+            : `Link ${target} to this computer`}
         </p>
         {item.reason.trim() ? <p className="text-sm text-muted-foreground">{item.reason}</p> : null}
       </div>
@@ -297,7 +297,7 @@ function LinkRequestDialog(props: {
       <WizardPopup>
         <WizardHeader
           title={pickMachine ? "Link a machine" : `Link ${targetName}`}
-          description="Agents here can then launch, message and wait on threads there. Revoke it in that machine's Sharing & access."
+          description="Agents here can then launch, message and wait on chats there. Revoke it in that machine's Sharing & access."
         >
           {steps.length > 1 && !useExisting ? (
             <WizardSteps
@@ -392,8 +392,8 @@ function LinkRequestDialog(props: {
             )}
             {useExisting ? (
               <p className="text-xs text-muted-foreground">
-                This environment is already linked to {targetName}. The agent can use that link as
-                it is; change its access in Settings → Environments.
+                This computer is already linked to {targetName}. The agent can use that link as it
+                is; change its access in Settings → Computers.
               </p>
             ) : null}
             {error !== null ? (

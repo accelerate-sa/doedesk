@@ -42,11 +42,11 @@ export function DraftThreadHeader(props: {
     });
   };
   const requiresThread = () =>
-    Dialog.alert("Available after the first message", "This action needs a saved thread.");
+    Dialog.alert("Available after the first message", "This action needs a saved chat.");
   return (
     <ThreadHeader
       draft
-      title="New thread"
+      title="New chat"
       subtitle=""
       hasThreadCwd={props.cwd !== null}
       inspectorMode={null}

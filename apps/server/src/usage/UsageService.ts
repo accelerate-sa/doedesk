@@ -378,6 +378,7 @@ export const make = Effect.gen(function* () {
           environment: yield* mergeProviderInstanceEnvironment(
             instance.environment,
             hostEnvironment,
+            driver.driverKind,
           ),
           configured,
         };

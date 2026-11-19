@@ -172,6 +172,104 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
   --font-mono:
     ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  /* The brand serif: reading is long text (answers, documents), display is titles.
+     Each face is limited to its script, so one stack sets digits in Newsreader's
+     figures, Latin in Redaction and Arabic in a naskh. Thmanyah Serif is only in
+     official builds (vite/brandFonts.ts). */
+  --font-reading:
+    "DoeDesk Figures", "Redaction", "Thmanyah Serif Text", "Noto Naskh Arabic", "Iowan Old Style",
+    "Palatino Linotype", Georgia, serif;
+  --font-display:
+    "DoeDesk Figures", "Redaction", "Thmanyah Serif Display", "Noto Naskh Arabic",
+    "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+}
+
+/* Redaction's 1 reads as a lowercase l, and so does Thmanyah's, so the digits in
+   every serif line come from Newsreader (SIL Open Font License,
+   fonts/newsreader/OFL.txt). scripts/build-brand-fonts.py makes the file. The
+   overrides keep Redaction's baseline position, as for the naskh below. */
+@font-face {
+  font-family: "DoeDesk Figures";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/newsreader/newsreader-figures.woff2") format("woff2");
+  unicode-range: U+0030-0039;
+  ascent-override: 90%;
+  descent-override: 30%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "DoeDesk Figures";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/newsreader/newsreader-figures-italic.woff2") format("woff2");
+  unicode-range: U+0030-0039;
+  ascent-override: 90%;
+  descent-override: 30%;
+  line-gap-override: 0%;
+}
+
+/* Redaction (MCKL) and Noto Naskh Arabic, both under the SIL Open Font License:
+   fonts/redaction/LICENSE.txt and fonts/noto-naskh-arabic/OFL.txt. Redaction has
+   no bold italic. */
+@font-face {
+  font-family: "Redaction";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/redaction/redaction-latin-400-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Redaction";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/redaction/redaction-latin-400-italic.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Redaction";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/redaction/redaction-latin-700-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* The wordmark keeps the brand face whatever reading font the user picks. */
+.brand-wordmark {
+  font-family: "Redaction", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* The overrides give the naskh Redaction's baseline position, so a line with an
+   Arabic word in it is no taller than its neighbours. */
+@font-face {
+  font-family: "Noto Naskh Arabic";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/noto-naskh-arabic/NotoNaskhArabic.woff2") format("woff2");
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+FB50-FDFF,
+    U+FE70-FE74, U+FE76-FEFC;
+  size-adjust: 105%;
+  ascent-override: 110%;
+  descent-override: 50%;
+  line-gap-override: 0%;
 }
 
 @theme inline {
@@ -2164,6 +2262,74 @@ code {
 
 .chat-markdown strong {
   font-weight: 700;
+}
+
+/* Reading prose: the assistant's answers and documents opened for reading are
+   set in the brand serif. Tables, chips, code and controls inside them stay in
+   the interface faces. Redaction runs small, so the text is a step larger. */
+.chat-markdown.reading-prose {
+  font-family: var(--font-reading);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  font-variant-numeric: lining-nums;
+}
+
+.chat-markdown.reading-prose :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.chat-markdown.reading-prose :is(h1, h2) {
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.chat-markdown.reading-prose h1 {
+  font-size: 1.75rem;
+}
+
+.chat-markdown.reading-prose h2 {
+  font-size: 1.4375rem;
+}
+
+.chat-markdown.reading-prose h3 {
+  font-size: 1.1875rem;
+}
+
+.chat-markdown.reading-prose :is(h4, h5, h6) {
+  font-size: 1.0625rem;
+}
+
+.chat-markdown.reading-prose
+  :is(
+    table,
+    button,
+    summary,
+    .chat-markdown-file-link,
+    .chat-markdown-codeblock-header,
+    [data-slot="context-chip-label"],
+    [data-markdown-alert-label],
+    section[data-footnotes]
+  ) {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+}
+
+/* Arabic needs more room between lines than Latin, and no negative tracking:
+   it would pull joined letters apart. */
+.chat-markdown.reading-prose [dir="rtl"] {
+  line-height: 1.85;
+  letter-spacing: normal;
+}
+
+.chat-markdown.reading-prose :is(h1, h2, h3, h4, h5, h6)[dir="rtl"] {
+  line-height: 1.45;
+}
+
+.chat-markdown.reading-prose table[dir="rtl"],
+.chat-markdown.reading-prose [dir="rtl"] table {
+  line-height: 1.6;
 }
 
 .chat-markdown pre {

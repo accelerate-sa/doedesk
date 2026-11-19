@@ -372,20 +372,20 @@ export function PullRequestsScreen(
                   result.error
                     ? "Couldn't load pull requests"
                     : targets.length && connectedTargets.length === 0
-                      ? "Environment offline"
+                      ? "Computer offline"
                       : targets.length
                         ? query
                           ? "No results"
                           : "No matching pull requests"
-                        : "Connect an environment"
+                        : "Connect a computer"
                 }
                 detail={
                   result.error ??
                   (targets.length && connectedTargets.length === 0
                     ? "Reconnect to load pull requests that aren't saved on this device."
                     : targets.length
-                      ? "Pull requests from the selected environments' projects appear here."
-                      : "Add an environment in Settings to browse its pull requests.")
+                      ? "Pull requests from the selected computers' folders appear here."
+                      : "Add a computer in Settings to browse its pull requests.")
                 }
                 variant="plain"
               />

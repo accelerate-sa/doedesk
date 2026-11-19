@@ -35,7 +35,7 @@ vi.mock("~/state/projects", () => {
                     entries: [{ path: "README.md", kind: "file" }],
                     truncated: false,
                   })
-                : AsyncResult.failure(Cause.fail(new Error("Environment is reconnecting."))),
+                : AsyncResult.failure(Cause.fail(new Error("Computer is reconnecting."))),
             )
           : (() => {
               const key = JSON.stringify([mocks.generation, request]);
@@ -233,7 +233,7 @@ it("reads a folder that failed while unreachable again once a new session is up"
     // The hook probe does not navigate.
     { router: false },
   );
-  await expect.element(screen.getByText("Environment is reconnecting.")).toBeInTheDocument();
+  await expect.element(screen.getByText("Computer is reconnecting.")).toBeInTheDocument();
   await act(() => {
     appAtomRegistry.set(mocks.reachable, true);
     appAtomRegistry.set(mocks.connectedSession, 2);

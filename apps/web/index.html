@@ -52,6 +52,20 @@
         // Keep this small boot-time copy in sync with the built-in palettes so
         // the selected theme is visible before the app has mounted.
         const BUILT_IN_THEME_PALETTES = {
+          doedesk: {
+            light: {
+              background: "#f5f3ee",
+              foreground: "#171815",
+              accent: "#96531f",
+              chrome: "#f5f3ee",
+            },
+            dark: {
+              background: "#121311",
+              foreground: "#eceae3",
+              accent: "#e2a674",
+              chrome: "#121311",
+            },
+          },
           "t3-chat": {
             light: {
               background: "oklch(0.982446 0.010114 325.653)",
@@ -133,6 +147,7 @@
           "system",
           "light",
           "dark",
+          "doedesk",
           "t3-chat",
           "grove",
           "ocean",
@@ -219,7 +234,9 @@
         };
 
         try {
-          const storedTheme = window.localStorage.getItem("t3code:theme");
+          // With nothing chosen yet, DoeDesk's own theme is used and follows the system appearance.
+          const chosenTheme = window.localStorage.getItem("t3code:theme");
+          const storedTheme = chosenTheme ?? "doedesk";
           const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
           const LEGACY_THEME_IDS = {
             "t3-chat-dark": "t3-chat",
@@ -262,7 +279,7 @@
               ? "system"
               : storedFollowSystem === "false"
                 ? preferenceMode
-                : theme === "system"
+                : theme === "system" || chosenTheme === null
                   ? "system"
                   : preferenceMode;
           // A valid mix half for the wanted appearance takes over: it decides
@@ -681,13 +698,13 @@
       if (desktopDisplayName) document.title = desktopDisplayName;
     </script>
     <!-- vite.config.ts stamps the web build's channel into this title. -->
-    <title>T3 Code</title>
+    <title>DoeDesk</title>
   </head>
   <body>
     <div id="root">
       <div id="boot-shell">
-        <div id="boot-shell-card" aria-label="T3 Code splash screen">
-          <img id="boot-shell-logo" src="/apple-touch-icon.png" alt="T3 Code" />
+        <div id="boot-shell-card" aria-label="DoeDesk splash screen">
+          <img id="boot-shell-logo" src="/apple-touch-icon.png" alt="DoeDesk" />
         </div>
       </div>
     </div>

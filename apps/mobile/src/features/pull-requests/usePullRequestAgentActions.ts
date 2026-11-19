@@ -50,7 +50,7 @@ export function usePullRequestAgentActions(
         : items;
     return {
       id: task,
-      title: action?.title ?? "Open thread",
+      title: action?.title ?? "Open chat",
       image: action?.icon,
       attributes: { disabled: disabled || !links.canAsk || action?.disabled },
       ...(chooseThread ? { subactions } : {}),

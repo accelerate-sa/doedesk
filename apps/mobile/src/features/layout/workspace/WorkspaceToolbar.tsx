@@ -22,7 +22,7 @@ import { useFloatingWorkspaceTabs, useSidebarWorkspaceTabs } from "./useSystemWo
 import { WorkspaceTabToolbarButtons } from "./WorkspaceSectionToolbar";
 
 const SEARCH_LABELS = {
-  threads: "Search threads",
+  threads: "Search chats",
   pullRequests: "Search pull requests",
   settings: "Search settings",
 } as const;

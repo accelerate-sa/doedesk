@@ -376,8 +376,8 @@ export function SnapShotCoordinator() {
               "missing-project",
               stackedThreadToast({
                 type: "error",
-                title: "Snapshot taken, but no project is available",
-                description: "Add a project, then capture the window again.",
+                title: "Snapshot taken, but no folder is available",
+                description: "Add a folder, then capture the window again.",
               }),
             );
             continue;

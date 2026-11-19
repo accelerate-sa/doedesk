@@ -17,7 +17,7 @@ export function useSettingsEnvironmentMenu(): AppBarMenu {
     selectProject,
   } = useSettingsEnvironmentFilter();
   return {
-    title: "Filter settings environments and projects",
+    title: "Filter settings computers and folders",
     icon:
       selectedIds === null && selectedProjectKey === null
         ? "line.3.horizontal.decrease"
@@ -27,12 +27,12 @@ export function useSettingsEnvironmentMenu(): AppBarMenu {
         id: "environments",
         title:
           selectedIds === null
-            ? "All environments"
-            : `${selectedTargets.length} ${selectedTargets.length === 1 ? "environment" : "environments"}`,
+            ? "All computers"
+            : `${selectedTargets.length} ${selectedTargets.length === 1 ? "computer" : "computers"}`,
         items: [
           {
             id: "all",
-            title: "All connected environments",
+            title: "All connected computers",
             selected: selectedIds === null,
             onPress: selectAll,
           },
@@ -50,11 +50,11 @@ export function useSettingsEnvironmentMenu(): AppBarMenu {
         id: "projects",
         title:
           selectableProjectGroups.find((group) => group.key === selectedProjectKey)?.label ??
-          (selectedProjectKey === null ? "All projects" : "Unavailable project"),
+          (selectedProjectKey === null ? "All folders" : "Unavailable folder"),
         items: [
           {
             id: "project:all",
-            title: "All projects",
+            title: "All folders",
             selected: selectedProjectKey === null,
             onPress: () => selectProject(null),
           },

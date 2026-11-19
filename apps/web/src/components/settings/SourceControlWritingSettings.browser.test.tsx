@@ -73,13 +73,13 @@ async function setup() {
     {
       ...DEFAULT_UNIFIED_SETTINGS.sourceControlWritingStyle,
       mode: "custom",
-      customInstructions: "First environment instructions",
+      customInstructions: "First computer instructions",
       followChangeRequestTemplates: true,
     },
     {
       ...DEFAULT_UNIFIED_SETTINGS.sourceControlWritingStyle,
       mode: "custom",
-      customInstructions: "Second environment instructions",
+      customInstructions: "Second computer instructions",
       followChangeRequestTemplates: false,
     },
   ];

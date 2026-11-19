@@ -105,7 +105,7 @@ describe("threadRoutes", () => {
   });
 
   it.each([
-    { status: "cached", source: "server thread" },
+    { status: "cached", source: "server chat" },
     { status: "cached", source: "draft" },
   ] as const)(
     "keeps available $source visible while the shell is $status",
@@ -113,7 +113,7 @@ describe("threadRoutes", () => {
       expect(
         resolveThreadRouteRenderState({
           bootstrapComplete: isThreadRouteSnapshotAuthoritative(status),
-          serverThreadExists: source === "server thread",
+          serverThreadExists: source === "server chat",
           serverThreadDeleted: false,
           unlistedThreadDetail: EMPTY_ENVIRONMENT_THREAD_STATE,
           draftThreadExists: source === "draft",
@@ -189,7 +189,7 @@ describe("threadRoutes", () => {
   });
 
   it.each(["missing", "deleted", "archived"] as const)(
-    "redirects an unlisted thread only after detail confirms it is %s",
+    "redirects an unlisted chat only after detail confirms it is %s",
     (outcome) => {
       const route = {
         bootstrapComplete: isThreadRouteSnapshotAuthoritative("live"),

@@ -295,8 +295,8 @@ async function openScratchDraft(request: LinkedDraftRequest) {
   );
   if (environmentId === null) {
     Dialog.alert(
-      "Could not start without a project",
-      "No connected environment offers threads without a project.",
+      "Could not start without a folder",
+      "No connected computer offers chats without a folder.",
     );
     return;
   }
@@ -310,10 +310,10 @@ async function openScratchDraft(request: LinkedDraftRequest) {
     if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       Dialog.alert(
-        "Could not start without a project",
+        "Could not start without a folder",
         error instanceof Error
           ? error.message
-          : "The folder for threads without a project could not be created.",
+          : "The folder for chats without a folder could not be created.",
       );
     }
     return;
@@ -328,7 +328,7 @@ function cloneRepository(repository: PromptLinkRepository, request: LinkedDraftR
     appAtomRegistry.get(workspaceConnections.environmentsAtom)[0]?.environmentId ??
     null;
   if (environmentId === null) {
-    Dialog.alert("Could not clone", "Connect an environment first.");
+    Dialog.alert("Could not clone", "Connect a computer first.");
     return;
   }
   const prompt =
@@ -412,7 +412,7 @@ function resolveLink(linkSearch: string) {
   Dialog.alert(`You don't have ${promptLinkRepositoryName(repository)}`, undefined, [
     { text: "Cancel", style: "cancel" },
     ...(request.prompt
-      ? [{ text: "Use without project", onPress: () => void openScratchDraft(request) }]
+      ? [{ text: "Use without folder", onPress: () => void openScratchDraft(request) }]
       : []),
     { text: "Clone", onPress: () => cloneRepository(repository, request) },
   ]);

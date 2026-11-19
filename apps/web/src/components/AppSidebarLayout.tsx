@@ -121,7 +121,7 @@ function readInitialThreadSidebarWidth(): number {
       window.innerWidth,
     );
   } catch (error) {
-    console.error("Could not read persisted thread sidebar width.", error);
+    console.error("Could not read persisted chat sidebar width.", error);
     return resolveInitialThreadSidebarWidth(null, window.innerWidth);
   }
 }
@@ -439,7 +439,7 @@ export function AppSidebarLayout({
     try {
       removeLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY);
     } catch (error) {
-      console.error("Could not clear persisted thread sidebar width.", error);
+      console.error("Could not clear persisted chat sidebar width.", error);
     }
     setSidebarWidth(resolveInitialThreadSidebarWidth(null, viewportWidth));
   };
@@ -475,7 +475,7 @@ export function AppSidebarLayout({
               data-app-sidebar=""
               {...sidebarArea}
               role="navigation"
-              aria-label="Threads"
+              aria-label="Chats"
               resizable={{
                 maxWidth: sidebarMaximumWidth,
                 minWidth: sidebarMinimumWidth,

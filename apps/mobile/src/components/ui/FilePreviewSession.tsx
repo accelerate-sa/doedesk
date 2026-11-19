@@ -46,7 +46,7 @@ const isAssetNotFoundError = Schema.is(AssetWorkspaceAssetNotFoundError);
 
 function remotePreviewFailureMessage(error: unknown): string {
   if (!isAssetNotFoundError(error)) {
-    return "Reconnect to this environment and try again. The file may have been moved or deleted.";
+    return "Reconnect to this computer and try again. The file may have been moved or deleted.";
   }
   const path = error.checkedPath ?? ("path" in error.resource ? error.resource.path : undefined);
   return path ? `The file was not found at ${path}.` : error.message;
@@ -73,7 +73,7 @@ async function resolvePreviewUri(
   // Refresh expired URLs before handing them to Quick Look or ACTION_VIEW, which retain them.
   const url = await refreshAssetUrl(item.environmentId, item.resource, signal)
     .then((value) => {
-      if (!value) throw new Error("Reconnect to this environment and try again.");
+      if (!value) throw new Error("Reconnect to this computer and try again.");
       return value;
     })
     .catch((error: unknown) => {

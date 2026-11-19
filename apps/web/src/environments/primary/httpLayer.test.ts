@@ -52,10 +52,10 @@ describe("primary environment HTTP layer", { concurrent: false }, () => {
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: {
-        location: { origin: "t3code://app" },
+        location: { origin: "doedesk://app" },
         desktopBridge: {
           getLocalEnvironmentBootstrap: () => ({
-            label: "Local environment",
+            label: "Local computer",
             httpBaseUrl: "http://127.0.0.1:3773",
             wsBaseUrl: "ws://127.0.0.1:3773",
             bootstrapToken: "desktop-bootstrap-token",

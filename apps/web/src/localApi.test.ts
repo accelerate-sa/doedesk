@@ -69,6 +69,6 @@ describe("LocalApi", () => {
     requestConfirmDialogMock.mockReturnValue(undefined);
     const { createLocalApi } = await import("./localApi");
 
-    await expect(createLocalApi().dialogs.confirm("Delete this thread?")).resolves.toBe(false);
+    await expect(createLocalApi().dialogs.confirm("Delete this chat?")).resolves.toBe(false);
   });
 });

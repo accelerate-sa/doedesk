@@ -43,7 +43,7 @@ vi.mock("../../state/pull-requests", async () => {
       Effect.suspend(() => {
         if (target.environmentId === "offline")
           return Effect.fail(
-            new PullRequestListTestError({ message: "Environment is not connected." }),
+            new PullRequestListTestError({ message: "Computer is not connected." }),
           );
         if (target.input.cursors && mocks.failPage)
           return Effect.fail(new PullRequestListTestError({ message: "Page failed." }));
@@ -110,7 +110,7 @@ it("keeps a refresh failure in the source errors and allows healthy pagination",
   using probe = setup(["healthy", "offline"]);
   await act(async () => probe.latest.onRefresh());
   expect(probe.latest.data.errors.map((error) => error.message)).toEqual([
-    "Environment is not connected.",
+    "Computer is not connected.",
   ]);
   expect(probe.latest.refreshing).toBe(false);
   expect(probe.latest.loadMoreError).toBeNull();

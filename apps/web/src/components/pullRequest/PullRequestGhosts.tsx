@@ -143,7 +143,7 @@ export function PullRequestDetailGhost({
                 variant="ghost-muted"
                 className="-ml-1.5"
                 onClick={onBack}
-                aria-label="Back to this thread's pull requests"
+                aria-label="Back to this chat's pull requests"
               >
                 <ArrowLeftIcon aria-hidden className="size-3.5" />
               </Button>

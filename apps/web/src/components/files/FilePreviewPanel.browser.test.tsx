@@ -414,7 +414,7 @@ describe("rendered Markdown select all", () => {
     using _settings = setup();
     await using screen = await render(
       <>
-        <p>Transcript text from the chat thread.</p>
+        <p>Transcript text from the chat chat.</p>
         {markdownPreview(false, "- [ ] Task item\n\nRendered file body.\n")}
       </>,
     );
@@ -424,7 +424,7 @@ describe("rendered Markdown select all", () => {
       );
       const selection = window.getSelection()?.toString() ?? "";
       expect(selection).toContain("Rendered file body.");
-      expect(selection).not.toContain("Transcript text from the chat thread.");
+      expect(selection).not.toContain("Transcript text from the chat chat.");
     };
 
     await userEvent.click(screen.getByText("Rendered file body."));

@@ -26,7 +26,7 @@ describe("confirm dialog coordinator", () => {
   it("serializes concurrent confirmations", async () => {
     const unregister = mountHost();
     const first = requireConfirmation(
-      requestConfirmDialog("Delete the project?", { initialFocus: "confirm" }),
+      requestConfirmDialog("Delete the folder?", { initialFocus: "confirm" }),
     );
     const second = requireConfirmation(requestConfirmDialog("Delete the worktree too?"));
 
@@ -34,7 +34,7 @@ describe("confirm dialog coordinator", () => {
     await expect(first).resolves.toBe(false);
     expect(readConfirmDialogState()).toEqual({
       status: "closing",
-      message: "Delete the project?",
+      message: "Delete the folder?",
       variant: "default",
       initialFocus: "confirm",
     });
@@ -55,7 +55,7 @@ describe("confirm dialog coordinator", () => {
 
   it("cancels active and queued confirmations if the last host unmounts", async () => {
     const unregister = mountHost();
-    const active = requireConfirmation(requestConfirmDialog("Delete the thread?"));
+    const active = requireConfirmation(requestConfirmDialog("Delete the chat?"));
     const queued = requireConfirmation(requestConfirmDialog("Delete the worktree too?"));
 
     unregister();

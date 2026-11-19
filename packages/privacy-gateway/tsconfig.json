@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // This package is plain Node on purpose: it is a network proxy with no Effect runtime, so
+    // the rules that steer code toward Effect's platform services do not apply to it.
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "nodeBuiltinImport": "off",
+          "globalDate": "off",
+          "globalTimers": "off",
+          "extendsNativeError": "off"
+        }
+      }
+    ]
+  },
+  "include": ["src"]
+}

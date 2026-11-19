@@ -52,7 +52,7 @@ const ACCESS_CHOICES: ReadonlyArray<{
   {
     access: "read-only",
     label: "Read only",
-    description: "Read projects and threads. Cannot start, message or change anything.",
+    description: "Read folders and chats. Cannot start, message or change anything.",
   },
   ...RUNTIME_MODE_CHOICES.map((choice) => ({ ...choice, access: choice.mode })),
 ];
@@ -135,8 +135,8 @@ function PendingLinkRequest(props: {
       <View className="gap-1">
         <Text className="font-t3-bold text-base text-foreground">
           {picksMachine(item)
-            ? "Link a machine to this environment"
-            : `Link ${target} to this environment`}
+            ? "Link a machine to this computer"
+            : `Link ${target} to this computer`}
         </Text>
         {item.reason.trim() ? (
           <Text className="font-sans text-sm leading-5 text-foreground-muted">{item.reason}</Text>
@@ -299,7 +299,7 @@ function LinkRequestSheet(props: {
       >
         <View className="gap-1">
           <Text className="font-sans text-sm leading-5 text-foreground-muted">
-            Agents here can then launch, message and wait on threads there. It appears under
+            Agents here can then launch, message and wait on chats there. It appears under
             Authorized clients in that machine's Sharing & access, where it can be revoked.
           </Text>
           {item.url !== undefined && target.kind === "machine" ? (
@@ -374,8 +374,8 @@ function LinkRequestSheet(props: {
         ) : null}
         {useExisting ? (
           <Text className="font-sans text-sm leading-5 text-foreground-muted">
-            This environment is already linked to {targetName}. The agent can use that link as it
-            is; change its access in Settings → Environments.
+            This computer is already linked to {targetName}. The agent can use that link as it is;
+            change its access in Settings → Computers.
           </Text>
         ) : target.kind === "none" ? null : (
           <>
@@ -413,8 +413,8 @@ function LinkRequestSheet(props: {
               ))}
             </SettingsSection>
             <Text className="font-sans text-xs text-foreground-muted">
-              An agent here never gets more there than its own mode here either. Threads it starts
-              there cannot change that environment's own threads, projects or settings.
+              An agent here never gets more there than its own mode here either. Chats it starts
+              there cannot change that computer's own chats, folders or settings.
             </Text>
           </>
         )}

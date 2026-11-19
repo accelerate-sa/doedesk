@@ -22,7 +22,7 @@ class PreviewSessionThreadKeyParseError extends Schema.TaggedError<PreviewSessio
   { threadKey: Schema.String },
 ) {
   override get message(): string {
-    return `Invalid scoped preview thread key: ${this.threadKey}`;
+    return `Invalid scoped preview chat key: ${this.threadKey}`;
   }
 }
 

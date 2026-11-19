@@ -50,7 +50,7 @@ export function SettingsProviderAccountsRouteScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
         {selectedTargets.length === 0 ? (
-          <Text className="text-foreground-muted">Select a connected environment.</Text>
+          <Text className="text-foreground-muted">Select a connected computer.</Text>
         ) : (
           selectedTargets.map((environment) => (
             <SettingsSection key={environment.environmentId} title={environment.label}>
@@ -285,7 +285,7 @@ function ProviderAccount({
   function signOut() {
     Dialog.alert(
       "Sign out?",
-      `Running threads sharing this sign-in on ${environment.label} will stop. Thread history is kept.`,
+      `Running chats sharing this sign-in on ${environment.label} will stop. Chat history is kept.`,
       [
         { text: "Cancel", style: "cancel" },
         {

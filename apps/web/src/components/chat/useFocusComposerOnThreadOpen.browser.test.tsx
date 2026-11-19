@@ -19,7 +19,7 @@ function ThreadProbe(props: { threadId: string }) {
   return (
     <div ref={setRoot}>
       <div data-sidebar-row="thread:beta">
-        <input aria-label="Thread title" />
+        <input aria-label="Chat title" />
       </div>
       <textarea aria-label="Message" ref={composerRef} />
     </div>
@@ -37,7 +37,7 @@ it("keeps the sidebar rename input when a double-click opens another thread", as
   await act(() => vi.advanceTimersToNextFrame());
   await expect.element(screen.getByRole("textbox", { name: "Message" })).toHaveFocus();
 
-  const renameInput = screen.getByRole("textbox", { name: "Thread title" });
+  const renameInput = screen.getByRole("textbox", { name: "Chat title" });
   renameInput.element().focus();
   await screen.rerender(<ThreadProbe threadId="beta" />);
   await act(() => vi.advanceTimersToNextFrame());

@@ -401,7 +401,7 @@ it("takes a triage draft's session along when its machine changes", async () => 
 
 it.each([
   [
-    "a project is picked",
+    "a folder is picked",
     1,
     (flow: ReturnType<typeof useNewTaskFlow>, picked: EnvironmentProject) =>
       flow.setProject(picked),

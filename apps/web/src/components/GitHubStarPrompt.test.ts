@@ -17,6 +17,8 @@ const { add, update, openExternal, commands, starred, page } = vi.hoisted(() => 
 }));
 vi.mock("./ui/toast", () => ({ toastManager: { add, update, close: vi.fn() } }));
 vi.mock("../localApi", () => ({ readLocalApi: () => ({ shell: { openExternal } }) }));
+// The prompt is a developer feature; these tests cover it with Developer mode on.
+vi.mock("~/doedesk/product", () => ({ isDeveloperMode: () => true }));
 vi.mock("../rpc/atomRegistry", () => ({ appAtomRegistry: {} }));
 vi.mock("../state/sourceControl", () => ({ sourceControlEnvironment: commands }));
 vi.mock("@t3tools/client-runtime/state/runtime", () => ({

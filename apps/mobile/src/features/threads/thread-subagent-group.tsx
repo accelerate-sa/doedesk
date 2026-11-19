@@ -200,7 +200,7 @@ export function ThreadSubagentGroup(props: {
                 accessibilityRole={target === null ? undefined : "link"}
                 accessibilityHint={
                   target !== null
-                    ? "Opens this agent's thread"
+                    ? "Opens this agent's chat"
                     : agent.remoteChild !== undefined
                       ? `Runs on ${agent.remoteChild.label}`
                       : "Provider-managed agent"

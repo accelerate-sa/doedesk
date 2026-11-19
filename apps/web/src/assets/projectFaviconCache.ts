@@ -23,7 +23,7 @@ function openDatabase() {
     });
     request.addEventListener("success", () => resolve(request.result));
     request.addEventListener("error", () => reject(request.error));
-    request.addEventListener("blocked", () => reject(new Error("Project icon cache is blocked.")));
+    request.addEventListener("blocked", () => reject(new Error("Folder icon cache is blocked.")));
   }));
 }
 
@@ -64,7 +64,7 @@ async function downscaleProjectFavicon(
       const dataUrl = canvas.toDataURL("image/webp", 0.85);
       if (dataUrl.length <= PROJECT_FAVICON_MAX_DATA_URL_LENGTH) return dataUrl;
     }
-    throw new Error("Project icon thumbnail exceeds the cache limit.");
+    throw new Error("Folder icon thumbnail exceeds the cache limit.");
   } finally {
     bitmap.close();
   }

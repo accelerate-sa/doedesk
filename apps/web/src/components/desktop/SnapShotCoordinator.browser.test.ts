@@ -271,7 +271,7 @@ describe("durable snapshot delivery", () => {
 
 describe("snapshot destination ownership", () => {
   it.each(["unmount", "blur", "disabled animations"])(
-    "keeps the original environment and thread after %s",
+    "keeps the original computer and chat after %s",
     async (reason) => {
       using _env = setup();
       const original = scopeThreadRef(environmentId, ThreadId.make("original"));

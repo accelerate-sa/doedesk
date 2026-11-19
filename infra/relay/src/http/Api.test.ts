@@ -9,15 +9,14 @@ import * as RelayTokens from "../auth/RelayTokens.ts";
 import * as Devices from "../agentActivity/Devices.ts";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no generateKeyPairSync.
 import * as NodeCrypto from "node:crypto";
-import { createClerkClient, verifyToken } from "@clerk/backend";
 import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
-import { vi } from "vite-plus/test";
 import * as Context from "effect/Context";
 import * as NodeCryptoLayer from "@effect/platform-node/NodeCrypto";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -68,11 +67,6 @@ import * as AgentActivityPublisher from "../agentActivity/AgentActivityPublisher
 import * as EnvironmentPublishSignatures from "../environments/EnvironmentPublishSignatures.ts";
 import * as T3ChatAccounts from "../t3chat/T3ChatAccounts.ts";
 
-vi.mock("@clerk/backend", () => ({
-  createClerkClient: vi.fn(),
-  verifyToken: vi.fn(),
-}));
-
 const relaySettings: RelayConfiguration.RelayConfiguration["Service"] = {
   relayIssuer: "https://relay.example.test",
   apns: {
@@ -82,9 +76,7 @@ const relaySettings: RelayConfiguration.RelayConfiguration["Service"] = {
     bundleId: "com.example.t3",
     environment: "sandbox",
   },
-  clerkSecretKey: Redacted.make("clerk-secret-key"),
-  clerkPublishableKey: "pk_test_test",
-  clerkJwtAudience: "t3-code-relay",
+  accountTokens: { issuer: "https://api.doedesk.test", audience: "doedesk-relay" },
   apnsDeliveryJobSigningSecret: Redacted.make("apns-delivery-secret"),
   cloudMintPrivateKey: Redacted.make("cloud-mint-private-key"),
   cloudMintPublicKey: "cloud-mint-public-key",
@@ -386,58 +378,44 @@ describe("Cloudflare rate-limit retry hint", () => {
 });
 
 describe("relay client authentication", () => {
-  it.effect("preserves the existing Clerk session JWT path", () =>
+  it.effect("accepts a token the account service signed for this relay, and only that", () =>
     Effect.gen(function* () {
-      vi.mocked(verifyToken).mockResolvedValue({
+      const pair = yield* Effect.promise(() =>
+        crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]),
+      );
+      const publicKey = yield* Effect.promise(() => crypto.subtle.exportKey("jwk", pair.publicKey));
+      const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+      const now = yield* Clock.currentTimeMillis;
+      const sign = (claims: Record<string, unknown>) =>
+        Effect.promise(async () => {
+          const unsigned = `${encode({ alg: "ES256", kid: "k1" })}.${encode({
+            iss: "https://api.doedesk.test",
+            aud: "doedesk-relay",
+            sub: "user_session",
+            exp: Math.floor(now / 1000) + 300,
+            ...claims,
+          })}`;
+          const signature = await crypto.subtle.sign(
+            { name: "ECDSA", hash: "SHA-256" },
+            pair.privateKey,
+            new TextEncoder().encode(unsigned),
+          );
+          return `${unsigned}.${Buffer.from(signature).toString("base64url")}`;
+        });
+      const settings = {
+        ...relaySettings,
+        accountTokens: { ...relaySettings.accountTokens, keys: [{ ...publicKey, kid: "k1" }] },
+      };
+
+      expect(yield* verifyRelayClientBearerToken(settings, yield* sign({}))).toEqual({
         sub: "user_session",
-        aud: relaySettings.clerkJwtAudience,
-      } as never);
-
-      expect(yield* verifyRelayClientBearerToken(relaySettings, "session-token")).toEqual({
-        sub: "user_session",
-        mode: "clerk_session_bearer",
+        mode: "account_bearer",
       });
-      expect(verifyToken).toHaveBeenCalledWith("session-token", {
-        secretKey: "clerk-secret-key",
-        audience: relaySettings.clerkJwtAudience,
-      });
-      expect(createClerkClient).not.toHaveBeenCalled();
-    }).pipe(
-      Effect.ensuring(
-        Effect.sync(() => {
-          vi.mocked(verifyToken).mockReset();
-          vi.mocked(createClerkClient).mockReset();
-        }),
-      ),
-    ),
-  );
-
-  it.effect("falls back to Clerk OAuth token verification for the headless CLI", () =>
-    Effect.gen(function* () {
-      vi.mocked(verifyToken).mockRejectedValue(new Error("not a session JWT"));
-      vi.mocked(createClerkClient).mockReturnValue({
-        authenticateRequest: vi.fn().mockResolvedValue({
-          isAuthenticated: true,
-          toAuth: () => ({ userId: "user_oauth" }),
-        }),
-      } as never);
-
-      expect(yield* verifyRelayClientBearerToken(relaySettings, "oauth-token")).toEqual({
-        sub: "user_oauth",
-        mode: "clerk_oauth_bearer",
-      });
-      expect(createClerkClient).toHaveBeenCalledWith({
-        secretKey: "clerk-secret-key",
-        publishableKey: "pk_test_test",
-      });
-    }).pipe(
-      Effect.ensuring(
-        Effect.sync(() => {
-          vi.mocked(verifyToken).mockReset();
-          vi.mocked(createClerkClient).mockReset();
-        }),
-      ),
-    ),
+      const otherAudience = yield* Effect.flip(
+        verifyRelayClientBearerToken(settings, yield* sign({ aud: "another-service" })),
+      );
+      expect(otherAudience.reason).toBe("audience_mismatch");
+    }),
   );
 });
 

@@ -14,8 +14,8 @@ it("keeps keyboard focus on a sidebar row on window return, but not a clicked ro
     list.append(element);
     return element;
   };
-  const clicked = row("Clicked thread");
-  const tabbed = row("Tabbed thread");
+  const clicked = row("Clicked chat");
+  const tabbed = row("Tabbed chat");
   document.body.append(list);
   using _list = { [Symbol.dispose]: () => list.remove() };
 
@@ -45,7 +45,7 @@ it("refocuses the composer on window return from a clicked area after a bare key
   const controller = createWorkspaceFocusController(document);
   const root = document.createElement("div");
   root.innerHTML =
-    '<nav data-workspace-area="sidebar" data-workspace-order="0" tabindex="-1"><button>Thread</button></nav>' +
+    '<nav data-workspace-area="sidebar" data-workspace-order="0" tabindex="-1"><button>Chat</button></nav>' +
     '<section data-workspace-area="conversation" data-workspace-order="1" tabindex="-1" style="height: 200px"></section>';
   document.body.append(root);
   using _root = {

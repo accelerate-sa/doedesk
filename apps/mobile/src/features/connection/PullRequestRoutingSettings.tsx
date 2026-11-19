@@ -21,17 +21,16 @@ const options: ReadonlyArray<{
   label: string;
   description: string;
 }> = [
-  { value: "off", label: "Off", description: "Keep source control requests on this environment." },
+  { value: "off", label: "Off", description: "Keep source control requests on this computer." },
   {
     value: "read",
     label: "Read PRs",
-    description: "Share PR data with other enabled environments.",
+    description: "Share PR data with other enabled computers.",
   },
   {
     value: "read-write",
     label: "Read and act",
-    description:
-      "Actions may use broader source control permissions than the original environment.",
+    description: "Actions may use broader source control permissions than the original computer.",
   },
 ];
 
@@ -104,8 +103,8 @@ export function PullRequestRoutingSettings() {
         })}
       </SettingsSection>
       <Text className="px-2 text-sm text-foreground-muted">
-        Choose environments you trust to share PR data and use each other's source control access.
-        Enable both environments. This applies only to this client.
+        Choose computers you trust to share PR data and use each other's source control access.
+        Enable both computers. This applies only to this client.
       </Text>
     </View>
   );

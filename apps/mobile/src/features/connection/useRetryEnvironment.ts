@@ -6,8 +6,8 @@ import { useAtomCommand } from "../../state/use-atom-command";
 
 export function useRetryEnvironment() {
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
-  const retryNow = useAtomCommand(environmentCatalog.retryNow, "environment retry");
-  const setEnabled = useAtomCommand(environmentCatalog.setEnabled, "environment toggle");
+  const retryNow = useAtomCommand(environmentCatalog.retryNow, "computer retry");
+  const setEnabled = useAtomCommand(environmentCatalog.setEnabled, "computer toggle");
 
   return (environmentId: EnvironmentId) =>
     // A retry does nothing while the environment is switched off.

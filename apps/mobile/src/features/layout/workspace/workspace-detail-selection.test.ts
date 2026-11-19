@@ -81,9 +81,9 @@ describe("selectWorkspaceDetail", () => {
   });
 
   it.each([
-    ["a page drilled into from the thread", (state: State) => push(state, "ThreadFiles")],
-    ["a linked thread", (state: State) => push(state, "Thread", threadB.params)],
-    ["a pull request opened from the thread", (state: State) => push(state, "PullRequest")],
+    ["a page drilled into from the chat", (state: State) => push(state, "ThreadFiles")],
+    ["a linked chat", (state: State) => push(state, "Thread", threadB.params)],
+    ["a pull request opened from the chat", (state: State) => push(state, "PullRequest")],
     ["a sheet", (state: State) => push(state, "GitOverview")],
   ])("leaves only the selection when %s is on top", (_, drillIn) => {
     const thread = select(home(), threadA);

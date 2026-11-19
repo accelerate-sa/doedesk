@@ -81,7 +81,7 @@ it.effect(
       const release = npmReleaseAtom("nightly");
       NodeAssert.ok(
         Atom.isWritable<EnvironmentId | null, EnvironmentId | null>(primaryEnvironmentIdAtom),
-        "Expected the mocked primary environment atom to be writable.",
+        "Expected the mocked primary computer atom to be writable.",
       );
       registry.set(primaryEnvironmentIdAtom, first);
       const unmount = registry.mount(release);
@@ -140,7 +140,7 @@ it.effect("does not call an unsupported RPC or fetch public npm for an older pri
     const registry = AtomRegistry.make();
     NodeAssert.ok(
       Atom.isWritable<EnvironmentId | null, EnvironmentId | null>(primaryEnvironmentIdAtom),
-      "Expected the mocked primary environment atom to be writable.",
+      "Expected the mocked primary computer atom to be writable.",
     );
     registry.set(primaryEnvironmentIdAtom, first);
     const release = npmReleaseAtom("latest");

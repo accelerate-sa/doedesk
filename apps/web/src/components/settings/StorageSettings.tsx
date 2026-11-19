@@ -310,7 +310,7 @@ function CleanupResults({
                   <span className="text-foreground/80">{environmentLabel}</span>
                   {entry.projectPath && (
                     <>
-                      <span>Project</span>
+                      <span>Folder</span>
                       <code className="text-foreground/80">{entry.projectPath}</code>
                     </>
                   )}
@@ -322,7 +322,7 @@ function CleanupResults({
                   )}
                   {entry.threadTitle && (
                     <>
-                      <span>Thread</span>
+                      <span>Chat</span>
                       <span>{entry.threadTitle}</span>
                     </>
                   )}
@@ -540,7 +540,7 @@ function StorageCleanupScopeNotice() {
         )
         .map((environment) => environment.environmentId)}
     >
-      Update the selected environments to use storage cleanup, or choose a machine that supports it.
+      Update the selected computers to use storage cleanup, or choose a machine that supports it.
     </SettingsScopeNotice>
   );
 }
@@ -590,7 +590,7 @@ export function WorktreeCleanupSection() {
     return (
       <SettingsSection id="storage-worktrees" title="Cleanup" variant="plain">
         <SettingsScopeNotice inline target="all">
-          Update the selected machines to configure project worktree cleanup.
+          Update the selected machines to configure folder worktree cleanup.
         </SettingsScopeNotice>
       </SettingsSection>
     );
@@ -611,9 +611,9 @@ export function WorktreeCleanupSection() {
             title="Automatic worktree cleanup"
             description={
               mode === "off"
-                ? "Keep this project's worktrees until you delete them manually."
+                ? "Keep this folder's worktrees until you delete them manually."
                 : mode === "custom"
-                  ? "Use these rules for this project."
+                  ? "Use these rules for this folder."
                   : "Use each machine's worktree cleanup settings."
             }
             serverScoped
@@ -652,14 +652,14 @@ export function WorktreeCleanupSection() {
         {(!isProjectScope || (!mixedModes && mode === "custom")) && (
           <>
             <SettingsRow
-              title="Delete worktrees with deleted threads"
+              title="Delete worktrees with deleted chats"
               status={ruleStatus("worktreeOnDelete")}
               managedPaths={lockablePath("worktreeOnDelete")}
-              description="Remove unused worktrees when active or archived threads are deleted. Worktrees with local changes are kept."
+              description="Remove unused worktrees when active or archived chats are deleted. Worktrees with local changes are kept."
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete worktrees with deleted threads"
+                  aria-label="Delete worktrees with deleted chats"
                   checked={settings.worktreeOnDelete}
                   onCheckedChange={(worktreeOnDelete) => updateWorktree({ worktreeOnDelete })}
                 />
@@ -683,7 +683,7 @@ export function WorktreeCleanupSection() {
               title="Delete inactive worktrees"
               status={ruleStatus("worktreeAfterDays")}
               managedPaths={lockablePath("worktreeAfterDays")}
-              description="Remove worktrees after their threads have been inactive for this many days. Branches and thread history are kept."
+              description="Remove worktrees after their chats have been inactive for this many days. Branches and chat history are kept."
               serverScoped={!isProjectScope}
               control={
                 <RetentionControl
@@ -716,7 +716,7 @@ export function WorktreeCleanupSection() {
                     ]
                       .filter(Boolean)
                       .join(". ")}
-                    description="Remove worktrees this many days after their thread settles. Set 0 days to remove them at the next cleanup. Branches and thread history are kept."
+                    description="Remove worktrees this many days after their chat settles. Set 0 days to remove them at the next cleanup. Branches and chat history are kept."
                     serverScoped={!isProjectScope}
                     control={
                       <RetentionControl

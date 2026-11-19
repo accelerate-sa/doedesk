@@ -45,7 +45,7 @@ function connectTransport(
         kind: "error",
         message: isUnavailable(result.failure)
           ? result.failure.message
-          : "Could not reach this environment. Try again.",
+          : "Could not reach this computer. Try again.",
       };
     }
     onEnvironment({
@@ -152,7 +152,7 @@ export function ApproveAgentSurface() {
     return (
       <Message
         title="Sign in to approve"
-        description="Sign in to T3 Connect with the account this environment is linked to."
+        description="Sign in to T3 Connect with the account this computer is linked to."
       >
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>

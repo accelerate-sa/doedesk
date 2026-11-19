@@ -6,7 +6,7 @@ import {
 } from "./contextMenuFallback";
 
 const items = [
-  { id: "heading", label: "Thread actions", header: true },
+  { id: "heading", label: "Chat actions", header: true },
   { id: "disabled", label: "Unavailable", disabled: true },
   { id: "rename", label: "Rename" },
   { id: "pin", label: "Pinned", checked: true, separatorBefore: true },
@@ -23,7 +23,7 @@ const items = [
 
 function setup() {
   const origin = document.createElement("button");
-  origin.textContent = "Selected thread";
+  origin.textContent = "Selected chat";
   document.body.append(origin);
   origin.focus();
   return {

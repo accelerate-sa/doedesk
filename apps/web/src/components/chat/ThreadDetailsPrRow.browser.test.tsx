@@ -288,19 +288,19 @@ const repositoryClone = {
 
 it.each([
   {
-    name: "the project holding its repository, not the No project thread's",
+    name: "the folder holding its repository, not the No folder chat's",
     thread: scratchProject,
     repository: "owner/repo",
     expected: "rebase",
   },
   {
-    name: "the thread's own project when it holds the repository too",
+    name: "the chat's own folder when it holds the repository too",
     thread: repositoryClone,
     repository: "owner/repo",
     expected: "merge",
   },
   {
-    name: "the thread's project when no project holds the repository",
+    name: "the chat's folder when no folder holds the repository",
     thread: scratchProject,
     repository: "owner/other",
     expected: "squash",

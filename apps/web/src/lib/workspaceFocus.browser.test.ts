@@ -184,7 +184,7 @@ describe("workspace area focus", () => {
     const spacer = document.createElement("div");
     spacer.style.height = "400px";
     const row = document.createElement("button");
-    row.textContent = "Last thread";
+    row.textContent = "Last chat";
     list.append(spacer, row);
     sidebar.element.append(list);
     const composer = fixture.area("composer", 2);

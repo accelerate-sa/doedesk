@@ -921,8 +921,8 @@ describe("buildThreadFeed", () => {
         ),
       ]).flatMap((entry) => (entry.type === "activity-group" ? entry.activities : []))[0]!;
 
-      expect(workEntryRowLabel(activity.workEntry)).toBe(title ?? "Thread forked");
-      expect(workEntryRowLabel(activity.workEntry, true)).toBe(title ?? "Thread forked");
+      expect(workEntryRowLabel(activity.workEntry)).toBe(title ?? "Chat forked");
+      expect(workEntryRowLabel(activity.workEntry, true)).toBe(title ?? "Chat forked");
       expect(activity.canExpand).toBe(true);
       expect(activity.getFullDetail()).toContain(threadId);
     },

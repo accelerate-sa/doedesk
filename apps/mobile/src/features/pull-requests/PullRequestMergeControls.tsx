@@ -74,7 +74,7 @@ export function PullRequestMergeControls(props: {
       : mergeUnavailableReason(pr, permissions.canWrite, terminology)) ??
     (stack.stack
       ? !stack.supportsStackActions
-        ? "This environment can display stacks but cannot merge them."
+        ? "This computer can display stacks but cannot merge them."
         : !stack.isFresh
           ? "Refresh the stack before merging."
           : scope?.reason

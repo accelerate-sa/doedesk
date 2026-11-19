@@ -34,8 +34,8 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
       type: "error",
       title:
         results.length === 1
-          ? "Failed to regenerate thread title"
-          : `Failed to regenerate ${failures.length} of ${results.length} thread titles`,
+          ? "Failed to regenerate chat title"
+          : `Failed to regenerate ${failures.length} of ${results.length} chat titles`,
       description: failures[0],
     });
   }
@@ -45,7 +45,7 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
     return stackedThreadToast({
       type: "info",
       title: "Title kept",
-      description: "The current title already fits this thread.",
+      description: "The current title already fits this chat.",
     });
   }
   return stackedThreadToast({
@@ -53,7 +53,7 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
     title: kept === results.length ? "Titles kept" : `Kept ${kept} of ${results.length} titles`,
     description:
       kept === results.length
-        ? "The current titles already fit these threads."
-        : "Those titles already fit their threads.",
+        ? "The current titles already fit these chats."
+        : "Those titles already fit their chats.",
   });
 }

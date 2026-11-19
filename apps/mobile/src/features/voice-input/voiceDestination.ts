@@ -156,7 +156,7 @@ function environmentTranscriber(
         throw new VoiceTranscriptionError({
           code: "unavailable",
           message:
-            "Install a transcription model for this environment in Settings → Voice, then try again.",
+            "Install a transcription model for this computer in Settings → Voice, then try again.",
         });
       return status.languages
         ? effectiveSpeechLanguage(
@@ -172,7 +172,7 @@ function environmentTranscriber(
       if (!native?.decodeRecording)
         throw new VoiceTranscriptionError({
           code: "unavailable",
-          message: "Update T3 Code to transcribe on an environment.",
+          message: "Update DoeDesk to transcribe on a computer.",
         });
       return native.decodeRecording(uri);
     },

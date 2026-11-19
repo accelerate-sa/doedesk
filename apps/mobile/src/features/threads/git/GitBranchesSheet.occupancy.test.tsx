@@ -87,13 +87,13 @@ it("recognizes both the main checkout and a linked worktree as this thread's che
     expect(rows()).toEqual([
       { name: "feature/available", subtitle: "Local branch", disabled: false },
       { name: "feature/linked", subtitle: "Checked out in another worktree", disabled: true },
-      { name: "main", subtitle: "Checked out in this thread", disabled: false },
+      { name: "main", subtitle: "Checked out in this chat", disabled: false },
     ]);
 
     checkout.worktreePath = linked;
     expect(rows()).toEqual([
       { name: "feature/available", subtitle: "Local branch", disabled: false },
-      { name: "feature/linked", subtitle: "Checked out in this thread", disabled: false },
+      { name: "feature/linked", subtitle: "Checked out in this chat", disabled: false },
       { name: "main", subtitle: "Checked out in another worktree", disabled: true },
     ]);
   } finally {

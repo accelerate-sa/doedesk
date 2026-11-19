@@ -1,3 +1,4 @@
+import { isNewThreadTitle } from "./placeholderThreadTitle.ts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { isAttachmentOnlyBootstrapPrompt } from "@t3tools/shared/composerContextReferences";
 import {
@@ -230,7 +231,7 @@ const make = Effect.gen(function* () {
         projectId: projection.thread.projectId,
       });
       const generatedTitle = result.title.trim();
-      return generatedTitle === "New thread" ||
+      return isNewThreadTitle(generatedTitle) ||
         (input.kind.type === "regenerate" && generatedTitle === projection.thread.title.trim())
         ? { status: "unchanged" as const }
         : { status: "renamed" as const, title: result.title };

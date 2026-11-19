@@ -93,7 +93,7 @@ it("keeps the sidebar thread list live after switching tabs beside a focused Thr
   });
   act(() => home.registry.set(shellsAtom, 2));
 
-  expect(home.latest, "new thread shells reach the sidebar list").toBe(2);
+  expect(home.latest, "new chat shells reach the sidebar list").toBe(2);
 });
 
 // Each phone tab slot shows its own copy of the Home route. PRs keeps Home focused; Settings
@@ -132,6 +132,6 @@ it.each([
     // A pushed Thread takes the focus and still stops the list.
     act(() => recordHomeTransitionEnd(true, false));
     act(() => home.registry.set(shellsAtom, 4));
-    expect(home.latest, "the list under a Thread holds its rows").toBe(3);
+    expect(home.latest, "the list under a Chat holds its rows").toBe(3);
   },
 );

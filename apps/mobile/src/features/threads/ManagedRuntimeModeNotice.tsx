@@ -38,7 +38,7 @@ export function ManagedRuntimeModeNotice(props: {
   return (
     <View className="gap-2 px-4 pb-3">
       <AppText textRole="footnote" className="text-foreground-muted">
-        {`${denial} Switch this thread's mode to continue.`}
+        {`${denial} Switch this chat's mode to continue.`}
       </AppText>
       {target === undefined || targetLabel === undefined ? null : (
         <Button

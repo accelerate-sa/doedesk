@@ -141,7 +141,7 @@ const pullRequestView = {
 };
 
 const pairingUrl = "https://vps.example.com/pair#token=ABC123";
-const pairLink = `t3code://pair?pairingUrl=${encodeURIComponent(pairingUrl)}`;
+const pairLink = `doedesk://pair?pairingUrl=${encodeURIComponent(pairingUrl)}`;
 
 function setup() {
   vi.clearAllMocks();
@@ -210,7 +210,7 @@ const threadRef = scopeThreadRef(environmentId, ThreadId.make("thread"));
 it.each([
   ["github.com", "pull/9339/commits"],
   ["code.example.com:8443", "commit"],
-])("opens a %s/%s commit in the active thread's Diff pane after discovery", async (host, path) => {
+])("opens a %s/%s commit in the active chat's Diff pane after discovery", async (host, path) => {
   setup();
   state.routeParams = { environmentId: "local", threadId: "thread" };
   await using _coordinator = await mount(`https://${host}/Effect-TS/effect/${path}/${sha}`);
@@ -271,7 +271,7 @@ it("opens a plain commit the workspace lacks like any other delivered link", asy
   const plainCommitUrl = `https://github.com/Effect-TS/effect/commit/${sha}`;
   await using _coordinator = await mount(plainCommitUrl);
   await vi.waitFor(() => expect(state.openScratchProject).toHaveBeenCalledOnce());
-  // Handing it to the OS browser would loop when T3 Code is the default browser.
+  // Handing it to the OS browser would loop when DoeDesk is the default browser.
   expect(state.openLink).not.toHaveBeenCalled();
   expect(useDiffPanelStore.getState().byThreadKey).toEqual({});
   expect(useRightPanelStore.getState().byThreadKey).toEqual({});
@@ -295,7 +295,7 @@ it("does not spend the pairing token when the user declines", async () => {
   state.confirm.mockResolvedValueOnce(false);
   await using _coordinator = await mount(
     pairLink,
-    `t3code://pair?pairingUrl=${encodeURIComponent(otherPairingUrl)}`,
+    `doedesk://pair?pairingUrl=${encodeURIComponent(otherPairingUrl)}`,
   );
   await vi.waitFor(() => expect(state.connectPairing).toHaveBeenCalled());
   expect(state.confirm).toHaveBeenCalledTimes(2);
@@ -308,7 +308,7 @@ it("skips a repeat of a pairing link that already paired", async () => {
   await using _coordinator = await mount(
     pairLink,
     pairLink,
-    `t3code://pair?pairingUrl=${encodeURIComponent(otherPairingUrl)}`,
+    `doedesk://pair?pairingUrl=${encodeURIComponent(otherPairingUrl)}`,
   );
   await vi.waitFor(() =>
     expect(state.connectPairing).toHaveBeenLastCalledWith({ pairingUrl: otherPairingUrl }),

@@ -7,6 +7,7 @@ import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
@@ -24,8 +25,8 @@ import type { ManagedPolicyDocument } from "@t3tools/contracts";
 
 import * as ServerConfig from "../config.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
-import { getTelemetryIdentity } from "./Identify.ts";
 import * as AnalyticsService from "./AnalyticsService.ts";
+import * as UsageDataConsent from "./UsageDataConsent.ts";
 
 interface RecordedBatchRequest {
   readonly path: string;
@@ -69,9 +70,10 @@ const SentBatch = Schema.fromJsonString(
         distinct_id: Schema.String,
         properties: Schema.Struct({
           telemetryChannel: Schema.String,
-          installId: Schema.optionalKey(Schema.String),
-          ownerSource: Schema.optionalKey(Schema.String),
-          observedBy: Schema.optionalKey(Schema.String),
+          installId: Schema.String,
+          consent: Schema.optionalKey(
+            Schema.Struct({ wordingId: Schema.String, at: Schema.String }),
+          ),
         }),
       }),
     ),
@@ -106,17 +108,32 @@ const failingFor = (minutes: number) => {
   return { respond, answers };
 };
 
+/** The person agrees to usage data, as the first-run choice records it. */
+const agree = Effect.flatMap(UsageDataConsent.UsageDataConsent, (consent) =>
+  consent.choose({ on: true, wordingId: "usage-data-2026-11", locale: "en" }),
+);
+
 const recordTwentyEvents = Effect.gen(function* () {
+  yield* agree;
   const analytics = yield* AnalyticsService.AnalyticsService;
   for (let index = 0; index < 20; index += 1) {
     yield* analytics.record("test.retry", { index });
   }
 });
 
-const analyticsLayerWith = (client: HttpClient.HttpClient, policy?: ManagedPolicyDocument) =>
+const analyticsLayerWith = (
+  client: HttpClient.HttpClient,
+  policy?: ManagedPolicyDocument,
+  /** A folder to keep between two starts; a new one each time when left out. */
+  baseDir?: string,
+) =>
   AnalyticsService.layer.pipe(
+    Layer.provideMerge(UsageDataConsent.layer),
     Layer.provideMerge(
-      ServerConfig.ServerConfig.layerTest(process.cwd(), { prefix: "t3-telemetry-retry-" }),
+      ServerConfig.ServerConfig.layerTest(
+        process.cwd(),
+        baseDir ?? { prefix: "t3-telemetry-retry-" },
+      ),
     ),
     Layer.provide(
       ConfigProvider.layer(
@@ -124,6 +141,7 @@ const analyticsLayerWith = (client: HttpClient.HttpClient, policy?: ManagedPolic
           T3CODE_TELEMETRY_ENABLED: true,
           T3CODE_POSTHOG_KEY: "phc_test_key",
           T3CODE_POSTHOG_HOST: "http://localhost",
+          DOEDESK_CLOUD_URL: "http://cloud.test",
         }),
       ),
     ),
@@ -148,14 +166,17 @@ const sendFor = (
   record: Effect.Effect<
     void,
     never,
-    AnalyticsService.AnalyticsService | Effect.Services<typeof getTelemetryIdentity>
+    AnalyticsService.AnalyticsService | UsageDataConsent.UsageDataConsent
   > = recordTwentyEvents,
   policy?: ManagedPolicyDocument,
+  baseDir?: string,
 ) =>
   Effect.gen(function* () {
     const batches: Array<ReadonlyArray<SentEvent>> = [];
     const client = HttpClient.make((request) =>
       Effect.gen(function* () {
+        // The record of the choice goes to its own address and is answered without being kept.
+        if (!request.url.endsWith("/batch/")) return yield* respondWithStatus(204)(request);
         if (request.body._tag === "Uint8Array") {
           const body = yield* decodeSentBatch(new TextDecoder().decode(request.body.body)).pipe(
             Effect.orDie,
@@ -165,7 +186,7 @@ const sendFor = (
         return yield* respond(request);
       }),
     );
-    const runtimeLayer = analyticsLayerWith(client, policy);
+    const runtimeLayer = analyticsLayerWith(client, policy, baseDir);
 
     yield* Effect.gen(function* () {
       yield* record;
@@ -185,6 +206,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
         respondWithStatus(204),
         Effect.gen(function* () {
           const analytics = yield* AnalyticsService.AnalyticsService;
+          // Agreeing counts for nothing while the shell has not been asked.
+          yield* agree;
           yield* analytics.record("test.before-discovery");
           yield* analytics.flush;
           env.T3CODE_TELEMETRY_ENABLED = "false";
@@ -192,6 +215,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
           yield* analytics.record("test.opted-out");
           yield* analytics.flush;
           env.T3CODE_TELEMETRY_ENABLED = "true";
+          yield* agree;
           yield* analytics.record("test.allowed");
           yield* analytics.flush;
         }),
@@ -203,30 +227,107 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
     }),
   );
 
-  it.effect("client owner reports cannot use up the server's owner cap", () =>
-    Effect.gen(function* () {
-      const batches = yield* sendFor(
-        10,
-        respondWithStatus(204),
-        Effect.gen(function* () {
-          const analytics = yield* AnalyticsService.AnalyticsService;
-          yield* analytics.recordOwners(
-            Array.from({ length: 1_001 }, (_, index) => ({
-              source: "device" as const,
-              ownerId: index.toString(16).padStart(64, "0"),
-            })),
-            "client",
-          );
-          // The event buffer also holds 1,000, so send the client events first.
-          yield* analytics.flush;
-          yield* analytics.recordOwners([{ source: "connect", ownerId: "a".repeat(64) }], "server");
-        }),
-      );
-      const owners = batches.flat().map((event) => event.properties.observedBy);
+  it.effect(
+    "sends nothing before the person has chosen, and nothing from before the choice after it",
+    () =>
+      Effect.gen(function* () {
+        const batches = yield* sendFor(
+          1,
+          respondWithStatus(204),
+          Effect.gen(function* () {
+            const analytics = yield* AnalyticsService.AnalyticsService;
+            yield* analytics.record("test.before-choice");
+            yield* analytics.flush;
+            yield* agree;
+            yield* analytics.record("test.after-choice");
+          }),
+        );
+        assert.deepEqual(
+          batches.flat().map((event) => event.event),
+          ["test.after-choice"],
+        );
+      }),
+  );
 
-      assert.equal(owners.filter((observedBy) => observedBy === "client").length, 1_000);
-      assert.equal(owners.filter((observedBy) => observedBy === "server").length, 1);
+  it.effect("names the installation by one random identifier that survives a restart", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      // What apps before 0.2 named an installation by: both are left behind.
+      const home = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-telemetry-home-" });
+      yield* fileSystem.makeDirectory(`${home}/.codex`);
+      yield* fileSystem.writeFileString(
+        `${home}/.codex/auth.json`,
+        JSON.stringify({ tokens: { account_id: "workspace-1" } }),
+      );
+      yield* fileSystem.writeFileString(`${home}/.claude.json`, JSON.stringify({ userID: "u-1" }));
+      const recordOne = Effect.gen(function* () {
+        const analytics = yield* AnalyticsService.AnalyticsService;
+        yield* analytics.record("test.identity");
+      });
+      const identifierOf = (
+        baseDir: string,
+        record: Effect.Effect<
+          void,
+          never,
+          AnalyticsService.AnalyticsService | UsageDataConsent.UsageDataConsent
+        > = recordOne,
+      ) =>
+        sendFor(1, respondWithStatus(204), record, undefined, baseDir).pipe(
+          Effect.provideService(HostProcess.HomeDirectory, home),
+          Effect.map((batches) => batches.flat()[0]),
+        );
+
+      const first = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-telemetry-a-" });
+      const agreed = yield* identifierOf(first, Effect.andThen(agree, recordOne));
+      const restarted = yield* identifierOf(first);
+      const other = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-telemetry-b-" });
+      const elsewhere = yield* identifierOf(other, Effect.andThen(agree, recordOne));
+
+      assert.match(
+        agreed?.distinct_id ?? "",
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      assert.equal(agreed?.properties.installId, agreed?.distinct_id);
+      assert.equal(restarted?.distinct_id, agreed?.distinct_id);
+      // The same provider logins on the same computer, a different identifier: it comes from neither.
+      assert.notEqual(elsewhere?.distinct_id, agreed?.distinct_id);
+      // The person agreed, so every event says to which wording and when.
+      assert.equal(agreed?.properties.consent?.wordingId, "usage-data-2026-11");
+      assert.deepEqual(restarted?.properties.consent, agreed?.properties.consent);
     }),
+  );
+
+  it.effect(
+    "discards the identifier when usage data is turned off, and makes a new one after",
+    () =>
+      Effect.gen(function* () {
+        const batches = yield* sendFor(
+          1,
+          respondWithStatus(204),
+          Effect.gen(function* () {
+            const analytics = yield* AnalyticsService.AnalyticsService;
+            const consent = yield* UsageDataConsent.UsageDataConsent;
+            yield* agree;
+            yield* analytics.record("test.first");
+            yield* analytics.flush;
+            yield* consent.choose({
+              on: false,
+              wordingId: "usage-data-settings-2026-11",
+              locale: "en",
+            });
+            yield* analytics.record("test.while-off");
+            yield* analytics.flush;
+            yield* agree;
+            yield* analytics.record("test.second");
+          }),
+        );
+        const sent = batches.flat();
+        assert.deepEqual(
+          sent.map((event) => event.event),
+          ["test.first", "test.second"],
+        );
+        assert.notEqual(sent[0]?.distinct_id, sent[1]?.distinct_id);
+      }),
   );
 
   it.effect("keeps a failed batch through a 20-minute outage and sends it once after", () =>
@@ -299,7 +400,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
         prefix: "t3-telemetry-base-",
       });
 
-      const layerTelemetry = AnalyticsService.layer.pipe(Layer.provideMerge(layerServerConfig));
+      const layerTelemetry = AnalyticsService.layer.pipe(
+        Layer.provideMerge(UsageDataConsent.layer),
+        Layer.provideMerge(layerServerConfig),
+      );
       const layerConfig = ConfigProvider.layer(
         ConfigProvider.fromUnknown({
           T3CODE_TELEMETRY_ENABLED: true,
@@ -339,8 +443,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
 
       yield* Effect.gen(function* () {
         yield* Layer.launch(layerBatchServer).pipe(Effect.forkScoped);
-        const { distinctId } = yield* getTelemetryIdentity;
-        assert.equal(distinctId !== null, true);
+        yield* agree;
         const analytics = yield* AnalyticsService.AnalyticsService;
 
         for (let index = 0; index < 45; index += 1) {
@@ -401,7 +504,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
       const layerServerConfig = ServerConfig.ServerConfig.layerTest(process.cwd(), {
         prefix: "t3-telemetry-disabled-",
       });
-      const layerTelemetry = AnalyticsService.layer.pipe(Layer.provideMerge(layerServerConfig));
+      const layerTelemetry = AnalyticsService.layer.pipe(
+        Layer.provideMerge(UsageDataConsent.layer),
+        Layer.provideMerge(layerServerConfig),
+      );
       const layerConfig = ConfigProvider.layer(
         ConfigProvider.fromUnknown({
           T3CODE_TELEMETRY_ENABLED: false,
@@ -431,6 +537,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
       yield* Effect.gen(function* () {
         yield* Layer.launch(layerBatchServer).pipe(Effect.forkScoped);
         const analytics = yield* AnalyticsService.AnalyticsService;
+        yield* agree;
         yield* analytics.record("test.disabled", { index: 1 });
         yield* analytics.flush;
       }).pipe(Effect.provide(layerRuntime));

@@ -313,7 +313,7 @@ export function DeviceSourcesSettings(props: {
     toastManager.add({
       type: failed.length ? "error" : "success",
       title: failed.length
-        ? `${host.label}: ${failed.length} of ${targets.length} environments failed`
+        ? `${host.label}: ${failed.length} of ${targets.length} computers failed`
         : `${host.label}: connection checks passed`,
       description: failed.length
         ? failed
@@ -322,7 +322,7 @@ export function DeviceSourcesSettings(props: {
               return `${target.label}: ${result?.status === "failed" ? result.error : "failed"}`;
             })
             .join("\n")
-        : "Connected or already available locally on each selected environment.",
+        : "Connected or already available locally on each selected computer.",
     });
   };
 
@@ -360,8 +360,8 @@ export function DeviceSourcesSettings(props: {
     title: "Local simulators",
     description:
       members.length > 1
-        ? "Simulators and emulators installed on each environment's own machine."
-        : "Simulators and emulators installed on this environment's machine.",
+        ? "Simulators and emulators installed on each computer's own machine."
+        : "Simulators and emulators installed on this computer's machine.",
     environments: active.map((member) => {
       const local = member.state?.hosts.find((host) => host.kind === "local");
       const status = local ? hostStatus(member.state, local.id) : hostStatus(member.state, "");

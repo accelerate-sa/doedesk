@@ -121,10 +121,10 @@ export function BranchToolbarBranchSelector({
   const composerFloatingLayerProps = useComposerMenuProps();
   const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
   const canOperateThread = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
-  const stopThreadSession = useAtomCommand(threadEnvironment.stopSession, "thread session stop");
+  const stopThreadSession = useAtomCommand(threadEnvironment.stopSession, "chat session stop");
   const updateThreadMetadata = useAtomCommand(
     threadEnvironment.updateMetadata,
-    "thread metadata update",
+    "chat metadata update",
   );
   const updateEmptyThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
@@ -417,7 +417,7 @@ export function BranchToolbarBranchSelector({
         stackedThreadToast({
           type: "error",
           title: "Action unavailable",
-          description: "This connection cannot change the thread's branch.",
+          description: "This connection cannot change the chat's branch.",
         }),
       );
       return;
@@ -612,7 +612,7 @@ export function BranchToolbarBranchSelector({
   useEffect(() => {
     if (projectCloneDone) refreshStaleRefs();
   }, [projectCloneDone]);
-  // A checkout made outside T3 Code, such as a clone finishing, leaves refs listed before it.
+  // A checkout made outside DoeDesk, such as a clone finishing, leaves refs listed before it.
   const statusBranch = branchStatusQuery.data?.refName ?? null;
   const refreshRefsMissingStatusBranch = useEffectEvent((branch: string | null) => {
     if (isInitialBranchesLoadPending || branch === null) return;

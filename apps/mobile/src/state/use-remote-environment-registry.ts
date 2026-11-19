@@ -66,7 +66,7 @@ export async function pairEnvironment(
     return { ok: true, error: null };
   }
   const error = Cause.squash(result.cause);
-  const message = error instanceof Error ? error.message : "Failed to pair with the environment.";
+  const message = error instanceof Error ? error.message : "Failed to pair with the computer.";
   if (
     error !== null &&
     typeof error === "object" &&
@@ -200,7 +200,7 @@ export function useRemoteConnections() {
       };
       Dialog.alert(
         "Remove from this device?",
-        `Forget ${environment.environmentLabel} and its cached threads on this device.\n\n${RELAY_REMOVAL_ACCOUNT_NOTE[registration]}`,
+        `Forget ${environment.environmentLabel} and its cached chats on this device.\n\n${RELAY_REMOVAL_ACCOUNT_NOTE[registration]}`,
         registration === "unregistered" || !hasCloudPublicConfig()
           ? [{ text: "Cancel", style: "cancel" }, remove]
           : [{ text: "Cancel", style: "cancel" }, openAccount, remove],
@@ -209,7 +209,7 @@ export function useRemoteConnections() {
     }
     Dialog.alert(
       "Remove from this device?",
-      `Forget ${environment.environmentLabel} and its cached threads on this device. Switch it off instead to keep it saved.`,
+      `Forget ${environment.environmentLabel} and its cached chats on this device. Switch it off instead to keep it saved.`,
       [{ text: "Cancel", style: "cancel" }, remove],
     );
   };

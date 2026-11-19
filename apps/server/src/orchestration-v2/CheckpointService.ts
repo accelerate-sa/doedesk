@@ -268,7 +268,8 @@ export const layer: Layer.Layer<
       withWorkspaceLock(
         input.scope.cwd,
         Effect.gen(function* () {
-          if (!(yield* checkpointStore.isGitRepository(input.scope.cwd))) {
+          // A plain folder is given a history of its own here, before the first turn changes it.
+          if (!(yield* checkpointStore.ensureRepository(input.scope.cwd))) {
             return;
           }
 

@@ -40,7 +40,7 @@ function reportScriptFailure(result: AtomCommandResult<unknown, unknown>) {
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: "Failed to save project actions",
+      title: "Failed to save folder actions",
       description: error instanceof Error ? error.message : "An error occurred.",
     });
   }
@@ -58,7 +58,7 @@ export function useProjectScriptSettings(
   const projects = useProjects();
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  const updateSettings = useAtomCommand(serverEnvironment.updateSettings, "project actions update");
+  const updateSettings = useAtomCommand(serverEnvironment.updateSettings, "folder actions update");
   const upsertKeybinding = useAtomCommand(
     serverEnvironment.upsertKeybinding,
     "action shortcut update",
@@ -88,7 +88,7 @@ export function useProjectScriptSettings(
           Cause.fail(
             new EnvironmentAuthorizationError({
               requiredScope: AuthSettingsWriteScope,
-              message: "This connection cannot change environment settings.",
+              message: "This connection cannot change computer settings.",
             }),
           ),
         ),

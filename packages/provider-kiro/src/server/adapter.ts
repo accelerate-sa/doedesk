@@ -626,7 +626,11 @@ export const makeKiroAdapterV2Driver = (
       return yield* makeKiroAdapterV2({
         instanceId: input.instanceId,
         settings: { ...input.config, enabled: input.enabled },
-        environment: yield* mergeProviderInstanceEnvironment(input.environment, hostEnvironment),
+        environment: yield* mergeProviderInstanceEnvironment(
+          input.environment,
+          hostEnvironment,
+          KIRO_PROVIDER,
+        ),
         selfInvocation,
         defaultModel,
         nativeLogging: (threadId) =>

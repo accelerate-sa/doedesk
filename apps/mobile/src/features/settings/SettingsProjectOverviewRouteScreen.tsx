@@ -84,7 +84,7 @@ export function SettingsProjectOverviewRouteScreen() {
       .filter((project) => selectedEnvironmentIds.has(project.environmentId)) ?? [];
 
   return (
-    <SettingsScreen title="Projects" menus={[environmentMenu]}>
+    <SettingsScreen title="Folders" menus={[environmentMenu]}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -94,11 +94,11 @@ export function SettingsProjectOverviewRouteScreen() {
       >
         {selectedProjectKey === null ? (
           <Text className="px-2 text-base text-foreground-muted">
-            Choose a project with the filter above to manage its name, checkouts and removal.
+            Choose a folder with the filter above to manage its name, checkouts and removal.
           </Text>
         ) : !group || members.length === 0 ? (
           <Text className="px-2 text-base text-foreground-muted">
-            This project has no checkout on the selected connected environments. Change the filter
+            This folder has no checkout on the selected connected computers. Change the filter
             above.
           </Text>
         ) : (
@@ -153,11 +153,11 @@ function ProjectOverviewContent(props: {
   );
   const deleteProject = useAtomCommand(projectEnvironment.delete, { reportFailure: false });
   const updateProject = useAtomCommand(projectEnvironment.update, {
-    label: "project name update",
+    label: "folder name update",
     reportFailure: true,
   });
   const organizeProject = useAtomCommand(projectEnvironment.update, {
-    label: "project update",
+    label: "folder update",
     reportFailure: true,
   });
   const [isOrganizing, setIsOrganizing] = useState(false);
@@ -182,7 +182,7 @@ function ProjectOverviewContent(props: {
     setIsOrganizing(true);
     for (const member of allMembers) {
       if (!readEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope)) {
-        Dialog.alert("Failed to update project", "This connection can no longer change it.");
+        Dialog.alert("Failed to update folder", "This connection can no longer change it.");
         break;
       }
       const result = await organizeProject({
@@ -214,8 +214,8 @@ function ProjectOverviewContent(props: {
       (entry) => entry.environmentId === denied.environmentId,
     );
     Dialog.alert(
-      "Failed to remove project",
-      `This connection cannot change projects in ${environment?.label ?? "this environment"}.`,
+      "Failed to remove folder",
+      `This connection cannot change folders in ${environment?.label ?? "this computer"}.`,
     );
     return false;
   };
@@ -237,9 +237,9 @@ function ProjectOverviewContent(props: {
       unloadedThreadCount: readUnloadedThreadCount(members, threads),
     });
     Dialog.confirm({
-      title: plan.targetKind === "checkout" ? "Remove checkout" : "Remove project",
+      title: plan.targetKind === "checkout" ? "Remove checkout" : "Remove folder",
       message: plan.confirmationMessage,
-      confirmText: plan.targetKind === "checkout" ? "Remove checkout" : "Remove project",
+      confirmText: plan.targetKind === "checkout" ? "Remove checkout" : "Remove folder",
       destructive: true,
       onCancel: finishRemoval,
       onConfirm: () => {
@@ -323,12 +323,12 @@ function ProjectOverviewContent(props: {
         </View>
       </View>
 
-      <SettingsSection title="Project">
+      <SettingsSection title="Folder">
         <View className="gap-3 p-4">
           <Text className="text-sm font-t3-medium text-foreground-muted">Name</Text>
           <View className="flex-row items-center gap-3">
             <AppTextInput
-              accessibilityLabel="Project name"
+              accessibilityLabel="Folder name"
               className="min-h-11 min-w-0 flex-1 rounded-xl border-continuous bg-card px-3 text-base text-foreground"
               value={draftName ?? displayName}
               onChangeText={setDraftName}
@@ -339,7 +339,7 @@ function ProjectOverviewContent(props: {
             {canSave ? (
               <Button
                 label="Save"
-                accessibilityHint="Save project name"
+                accessibilityHint="Save folder name"
                 tone="secondary"
                 onPress={saveName}
               />
@@ -355,8 +355,8 @@ function ProjectOverviewContent(props: {
             label="Pin"
             subtitle={
               offline
-                ? "Connect every machine with this project to change this."
-                : "Pinned projects come first in project pickers."
+                ? "Connect every machine with this folder to change this."
+                : "Pinned folders come first in folder pickers."
             }
             value={props.group.pinned}
             disabled={isOrganizing || offline}
@@ -364,11 +364,11 @@ function ProjectOverviewContent(props: {
           />
           <SettingsActionRow
             icon="archivebox"
-            label={props.group.archived ? "Unarchive project" : "Archive project"}
+            label={props.group.archived ? "Unarchive folder" : "Archive folder"}
             description={
               props.group.archived
-                ? "Hidden from project pickers. Threads and files are kept."
-                : "Hides the project from project pickers. Threads and files are kept."
+                ? "Hidden from folder pickers. Chats and files are kept."
+                : "Hides the folder from folder pickers. Chats and files are kept."
             }
             disabled={isOrganizing || offline}
             onPress={() => void organize({ archived: !props.group.archived })}
@@ -421,15 +421,15 @@ function ProjectOverviewContent(props: {
             props.hasOtherMembers
               ? "Remove checkout"
               : props.members.length > 1
-                ? "Remove this project everywhere"
-                : "Remove project"
+                ? "Remove this folder everywhere"
+                : "Remove folder"
           }
           description={
             props.hasOtherMembers
-              ? "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched."
+              ? "Deletes the selected machine's checkout entries and their chats. Other machines and files on disk are not touched."
               : props.members.length > 1
-                ? `Deletes all ${props.members.length} checkout entries and their threads on every machine. Files on disk are not touched.`
-                : "Deletes the project entry and its threads. Files on disk are not touched."
+                ? `Deletes all ${props.members.length} checkout entries and their chats on every machine. Files on disk are not touched.`
+                : "Deletes the folder entry and its chats. Files on disk are not touched."
           }
           tone="danger"
           disabled={!canRemoveGroup || isRemoving}

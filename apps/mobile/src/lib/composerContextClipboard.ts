@@ -200,7 +200,7 @@ async function importAttachment(
   const connection = appAtomRegistry.get(
     environmentSession.preparedConnectionValueAtom(environmentId),
   );
-  if (Option.isNone(connection)) throw new Error("Reconnect to the source environment");
+  if (Option.isNone(connection)) throw new Error("Reconnect to the source computer");
   const result = await executeAtomQuery(
     appAtomRegistry,
     assetEnvironment.createUrl({

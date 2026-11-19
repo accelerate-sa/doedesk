@@ -1,0 +1,9 @@
+# DoeDesk never pushes to T3 Code (pingdotgg/t3code), under any remote name.
+# Git passes the remote's name and its URL. See docs/operations/doedesk-release.md.
+url=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+case "$url" in
+  *pingdotgg/t3code*)
+    echo "Refused: $2 is T3 Code's repository. DoeDesk pushes only to origin (accelerate-sa/doedesk)." >&2
+    exit 1
+    ;;
+esac

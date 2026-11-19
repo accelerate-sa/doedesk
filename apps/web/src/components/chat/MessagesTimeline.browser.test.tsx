@@ -1005,7 +1005,7 @@ describe("MessagesTimeline messages", () => {
     );
     await using screen = await renderElement(
       mode === "grouped-delayed" ? (
-        <MessagesTimeline {...props} timelineEntries={[message("Previous thread")]} />
+        <MessagesTimeline {...props} timelineEntries={[message("Previous chat")]} />
       ) : (
         timeline()
       ),
@@ -1436,11 +1436,11 @@ describe("MessagesTimeline agent messages", () => {
     expect(row.textContent).toContain("Review finished");
     expect(row.getAttribute("aria-expanded")).toBe("false");
     expect(screen.text()).not.toContain("drops the index");
-    expect(screen.buttons("Open thread")).toHaveLength(0);
+    expect(screen.buttons("Open chat")).toHaveLength(0);
 
     await click(row);
     expect(screen.text()).toContain("The migration drops the index before backfilling it.");
-    await click(screen.button("Open thread"));
+    await click(screen.button("Open chat"));
     expect(onOpenThread).toHaveBeenCalledWith(SENDER_THREAD_ID, ENVIRONMENT_ID);
 
     await click(screen.button(/^Agent/));
@@ -1448,10 +1448,10 @@ describe("MessagesTimeline agent messages", () => {
 
     // The linked sender shows the title it sent, and its thread cannot be opened from here.
     await click(screen.button(/^Release lead/));
-    expect(screen.buttons("Open thread")).toHaveLength(0);
+    expect(screen.buttons("Open chat")).toHaveLength(0);
   });
 
-  it("leaves messages sent by T3 Code as full bubbles", async () => {
+  it("leaves messages sent by DoeDesk as full bubbles", async () => {
     setup();
     await using screen = await renderTimeline([
       message(AGENT_MESSAGE, { createdBy: "agent", creationSource: "server" }),
@@ -1636,7 +1636,7 @@ describe("MessagesTimeline attachments", () => {
     await using screen = await renderTimeline(
       [
         // The first message row is always mounted, so the recordings go in the second.
-        message("Start of the thread.", { role: "user" }, "opening"),
+        message("Start of the chat.", { role: "user" }, "opening"),
         message(
           "Two recordings.",
           {
@@ -1835,7 +1835,7 @@ describe("MessagesTimeline thread find", () => {
       false,
     );
     await using screen = await renderElement(
-      <MessagesTimeline {...base} timelineEntries={[message("Short thread")]} />,
+      <MessagesTimeline {...base} timelineEntries={[message("Short chat")]} />,
     );
     await screen.rerender(
       <MessagesTimeline
@@ -1872,7 +1872,7 @@ describe("MessagesTimeline thread find", () => {
       false,
     );
     await using screen = await renderElement(
-      <MessagesTimeline {...base} timelineEntries={[message("Short thread")]} />,
+      <MessagesTimeline {...base} timelineEntries={[message("Short chat")]} />,
     );
     await screen.rerender(
       <MessagesTimeline

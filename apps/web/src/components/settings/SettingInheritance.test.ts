@@ -76,7 +76,7 @@ describe("settingInheritanceLayers", () => {
       "defaultThreadEnvMode",
     );
     expect(fromFile.map((layer) => [layer.label, layer.value, layer.effective])).toEqual([
-      ["Project", "Inherits", false],
+      ["Folder", "Inherits", false],
       ["Laptop", "Inherits", false],
       ["t3.json", "New worktree", true],
       ["Default", "Current checkout", false],

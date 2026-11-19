@@ -155,7 +155,7 @@ export function usePullRequestThreads(
           { text: draft.text, start: draft.text.length, end: draft.text.length },
         )
       )
-        throw new Error("Remove some context from this thread's draft, then try again.");
+        throw new Error("Remove some context from this chat's draft, then try again.");
       const withContext = getComposerDraftSnapshot(draftKey);
       setComposerDraftText(
         draftKey,
@@ -174,7 +174,7 @@ export function usePullRequestThreads(
     setBusy(false);
     if (AsyncResult.isFailure(result)) {
       const cause = squashAtomCommandFailure(result);
-      Dialog.alert("Couldn't open a thread", cause instanceof Error ? cause.message : "Try again.");
+      Dialog.alert("Couldn't open a chat", cause instanceof Error ? cause.message : "Try again.");
     }
   };
   return {

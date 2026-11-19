@@ -24,7 +24,7 @@ describe("announce", () => {
     expect(spokenText()).toEqual([]);
 
     vi.advanceTimersByTime(50);
-    expect(spokenText()).toEqual(["Settled 1 thread, Ctrl+Z to undo. Model: Claude Sonnet 5.5"]);
+    expect(spokenText()).toEqual(["Settled 1 chat, Ctrl+Z to undo. Model: Claude Sonnet 5.5"]);
   });
 
   it("speaks the same message twice in a row through the other region", () => {
@@ -50,7 +50,7 @@ describe("announce", () => {
     announce("Settled 2 threads, Ctrl+Z to undo", "undo");
     vi.runAllTimers();
 
-    expect(spokenText()).toEqual(["Opening in VS Code. Settled 2 threads, Ctrl+Z to undo"]);
+    expect(spokenText()).toEqual(["Opening in VS Code. Settled 2 chats, Ctrl+Z to undo"]);
 
     announce("Settled 1 thread, Ctrl+Z to undo", "undo");
     announce("Opening in Zed");

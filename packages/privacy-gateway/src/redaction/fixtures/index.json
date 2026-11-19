@@ -1,0 +1,768 @@
+[
+  {
+    "id": "clean--letter_en",
+    "family": "clean",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1000,
+    "height": 1300,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "EMAIL",
+        "text": "k.alotaibi@najd-trading.example"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 6,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 7,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 8,
+        "kind": "PERSON",
+        "text": "Faisal Al-Harbi"
+      },
+      {
+        "label": 9,
+        "kind": "ID",
+        "text": "2345678901"
+      }
+    ]
+  },
+  {
+    "id": "arabic--letter_ar",
+    "family": "arabic",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1000,
+    "height": 1300,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "خالد العتيبي"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "نورة القحطاني"
+      },
+      {
+        "label": 6,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 7,
+        "kind": "PERSON",
+        "text": "فيصل الحربي"
+      },
+      {
+        "label": 8,
+        "kind": "ID",
+        "text": "2345678901"
+      },
+      {
+        "label": 9,
+        "kind": "PHONE",
+        "text": "0509876543"
+      },
+      {
+        "label": 10,
+        "kind": "PERSON",
+        "text": "ريم الدوسري"
+      }
+    ]
+  },
+  {
+    "id": "arabic--mixed",
+    "family": "arabic",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1000,
+    "height": 1000,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "نورة القحطاني"
+      },
+      {
+        "label": 2,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 3,
+        "kind": "IBAN",
+        "text": "SA78 8000 0006 0801 0167 5191 23"
+      },
+      {
+        "label": 4,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 5,
+        "kind": "EMAIL",
+        "text": "noura.q@riyadh-clinic.example"
+      },
+      {
+        "label": 6,
+        "kind": "ID",
+        "text": "1023456789"
+      },
+      {
+        "label": 7,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 8,
+        "kind": "PERSON",
+        "text": "Faisal Al-Harbi"
+      },
+      {
+        "label": 9,
+        "kind": "PERSON",
+        "text": "ريم الدوسري"
+      }
+    ]
+  },
+  {
+    "id": "disjointed--table",
+    "family": "disjointed",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1100,
+    "height": 760,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 5,
+        "kind": "ID",
+        "text": "2345678901"
+      },
+      {
+        "label": 6,
+        "kind": "PHONE",
+        "text": "0509876543"
+      },
+      {
+        "label": 7,
+        "kind": "PERSON",
+        "text": "Faisal Al-Harbi"
+      },
+      {
+        "label": 8,
+        "kind": "ID",
+        "text": "1023456789"
+      },
+      {
+        "label": 9,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 10,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      }
+    ]
+  },
+  {
+    "id": "disjointed--split_lines",
+    "family": "disjointed",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 560,
+    "height": 1100,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 4,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 6,
+        "kind": "PERSON",
+        "text": "Abdulrahman Al-Shehri"
+      }
+    ]
+  },
+  {
+    "id": "disjointed--letter_spaced",
+    "family": "disjointed",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1100,
+    "height": 620,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 5,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      }
+    ]
+  },
+  {
+    "id": "screenshot--chat",
+    "family": "screenshot",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 760,
+    "height": 1180,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 3,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 4,
+        "kind": "ID",
+        "text": "2345678901"
+      },
+      {
+        "label": 5,
+        "kind": "PHONE",
+        "text": "0509876543"
+      },
+      {
+        "label": 6,
+        "kind": "PERSON",
+        "text": "فيصل الحربي"
+      },
+      {
+        "label": 7,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 8,
+        "kind": "EMAIL",
+        "text": "k.alotaibi@najd-trading.example"
+      }
+    ]
+  },
+  {
+    "id": "rotation--letter_en-180",
+    "family": "rotation",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1000,
+    "height": 1300,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "EMAIL",
+        "text": "k.alotaibi@najd-trading.example"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 6,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 7,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 8,
+        "kind": "PERSON",
+        "text": "Faisal Al-Harbi"
+      },
+      {
+        "label": 9,
+        "kind": "ID",
+        "text": "2345678901"
+      }
+    ]
+  },
+  {
+    "id": "warp--letter_en-perspective-medium",
+    "family": "warp",
+    "file": "input.jpg",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1000,
+    "height": 1300,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "EMAIL",
+        "text": "k.alotaibi@najd-trading.example"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 6,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 7,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 8,
+        "kind": "PERSON",
+        "text": "Faisal Al-Harbi"
+      },
+      {
+        "label": 9,
+        "kind": "ID",
+        "text": "2345678901"
+      }
+    ]
+  },
+  {
+    "id": "skew--letter_ar-15",
+    "family": "skew",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1303,
+    "height": 1515,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "خالد العتيبي"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "نورة القحطاني"
+      },
+      {
+        "label": 6,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 7,
+        "kind": "PERSON",
+        "text": "فيصل الحربي"
+      },
+      {
+        "label": 8,
+        "kind": "ID",
+        "text": "2345678901"
+      },
+      {
+        "label": 9,
+        "kind": "PHONE",
+        "text": "0509876543"
+      },
+      {
+        "label": 10,
+        "kind": "PERSON",
+        "text": "ريم الدوسري"
+      }
+    ]
+  },
+  {
+    "id": "format--exif-orientation-6",
+    "family": "format",
+    "file": "input.jpg",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1000,
+    "height": 1300,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "EMAIL",
+        "text": "k.alotaibi@najd-trading.example"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 6,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 7,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 8,
+        "kind": "PERSON",
+        "text": "Faisal Al-Harbi"
+      },
+      {
+        "label": 9,
+        "kind": "ID",
+        "text": "2345678901"
+      }
+    ]
+  },
+  {
+    "id": "format--jpeg-metadata",
+    "family": "format",
+    "file": "input.jpg",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1000,
+    "height": 1300,
+    "absent": ["DOEDESK-PLANTED-METADATA-Khalid-Al-Otaibi-1087654321", "GPS", "xmpmeta"],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "EMAIL",
+        "text": "k.alotaibi@najd-trading.example"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 6,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 7,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 8,
+        "kind": "PERSON",
+        "text": "Faisal Al-Harbi"
+      },
+      {
+        "label": 9,
+        "kind": "ID",
+        "text": "2345678901"
+      }
+    ]
+  },
+  {
+    "id": "size--tiny-crop",
+    "family": "size",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 120,
+    "height": 36,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PHONE",
+        "text": "0551234567"
+      }
+    ]
+  },
+  {
+    "id": "broken--empty",
+    "family": "broken",
+    "file": "input.png",
+    "expect": "withheld",
+    "outcome": "withheld",
+    "width": 0,
+    "height": 0,
+    "absent": [],
+    "values": []
+  },
+  {
+    "id": "broken--truncated-png",
+    "family": "broken",
+    "file": "input.png",
+    "expect": "withheld",
+    "outcome": "withheld",
+    "width": 0,
+    "height": 0,
+    "absent": [],
+    "values": []
+  },
+  {
+    "id": "broken--text-as-png",
+    "family": "broken",
+    "file": "input.png",
+    "expect": "withheld",
+    "outcome": "withheld",
+    "width": 0,
+    "height": 0,
+    "absent": [],
+    "values": []
+  },
+  {
+    "id": "broken--png-as-jpeg",
+    "family": "broken",
+    "file": "input.png",
+    "expect": "redacted",
+    "outcome": "redacted",
+    "width": 1000,
+    "height": 1300,
+    "absent": [],
+    "values": [
+      {
+        "label": 1,
+        "kind": "PERSON",
+        "text": "Khalid Al-Otaibi"
+      },
+      {
+        "label": 2,
+        "kind": "ID",
+        "text": "1087654321"
+      },
+      {
+        "label": 3,
+        "kind": "PHONE",
+        "text": "0551234567"
+      },
+      {
+        "label": 4,
+        "kind": "EMAIL",
+        "text": "k.alotaibi@najd-trading.example"
+      },
+      {
+        "label": 5,
+        "kind": "PERSON",
+        "text": "Noura Al-Qahtani"
+      },
+      {
+        "label": 6,
+        "kind": "PHONE",
+        "text": "+966 55 987 6543"
+      },
+      {
+        "label": 7,
+        "kind": "IBAN",
+        "text": "SA55 2000 0001 2345 6789 1234 56"
+      },
+      {
+        "label": 8,
+        "kind": "PERSON",
+        "text": "Faisal Al-Harbi"
+      },
+      {
+        "label": 9,
+        "kind": "ID",
+        "text": "2345678901"
+      }
+    ]
+  }
+]

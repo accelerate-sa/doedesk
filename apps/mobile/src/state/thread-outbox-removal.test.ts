@@ -190,7 +190,7 @@ describe("thread outbox removal", () => {
     appAtomRegistry.set(composerDraftsAtom, {
       [clearedDraftKey]: { text: "edited", attachments: [editorOnlyFile] },
       [`pending-task:${replaced.messageId}`]: { text: "replacement", attachments: [] },
-      [`pending-task:${kept.messageId}`]: { text: "other environment", attachments: [] },
+      [`pending-task:${kept.messageId}`]: { text: "other computer", attachments: [] },
     });
     await Promise.all([
       harness.manager.enqueue(cleared),

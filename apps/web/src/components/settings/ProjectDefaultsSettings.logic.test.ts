@@ -83,7 +83,7 @@ describe("resolveDefaultModelSettingsPresentation", () => {
     });
     expect(present(withoutClaude)).toEqual({
       selection: savedClaude,
-      providerNote: "This provider is not available on this environment.",
+      providerNote: "This provider is not available on this computer.",
     });
   });
 

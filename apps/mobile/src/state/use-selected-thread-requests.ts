@@ -166,15 +166,15 @@ function collectAnsweredRequestDrafts(
 export function useSelectedThreadRequests() {
   const respondToApproval = useAtomCommand(
     threadEnvironment.respondToApproval,
-    "thread approval response",
+    "chat approval response",
   );
   const respondToUserInput = useAtomCommand(
     threadEnvironment.respondToUserInput,
-    "thread user input response",
+    "chat user input response",
   );
   const dismissUserInput = useAtomCommand(
     threadEnvironment.dismissUserInput,
-    "thread user input dismissal",
+    "chat user input dismissal",
   );
   const { selectedThread: selectedThreadShell } = useThreadSelection();
   const pendingRequests = useSelectedThreadPendingRequests();

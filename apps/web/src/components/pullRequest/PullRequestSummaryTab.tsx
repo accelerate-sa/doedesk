@@ -451,7 +451,7 @@ export function PullRequestSummaryTab({
   checksStale = false,
   activityError,
   pendingFinding,
-  fixFindingLabel = "Fix in a thread",
+  fixFindingLabel = "Fix in a chat",
   fixCheckLabel = "Fix",
   onFixFinding,
   onAddToChat,

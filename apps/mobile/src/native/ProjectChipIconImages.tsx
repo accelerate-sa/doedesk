@@ -74,7 +74,7 @@ class ProjectGlyphRasterizeError extends Schema.TaggedError<ProjectGlyphRasteriz
   { key: Schema.String, cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return `Could not rasterize the project glyph ${this.key}.`;
+    return `Could not rasterize the folder glyph ${this.key}.`;
   }
 }
 

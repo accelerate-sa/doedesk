@@ -85,7 +85,7 @@ it.each(["resume", "draft", "question"] as const)(
         hasSendableContent: mode === "draft",
       }),
     );
-    const action = { resume: "Resume thread", draft: "Submit message", question: "Submit" }[mode];
+    const action = { resume: "Resume chat", draft: "Submit message", question: "Submit" }[mode];
     expect(screen.getByRole("button", { name: "Stop generation" }).query()).toBeNull();
     expect(target()).toBe(screen.getByRole("button", { name: action, exact: true }).element());
     await act(() => {
@@ -127,7 +127,7 @@ it("allows retry after ten seconds and protects a late stop", async () => {
     <ComposerPrimaryActions {...props} isRunning={false} canInterrupt={false} canResume />,
   );
   await act(() =>
-    (screen.getByRole("button", { name: "Resume thread" }).element() as HTMLButtonElement).click(),
+    (screen.getByRole("button", { name: "Resume chat" }).element() as HTMLButtonElement).click(),
   );
   expect(props.onInterrupt).toHaveBeenCalledTimes(2);
   expect(props.onResume).not.toHaveBeenCalled();

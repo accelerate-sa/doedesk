@@ -38,7 +38,7 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
         stackedThreadToast({
           type: "info",
           title: "Dropping folders needs the desktop app",
-          description: "Browsers do not share folder paths. Use Add project to choose a folder.",
+          description: "Browsers do not share folder paths. Use Add folder to choose a folder.",
         }),
       );
       return;
@@ -72,7 +72,7 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
         stackedThreadToast({
           type: "error",
           title: `Could not add "${folder.name}"`,
-          description: response?.message ?? "T3 Code could not read the folder's path.",
+          description: response?.message ?? "DoeDesk could not read the folder's path.",
         }),
       );
     }
@@ -110,8 +110,8 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
           toastManager.add(
             stackedThreadToast({
               type: "info",
-              title: "Only folders can be added as projects",
-              description: "Drop files on a thread to attach them.",
+              title: "Only folders can be added as folders",
+              description: "Drop files on a chat to attach them.",
             }),
           );
         }
@@ -126,7 +126,7 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
           <FolderPlusIcon className="size-5 text-sidebar-muted-foreground" />
           {bridge === undefined
             ? "Dropping folders needs the desktop app"
-            : "Drop folders to add projects"}
+            : "Drop folders to add folders"}
         </div>
       ) : null}
     </div>

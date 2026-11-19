@@ -224,7 +224,7 @@ export function describeUnavailableModelSelection(
   }
   return isDisabledForProject(config, provider, selection.instanceId, projectId)
     ? {
-        title: "Model turned off for this project",
+        title: "Model turned off for this folder",
         detail: "Turn it back on from web or desktop, or choose another model.",
       }
     : {

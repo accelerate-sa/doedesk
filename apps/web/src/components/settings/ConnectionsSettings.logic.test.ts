@@ -162,7 +162,7 @@ describe("resolveAccessEnvironmentId", () => {
   const laptop = EnvironmentId.make("laptop");
   it.each([
     {
-      label: "defaults to the primary environment",
+      label: "defaults to the primary computer",
       primaryEnvironmentId: primary,
       environments: [
         { environmentId: primary, connected: true },
@@ -172,7 +172,7 @@ describe("resolveAccessEnvironmentId", () => {
       expected: primary,
     },
     {
-      label: "falls back to a connected saved environment without a primary",
+      label: "falls back to a connected saved computer without a primary",
       primaryEnvironmentId: null,
       environments: [
         { environmentId: laptop, connected: false },
@@ -199,7 +199,7 @@ describe("resolveAccessEnvironmentId", () => {
       expected: service,
     },
     {
-      label: "has nothing to show without environments",
+      label: "has nothing to show without computers",
       primaryEnvironmentId: null,
       environments: [],
       selected: null,

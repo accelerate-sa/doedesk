@@ -94,7 +94,7 @@ function EmptyMobileClients() {
       <EmptyHeader>
         <EmptyTitle>No mobile clients</EmptyTitle>
         <EmptyDescription>
-          Install T3 Code on your phone and sign in to T3 Connect to get push notifications and Live
+          Install DoeDesk on your phone and sign in to T3 Connect to get push notifications and Live
           Activities.
         </EmptyDescription>
       </EmptyHeader>
@@ -112,7 +112,7 @@ export function MobileClientsUserProfilePage() {
   return (
     <ClerkUserProfilePage
       title="Mobile clients"
-      description="Mobile devices that get notifications from your environments."
+      description="Mobile devices that get notifications from your computers."
       action={
         <ClerkUserProfileRefreshButton
           isPending={devicesState.isPending}

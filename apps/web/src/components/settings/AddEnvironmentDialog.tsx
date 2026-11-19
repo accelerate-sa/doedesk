@@ -183,7 +183,7 @@ export function AddEnvironmentDialog({
     handleOpenChange(false);
     toastManager.add({
       type: "success",
-      title: routeTarget ? "Route added" : "Environment connected",
+      title: routeTarget ? "Route added" : "Computer connected",
       description: routeTarget
         ? `${routeTarget.label} can now be reached over SSH ${target.alias}.`
         : `${target.alias} is ready over an SSH-managed tunnel.`,
@@ -263,7 +263,7 @@ export function AddEnvironmentDialog({
         : {
             type: "success",
             title: "Backend added",
-            description: "The environment is saved and will reconnect on app startup.",
+            description: "The computer is saved and will reconnect on app startup.",
           },
     );
     setIsAddingSavedBackend(false);
@@ -484,7 +484,7 @@ export function AddEnvironmentDialog({
         onClick={() => void handleAddSavedBackend()}
       >
         <PlusIcon className="size-3.5" />
-        {isAddingSavedBackend ? "Adding…" : routeTarget ? "Add route" : "Add environment"}
+        {isAddingSavedBackend ? "Adding…" : routeTarget ? "Add route" : "Add computer"}
       </Button>
     </div>
   );
@@ -607,7 +607,7 @@ export function AddEnvironmentDialog({
           onClick={() => void handleAddSavedBackend()}
         >
           <PlusIcon className="size-3.5" />
-          {isAddingSavedBackend ? "Adding…" : routeTarget ? "Add route" : "Add environment"}
+          {isAddingSavedBackend ? "Adding…" : routeTarget ? "Add route" : "Add computer"}
         </Button>
       </div>
     </div>
@@ -620,25 +620,25 @@ export function AddEnvironmentDialog({
           render={
             <DialogTrigger
               render={
-                <Button size="xs" variant="ghost-muted" aria-label="Add environment">
+                <Button size="xs" variant="ghost-muted" aria-label="Add computer">
                   <PlusIcon className="size-3" />
-                  <span>Add environment</span>
+                  <span>Add computer</span>
                 </Button>
               }
             />
           }
         />
-        <TooltipPopup side="top">Add environment</TooltipPopup>
+        <TooltipPopup side="top">Add computer</TooltipPopup>
       </Tooltip>
       <DialogPopup className="max-h-[80dvh] sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
-            {routeTarget ? `Add a route to ${routeTarget.label}` : "Add Environment"}
+            {routeTarget ? `Add a route to ${routeTarget.label}` : "Add Computer"}
           </DialogTitle>
           <DialogDescription>
             {routeTarget
               ? "Pair this machine again over another address, such as its Tailscale name. It joins the existing routes instead of adding a second machine."
-              : "Pair another environment to this client."}
+              : "Pair another computer to this client."}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>

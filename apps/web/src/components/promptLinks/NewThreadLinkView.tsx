@@ -141,7 +141,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       replace: true,
     }).catch(() => null);
     if (opened === null) {
-      setState({ status: "failed", message: "T3 Code could not open a new thread." });
+      setState({ status: "failed", message: "DoeDesk could not open a new chat." });
       return;
     }
     setState({ status: "opened" });
@@ -184,7 +184,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     if (project === null) {
       setState({
         status: "failed",
-        message: "None of your machines can start a thread without a project right now.",
+        message: "None of your machines can start a chat without a folder right now.",
       });
       return;
     }
@@ -208,7 +208,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       setState({
         status: "failed",
         message:
-          "This machine cannot clone from a link. Update T3 Code on it, or clone the repository from the command palette.",
+          "This machine cannot clone from a link. Update DoeDesk on it, or clone the repository from the command palette.",
       });
       return;
     }
@@ -253,7 +253,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       5_000,
     ).catch(() => null);
     if (project === null) {
-      setState({ status: "failed", message: "The clone started, but its project did not appear." });
+      setState({ status: "failed", message: "The clone started, but its folder did not appear." });
       return;
     }
     if (link.kind === "pull-request") {
@@ -372,13 +372,13 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       return (
         <LinkPage
           title={`You don't have ${name}`}
-          description="Clone it to work on it here, or start without a project."
+          description="Clone it to work on it here, or start without a folder."
         >
           <Button size="sm" onClick={() => void cloneRepository(state.repository)}>
             Clone {name}
           </Button>
           <Button size="sm" variant="outline" onClick={openWithoutProject}>
-            Use without project
+            Use without folder
           </Button>
         </LinkPage>
       );
@@ -417,7 +417,7 @@ function PullRequestLinkCheckout({
   return (
     <LinkPage
       title={`Check out ${owner}/${name}#${number}?`}
-      description="This puts the pull request's code in a new worktree and runs your project's setup script on it."
+      description="This puts the pull request's code in a new worktree and runs your folder's setup script on it."
     >
       <Button
         size="sm"

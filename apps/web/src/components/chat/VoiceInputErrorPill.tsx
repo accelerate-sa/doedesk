@@ -19,7 +19,7 @@ const VOICE_ERROR_LABELS: Record<string, string> = {
   "Voice recording was interrupted.": "Recording interrupted",
   "Could not finish voice recording.": "Couldn’t finish",
   "Could not transcribe this recording.": "Transcription failed",
-  "Voice transcription on this environment failed.": "Transcription failed",
+  "Voice transcription on this computer failed.": "Transcription failed",
   "The draft changed while voice input was running. The transcript was not added.": "Draft changed",
   "No speech was detected.": "No speech heard",
   "Microphone processing failed.": "Mic failed",
@@ -28,7 +28,7 @@ const VOICE_ERROR_LABELS: Record<string, string> = {
 
 const RETRYABLE_TRANSCRIPTIONS = new Set([
   "Could not transcribe this recording.",
-  "Voice transcription on this environment failed.",
+  "Voice transcription on this computer failed.",
 ]);
 
 export function VoiceInputErrorPill(props: {

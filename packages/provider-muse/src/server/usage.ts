@@ -133,6 +133,7 @@ export const museUsageReader: ProviderUsageReader<
         value === undefined ? [] : [{ name, value, sensitive: false }],
       ),
       yield* HostProcess.Environment,
+      "muse",
     );
     const binaryPath = expandHomePath(config?.binaryPath ?? "muse", home);
     const museHome = yield* usageHome.resolve({

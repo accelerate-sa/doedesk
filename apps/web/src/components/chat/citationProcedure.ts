@@ -211,7 +211,7 @@ const citedHistoryAtom = Atom.family(
             get.registry,
             threadEnvironment.loadEarlierHistory,
             { environmentId, input: { threadId, throughEntryId: messageId } },
-            { label: "load cited thread history", reportFailure: false },
+            { label: "load cited chat history", reportFailure: false },
           );
           return result._tag === "Success"
             ? result.value

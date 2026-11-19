@@ -188,6 +188,7 @@ export const CodexDriver: ProviderDriver<
     const processEnv = yield* mergeProviderInstanceEnvironment(
       environment,
       yield* HostProcess.Environment,
+      DRIVER_KIND,
     );
     const environmentHome = processEnv.CODEX_HOME;
     const homeConfig =

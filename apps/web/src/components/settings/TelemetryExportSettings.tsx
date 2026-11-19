@@ -77,7 +77,7 @@ export function TelemetryExportSettings() {
     return (
       <SettingsSection title="OpenTelemetry export" id="telemetry-export">
         <SettingsScopeNotice target="environment">
-          Choose one environment to configure its telemetry exports.
+          Choose one computer to configure its telemetry exports.
         </SettingsScopeNotice>
       </SettingsSection>
     );
@@ -175,7 +175,7 @@ function TelemetryExportForm() {
         {!canEdit && (
           <p className="text-xs text-muted-foreground">
             This connection lacks permission to change settings on{" "}
-            {environment?.label ?? "the selected environment"}.
+            {environment?.label ?? "the selected computer"}.
           </p>
         )}
         {SIGNALS.map((descriptor) => {

@@ -51,3 +51,7 @@ node_modules/
 .pnpm-store/
 
 /packages/ssh/.ssh-launcher-test-*/
+
+# Thmanyah Serif may ship inside official builds but must never be committed: its licence
+# forbids redistribution. Builds read it from DOEDESK_BRAND_FONTS_DIR, outside the repository.
+*[Tt]hmanyah*

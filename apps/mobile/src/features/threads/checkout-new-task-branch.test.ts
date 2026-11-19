@@ -196,7 +196,7 @@ describe("new-task branch checkout", () => {
       workspaceMode: "local",
       readRefs,
       switchRef: () => {
-        throw new Error("Existing worktrees must not switch the project checkout");
+        throw new Error("Existing worktrees must not switch the folder checkout");
       },
     });
     expect(result._tag).toBe("Success");

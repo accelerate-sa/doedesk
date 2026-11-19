@@ -19,7 +19,7 @@ export function PairingPendingSurface() {
   return (
     <StandalonePage>
       <StandalonePageHeader
-        title="Pairing with this environment"
+        title="Pairing with this computer"
         description="Validating the pairing link and preparing your session."
       />
     </StandalonePage>
@@ -85,7 +85,7 @@ export function PairingRouteSurface({
   return (
     <StandalonePage>
       <StandalonePageHeader
-        title="Pair with this environment"
+        title="Pair with this computer"
         description={describeAuthGate(auth.bootstrapMethods)}
       />
 
@@ -179,7 +179,7 @@ export function HostedPairingRouteSurface() {
     });
     if (result._tag === "Success") {
       setStatus("paired");
-      setMessage(`${request.label || "The environment"} is saved in this browser.`);
+      setMessage(`${request.label || "The computer"} is saved in this browser.`);
       return;
     }
 
@@ -268,10 +268,10 @@ function errorMessageFromUnknown(error: unknown): string {
 
 function describeAuthGate(bootstrapMethods: ReadonlyArray<string>): string {
   if (bootstrapMethods.includes("desktop-bootstrap")) {
-    return "This environment expects a trusted pairing credential before the app can connect.";
+    return "This computer expects a trusted pairing credential before the app can connect.";
   }
 
-  return "Enter a pairing token to start a session with this environment.";
+  return "Enter a pairing token to start a session with this computer.";
 }
 
 function describeSupportedMethods(bootstrapMethods: ReadonlyArray<string>): string {
@@ -279,12 +279,12 @@ function describeSupportedMethods(bootstrapMethods: ReadonlyArray<string>): stri
     bootstrapMethods.includes("desktop-bootstrap") &&
     bootstrapMethods.includes("one-time-token")
   ) {
-    return "Desktop-managed pairing and one-time pairing tokens are both accepted for this environment.";
+    return "Desktop-managed pairing and one-time pairing tokens are both accepted for this computer.";
   }
 
   if (bootstrapMethods.includes("desktop-bootstrap")) {
-    return "This environment is desktop-managed. Open it from the desktop app or paste a bootstrap credential if one was issued explicitly.";
+    return "This computer is desktop-managed. Open it from the desktop app or paste a bootstrap credential if one was issued explicitly.";
   }
 
-  return "This environment accepts one-time pairing tokens. Pairing links can open this page directly, or you can paste the token here.";
+  return "This computer accepts one-time pairing tokens. Pairing links can open this page directly, or you can paste the token here.";
 }

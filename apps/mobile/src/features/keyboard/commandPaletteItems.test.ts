@@ -21,9 +21,9 @@ function item(
 }
 
 const items = [
-  item("new", "New thread in…", "action", ["project", "create"]),
+  item("new", "New chat in…", "action", ["project", "create"]),
   item("settings", "Open settings", "action", ["preferences"]),
-  item("project", "Mobile app", "project", ["/workspaces/mobile", "new thread"]),
+  item("project", "Mobile app", "project", ["/workspaces/mobile", "new chat"]),
   item("siva:one", "Keyboard shortcuts", "thread"),
   item("mac:one", "Mobile app layout", "thread"),
 ];

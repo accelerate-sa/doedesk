@@ -97,7 +97,7 @@ const setup = Effect.fn("TestThreadPr.setup")(function* () {
   let replyGate: Latch.Latch | null = null;
   const target = new PrimaryConnectionTarget({
     environmentId,
-    label: "Sidebar environment",
+    label: "Sidebar computer",
     httpBaseUrl: "https://sidebar.test",
     wsBaseUrl: "wss://sidebar.test",
   });

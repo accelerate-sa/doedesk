@@ -176,8 +176,8 @@ export function EasDeviceHostEditor(props: {
           <DialogHeader>
             <DialogTitle>{props.isNew ? "Add Expo host" : "Edit Expo host"}</DialogTitle>
             <DialogDescription>
-              The environment's server signs in to Expo and starts the sessions. Without a token
-              here it uses EXPO_TOKEN, then its eas login.
+              The computer's server signs in to Expo and starts the sessions. Without a token here
+              it uses EXPO_TOKEN, then its eas login.
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -264,7 +264,7 @@ export function EasDeviceHostEditor(props: {
                     ? account.error
                     : account.status === "checking"
                       ? "Checking the Expo account…"
-                      : "Check the Expo account before choosing a project."}
+                      : "Check the Expo account before choosing a folder."}
               </p>
               <Button
                 type="button"
@@ -277,7 +277,7 @@ export function EasDeviceHostEditor(props: {
               </Button>
             </div>
             <div className="space-y-1.5 text-sm">
-              <span>Expo project</span>
+              <span>Expo folder</span>
               <Select
                 value={draft.appId ?? FROM_THREAD_PROJECT}
                 disabled={props.busy}
@@ -289,17 +289,17 @@ export function EasDeviceHostEditor(props: {
                   });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Expo project">
+                <SelectTrigger size="sm" aria-label="Expo folder">
                   <SelectValue>
                     {(value: string) =>
                       value === FROM_THREAD_PROJECT
-                        ? "From the thread's project"
+                        ? "From the chat's folder"
                         : (apps.find((app) => app.id === value)?.fullName ?? value)
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
-                  <SelectItem value={FROM_THREAD_PROJECT}>From the thread's project</SelectItem>
+                  <SelectItem value={FROM_THREAD_PROJECT}>From the chat's folder</SelectItem>
                   {draft.appId && !apps.some((app) => app.id === draft.appId) ? (
                     <SelectItem value={draft.appId}>{draft.appId}</SelectItem>
                   ) : null}
@@ -311,8 +311,8 @@ export function EasDeviceHostEditor(props: {
                 </SelectPopup>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Sessions bill the project's Expo account. "From the thread's project" reads
-                extra.eas.projectId from the project's app config.
+                Sessions bill the folder's Expo account. "From the chat's folder" reads
+                extra.eas.projectId from the folder's app config.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3 text-sm">

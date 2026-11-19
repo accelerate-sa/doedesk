@@ -92,6 +92,7 @@ export const FxDriver: ProviderDriver<FxSettings, FxDriverEnv> = {
     const processEnv = yield* mergeProviderInstanceEnvironment(
       environment,
       yield* HostProcess.Environment,
+      FX_DRIVER_KIND,
     );
     const continuationIdentity = defaultProviderContinuationIdentity({
       driverKind: FX_DRIVER_KIND,

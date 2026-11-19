@@ -271,7 +271,7 @@ describe("archive navigation", () => {
 describe("delete navigation", () => {
   it.each([
     { type: "REPLACE", by: "the app's missing-thread redirect", fallsBack: true },
-    { type: "PUSH", by: "the user opening another thread", fallsBack: false },
+    { type: "PUSH", by: "the user opening another chat", fallsBack: false },
   ])("falls back: $fallsBack after $by while deleting", async ({ type, fallsBack }) => {
     router.state.matches[0]!.params = {
       environmentId: target.environmentId,
@@ -397,7 +397,7 @@ describe("archive and delete Undo expiry", () => {
       ["snoozeThread", "unsnooze"],
       ["unpinThread", "pin"],
     ] as const)(
-      "expires an earlier %s Undo for that thread only, across hook instances",
+      "expires an earlier %s Undo for that chat only, across hook instances",
       async (handler, inverse) => {
         const sidebar = useThreadActions();
         const header = useThreadActions();

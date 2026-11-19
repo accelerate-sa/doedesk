@@ -21,8 +21,8 @@ describe("droppedThreadContextRecord", () => {
       environmentId: EnvironmentId.make("local"),
       threadId: ThreadId.make("sidebar-thread"),
     };
-    expect(droppedThreadContextRecord(ref, { title: "Sidebar thread" })).toEqual(
-      threadContextRecord(ref, "Sidebar thread"),
+    expect(droppedThreadContextRecord(ref, { title: "Sidebar chat" })).toEqual(
+      threadContextRecord(ref, "Sidebar chat"),
     );
     expect(droppedThreadContextRecord(ref, null)).toBeNull();
   });

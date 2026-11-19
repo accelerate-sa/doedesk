@@ -1,4 +1,16 @@
 import { useAuth } from "@clerk/react";
+import { PrivacySetup } from "../privacy/PrivacySetup";
+import {
+  isPrivacyDecided,
+  refreshPrivacyStatus,
+  setPrivacyStatus,
+  useConsentLocale,
+  usePrivacyStatus,
+  useUsageData,
+} from "~/privacy/privacyClient";
+import { ProfileQuestions } from "../privacy/ProfileQuestions";
+import { settleUsageDataFirstRun, UsageDataChoice, usageDataChoiceDue } from "../privacy/UsageData";
+import { useDeveloperMode } from "~/doedesk/product";
 import { useAtomValue } from "@effect/atom-react";
 import type {
   AgentSessionProjectCandidate,
@@ -117,7 +129,7 @@ import { cn } from "../../lib/utils";
 import { formatRelativeTime } from "../../timestampFormat";
 
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
-const SCAN_LIMIT_MESSAGE = "Scan limit reached. Some projects or conversations may be missing.";
+const SCAN_LIMIT_MESSAGE = "Scan limit reached. Some folders or conversations may be missing.";
 
 /**
  * First-run page for one computer: its agents, the projects found in agent history, and the
@@ -130,6 +142,7 @@ export function WelcomePage({
   readonly environmentId: EnvironmentId;
   readonly onDone: (projectRef?: ScopedProjectRef) => void | Promise<void>;
 }) {
+  const developerMode = useDeveloperMode();
   const { environments } = useEnvironments();
   const label =
     environments.find((environment) => environment.environmentId === environmentId)?.label ??
@@ -211,7 +224,7 @@ export function WelcomePage({
         } else if (importedThreadCount > 0) {
           toastManager.add({
             type: "success",
-            title: `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "thread" : "threads"}`,
+            title: `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "chat" : "chats"}`,
           });
         }
         return true;
@@ -248,9 +261,19 @@ export function WelcomePage({
     onDone: finish,
   });
   // Without import permission, starting simply skips the projects.
-  const selected = projectImport.canWrite ? projectImport.selected : [];
+  const selected = developerMode && projectImport.canWrite ? projectImport.selected : [];
+  const privacy = usePrivacyStatus();
+  const privacyStatus = privacy.kind === "ready" ? privacy.status : null;
+  const privacyReady = privacyStatus !== null && isPrivacyDecided(privacyStatus);
+  const usageData = useUsageData();
+  const [consentLocale] = useConsentLocale();
+  // Shown from the moment the choice is due, and kept on the page after the person answers it.
+  const [usageDataOffered, setUsageDataOffered] = useState(false);
+  if (!usageDataOffered && usageDataChoiceDue(usageData)) setUsageDataOffered(true);
   const newCount = selected.filter(projectImport.isNew).length;
   const start = () => {
+    // Leaving the page with the choice untouched is an answer too: see settleUsageDataFirstRun.
+    void settleUsageDataFirstRun(usageData, consentLocale).catch(() => undefined);
     keepChoicesRef.current = scans.some((scan) => scan.data === null);
     if (selected.length === 0) {
       projectImport.finishAfterImport();
@@ -272,47 +295,81 @@ export function WelcomePage({
         {isElectron ? <WorkspacePageHeader electron /> : null}
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-both">
           <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 pt-12 pb-8 sm:pt-20">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Welcome to T3 Code
+            <h1 className="font-display text-4xl tracking-tight text-foreground">
+              Welcome to DoeDesk
             </h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              Setting up <span className="text-foreground">{label}</span>.
+            <p className="mt-2 font-reading text-lg text-muted-foreground">
+              An AI assistant for confidential work.
             </p>
             <div className="mt-10 border-t border-border/60">
+              <WelcomeSection title="Privacy">
+                <p className="pt-2.5 text-sm leading-relaxed text-muted-foreground">
+                  Names, phone numbers and IDs are replaced with stand-ins before the AI sees them,
+                  and put back on your screen.
+                </p>
+                {privacyStatus !== null ? (
+                  <PrivacySetup status={privacyStatus} onStatus={setPrivacyStatus} />
+                ) : privacy.kind === "loading" ? (
+                  <p className="py-2 text-sm text-muted-foreground">Checking…</p>
+                ) : (
+                  <div className="flex items-center gap-3 py-2">
+                    <p className="text-sm text-destructive">Could not reach DoeDesk on {label}.</p>
+                    <Button variant="outline" size="sm" onClick={refreshPrivacyStatus}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+              </WelcomeSection>
+              {privacyStatus !== null && privacyReady && !privacyStatus.profileAnswered ? (
+                <WelcomeSection title="About you">
+                  <ProfileQuestions onStatus={setPrivacyStatus} />
+                </WelcomeSection>
+              ) : null}
               <AgentsSection
                 environmentId={environmentId}
                 label={label}
                 isPrimary={isPrimary}
                 onImportSourceEnabled={() => scans[0]?.refresh()}
               />
-              <ProjectsSection
-                scan={scans[0]}
-                projectImport={projectImport}
-                isImporting={isImporting}
-              />
-              {showPhone ? <PhoneSection environmentId={environmentId} /> : null}
+              {developerMode ? (
+                <ProjectsSection
+                  scan={scans[0]}
+                  projectImport={projectImport}
+                  isImporting={isImporting}
+                />
+              ) : null}
+              {developerMode && showPhone ? <PhoneSection environmentId={environmentId} /> : null}
+              {usageDataOffered && usageData !== null ? (
+                <WelcomeSection title="Usage data">
+                  <div className="py-2.5">
+                    <UsageDataChoice status={usageData} />
+                  </div>
+                </WelcomeSection>
+              ) : null}
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              {agentReady ? (
+              {agentReady || !privacyReady ? (
                 <span />
               ) : (
                 <Button variant="ghost-muted" disabled={isImporting} onClick={start}>
-                  Start without an agent
+                  Start without an AI
                 </Button>
               )}
               <div className="flex items-center gap-3">
-                {agentReady ? null : (
-                  <span className="text-xs text-muted-foreground">Set up one agent to start.</span>
+                {!privacyReady ? (
+                  <span className="text-xs text-muted-foreground">Sign in to start.</span>
+                ) : agentReady ? null : (
+                  <span className="text-xs text-muted-foreground">Connect one AI to start.</span>
                 )}
-                <Button disabled={!agentReady || isImporting} onClick={start}>
+                <Button disabled={!privacyReady || !agentReady || isImporting} onClick={start}>
                   {isImporting
                     ? selected.length > 0
                       ? "Importing…"
                       : "Starting…"
                     : newCount > 0
-                      ? `Import ${newCount} ${newCount === 1 ? "project" : "projects"} and start`
+                      ? `Import ${newCount} ${newCount === 1 ? "folder" : "folders"} and start`
                       : selected.length > 0
-                        ? "Import threads and start"
+                        ? "Import chats and start"
                         : "Start"}
                 </Button>
               </div>
@@ -325,12 +382,13 @@ export function WelcomePage({
   );
 }
 
+// Where an organization's policy turns usage data off, the page says so instead of asking.
 function TelemetryNotice({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const telemetryOff = managedTelemetryOffMessage(useManagedPolicy(environmentId));
+  if (telemetryOff === undefined) return null;
   return (
     <p className="mt-auto pt-12 text-2xs leading-relaxed text-muted-foreground/70">
-      {telemetryOff ?? "T3 Code collects anonymous usage data to improve the app."}{" "}
-      {telemetryOff === undefined ? "To opt out, see the" : "See the"}{" "}
+      {telemetryOff} See the{" "}
       <a
         className="underline decoration-current/40 underline-offset-2 hover:text-muted-foreground"
         href={PRIVACY_POLICY_URL}
@@ -385,14 +443,21 @@ interface AgentTerminalSession {
 
 // Shared by the page (to enable Start) and the agents section, so both agree on what is ready.
 function useWelcomeAgents(environmentId: EnvironmentId) {
+  const developerMode = useDeveloperMode();
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
   const managedPolicy = serverConfig?.managedPolicy;
   return {
     providers,
     serverConfig,
-    ...groupWelcomeAgents(providers, serverConfig?.settings, agentName, (provider) =>
-      isManagedDriverAllowed(managedPolicy, provider.driver),
+    ...groupWelcomeAgents(
+      providers,
+      serverConfig?.settings,
+      agentName,
+      (provider) =>
+        isManagedDriverAllowed(managedPolicy, provider.driver) &&
+        // Cursor's traffic cannot be masked, so DoeDesk blocks it; offering it would only fail.
+        (developerMode || provider.driver !== "cursor"),
     ),
   };
 }
@@ -615,7 +680,7 @@ function AgentsSection({
   ].filter((note) => note !== null);
 
   return (
-    <WelcomeSection title="Agents">
+    <WelcomeSection title="AI">
       {found.map((provider) => (
         <AgentRow
           key={provider.instanceId}
@@ -643,7 +708,7 @@ function AgentsSection({
               found.length > 0 ? "text-muted-foreground" : "text-foreground",
             )}
           >
-            {found.length > 0 ? "Add more agents" : "Set up an agent"}
+            {found.length > 0 ? "Add more" : "Set up an agent"}
           </span>
           {showMore ? null : <AgentLogoStack providers={available} acp={acpAllowed} />}
           <ChevronDownIcon className="ml-auto size-4 text-muted-foreground group-data-panel-open:rotate-180" />
@@ -774,9 +839,9 @@ function ProjectsSection({
   if (scan === undefined) return null;
   if (scan.isPending && candidates.length === 0) {
     return (
-      <WelcomeSection title="Projects">
+      <WelcomeSection title="Folders">
         <p className="text-sm leading-10 text-muted-foreground">
-          Looking for projects in your {IMPORT_SOURCES_LABEL} history…
+          Looking for folders in your {IMPORT_SOURCES_LABEL} history…
         </p>
       </WelcomeSection>
     );
@@ -788,12 +853,12 @@ function ProjectsSection({
   );
   if (scan.error !== null && candidates.length === 0) {
     return (
-      <WelcomeSection title="Projects">
+      <WelcomeSection title="Folders">
         <div
           role="alert"
           className="flex min-h-10 items-center justify-between gap-3 text-sm text-muted-foreground"
         >
-          <span>Could not check projects. {scan.error}</span>
+          <span>Could not check folders. {scan.error}</span>
           {retry}
         </div>
       </WelcomeSection>
@@ -801,7 +866,7 @@ function ProjectsSection({
   }
   if (candidates.length === 0) {
     return scan.data?.truncated ? (
-      <WelcomeSection title="Projects">
+      <WelcomeSection title="Folders">
         <p className="text-xs leading-10 text-muted-foreground" role="status">
           {SCAN_LIMIT_MESSAGE}
         </p>
@@ -820,7 +885,7 @@ function ProjectsSection({
     selected.length < candidates.length &&
     !(selected.length === defaultKeys.length && defaultKeys.every((key) => selectedKeys.has(key)));
   return (
-    <WelcomeSection title="Projects">
+    <WelcomeSection title="Folders">
       <div className="flex min-h-10 items-center gap-3 py-1">
         <label className="flex min-w-0 flex-1 items-center gap-3">
           <RowIcon>
@@ -836,8 +901,8 @@ function ProjectsSection({
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-foreground">
               {canWrite && selected.length > 0
-                ? `Import ${selected.length} ${selected.length === 1 ? "project" : "projects"} and their threads`
-                : "Import projects and their threads"}
+                ? `Import ${selected.length} ${selected.length === 1 ? "folder" : "folders"} and their chats`
+                : "Import folders and their chats"}
             </span>
             <span className="block text-xs text-muted-foreground">
               From your {IMPORT_SOURCES_LABEL} history
@@ -903,7 +968,7 @@ function ProjectsSection({
           role="alert"
           className="flex items-center justify-between gap-3 pl-8 text-sm text-muted-foreground"
         >
-          <span>Could not check projects again. {scan.error}</span>
+          <span>Could not check folders again. {scan.error}</span>
           {retry}
         </div>
       ) : null}
@@ -924,7 +989,7 @@ function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId
             <SmartphoneIcon className="size-4" />
           </RowIcon>
           <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
-            Use T3 Code on your phone
+            Use DoeDesk on your phone
           </span>
           <CollapsibleTrigger render={<Button variant="ghost-muted" size="xs" />}>
             {open ? "Hide" : "Set up"}
@@ -948,7 +1013,7 @@ function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId
                 size={124}
                 level="M"
                 marginSize={2}
-                title="T3 Code app for iPhone and Android"
+                title="DoeDesk app for iPhone and Android"
               />
             </div>
           </div>
@@ -1150,7 +1215,7 @@ function AgentRow({
   readonly provider: ServerProvider;
   readonly state: ReturnType<typeof welcomeAgentState>;
   readonly action?: ReactNode;
-  // A row in the "Add more agents" grid: the button carries the state, so no detail line.
+  // A row in the "Add more" grid: the button carries the state, so no detail line.
   readonly compact?: boolean;
 }) {
   const name = agentName(provider);
@@ -1385,7 +1450,7 @@ function AgentInstallTerminal({
   );
 }
 
-const IMPORT_PERMISSION_MESSAGE = "This connection cannot import projects or thread history.";
+const IMPORT_PERMISSION_MESSAGE = "This connection cannot import folders or chat history.";
 
 // Creates the selected projects, then imports each one's agent history. Owns retry state so a
 // second Start resumes instead of recreating projects.
@@ -1442,7 +1507,7 @@ function useProjectImport({
       })),
     ),
   );
-  // Projects already in T3 Code stay in the list, but reopening the page does not import their
+  // Projects already in DoeDesk stay in the list, but reopening the page does not import their
   // history again unless the user picks them. The scan can be 30 s old, so the live list decides.
   const projects = useProjects();
   const isNewProject = isNewOnboardingProject(projects);
@@ -1623,13 +1688,13 @@ function useProjectImport({
     const importedThreadCount = importedThreadTotal();
     if (importedProjectsCount < selection.length) {
       if (importedThreadCount > 0 && skippedThreadCount > 0) {
-        importWarningRef.current = `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "thread" : "threads"}. ${skippedThreadCount} ${skippedThreadCount === 1 ? "thread" : "threads"} could not be imported.`;
+        importWarningRef.current = `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "chat" : "chats"}. ${skippedThreadCount} ${skippedThreadCount === 1 ? "chat" : "chats"} could not be imported.`;
       } else if (skippedThreadCount > 0) {
-        importWarningRef.current = `${skippedThreadCount} ${skippedThreadCount === 1 ? "thread could" : "threads could"} not be imported.`;
+        importWarningRef.current = `${skippedThreadCount} ${skippedThreadCount === 1 ? "chat could" : "chats could"} not be imported.`;
       } else if (importedThreadCount > 0) {
-        importWarningRef.current = `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "thread" : "threads"}. Some thread history could not be imported.`;
+        importWarningRef.current = `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "chat" : "chats"}. Some chat history could not be imported.`;
       } else {
-        importWarningRef.current = "Could not import thread history.";
+        importWarningRef.current = "Could not import chat history.";
       }
     }
     finishAfterImport();

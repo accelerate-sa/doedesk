@@ -138,7 +138,7 @@ export function T3ConnectProfilePage() {
       {environmentsState.error ? (
         <>
           <ClerkRow
-            title="Could not load T3 Connect environments"
+            title="Could not load T3 Connect computers"
             subtitle={environmentsState.error}
           />
           {errorTraceId ? (
@@ -153,7 +153,7 @@ export function T3ConnectProfilePage() {
       ) : isInitialLoad ? (
         <View className="flex-row items-center gap-3 px-6 py-4">
           <AppActivityIndicator colorClassName={"accent-clerk-foreground-muted"} size="small" />
-          <Text className="text-base text-clerk-foreground-muted">Loading environments</Text>
+          <Text className="text-base text-clerk-foreground-muted">Loading computers</Text>
         </View>
       ) : environments.length > 0 ? (
         environments.map((environment) => (

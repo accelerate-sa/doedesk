@@ -78,15 +78,15 @@ it.each([
   {
     parent: "deleted there",
     reply: deleted,
-    feedback: { type: "info", title: "The parent thread was deleted" },
+    feedback: { type: "info", title: "The parent chat was deleted" },
   },
   {
     parent: "unreadable",
     reply: {
       _tag: "Failure",
-      cause: Cause.fail(new Error("Failed to load orchestration V2 thread")),
+      cause: Cause.fail(new Error("Failed to load orchestration V2 chat")),
     },
-    feedback: { type: "error", title: "Could not open the parent thread" },
+    feedback: { type: "error", title: "Could not open the parent chat" },
   },
 ])("keeps the child open with feedback when its remote parent is $parent", async (row) => {
   await using screen = await renderChild(row.reply);

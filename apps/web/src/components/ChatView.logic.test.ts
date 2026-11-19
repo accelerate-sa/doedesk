@@ -151,7 +151,7 @@ describe("deriveComposerSendState", () => {
 
 describe("isThreadEnvironmentLocked", () => {
   it.each([
-    { name: "an empty unbound thread", providerThread: null, expected: false },
+    { name: "an empty unbound chat", providerThread: null, expected: false },
     {
       name: "an imported session bound before its first run",
       providerThread: "imported",
@@ -928,8 +928,8 @@ describe("waitForRevertedMessage", () => {
         { environmentId: threadRef.environmentId, threadId: ThreadId.make(id) },
         title,
       );
-    const drafted = thread("drafted-thread", "Drafted thread");
-    const mentioned = thread("referenced-thread", "Other thread");
+    const drafted = thread("drafted-thread", "Drafted chat");
+    const mentioned = thread("referenced-thread", "Other chat");
     const machine = environmentContextRecord(EnvironmentId.make("env-2"), "Build box");
     useComposerDraftStore.getState().addThreadContexts(threadRef, [drafted]);
     const draftPrompt = useComposerDraftStore.getState().getComposerDraft(threadRef)!.prompt;

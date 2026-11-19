@@ -643,9 +643,9 @@ function itemSummary(
     case "handoff":
       return "Context handed off";
     case "fork":
-      return "Thread forked";
+      return "Chat forked";
     case "thread_created":
-      return "Thread created";
+      return "Chat created";
     case "secret_request":
       return item.label;
     case "link_request":

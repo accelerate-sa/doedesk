@@ -308,10 +308,10 @@ export function ComposerContextSheet(props: {
             ) : null}
             {record.kind === "thread" ? (
               <View className="gap-3">
-                <ContextField label="Thread" value={record.title} />
+                <ContextField label="Chat" value={record.title} />
                 {props.onOpenThread ? (
                   <Button
-                    label="Open thread"
+                    label="Open chat"
                     tone="secondary"
                     onPress={() =>
                       props.onOpenThread?.({

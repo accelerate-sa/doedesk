@@ -19,6 +19,12 @@ const CLI_RUNTIME_EXTERNAL_PREFIXES = [
   "node-addon-api",
   "bufferutil",
   "utf-8-validate",
+  // The image library of the privacy gateway: a native binary found beside its loader, and the
+  // two packages the loader itself imports.
+  "sharp",
+  "@img/",
+  "detect-libc",
+  "semver",
 ] as const;
 
 // Match Cursor dependency boundaries so zod does not externalize zod-to-json-schema.

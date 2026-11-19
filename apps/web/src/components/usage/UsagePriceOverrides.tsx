@@ -183,7 +183,7 @@ export function UsagePriceOverrides({
   const hasChanges = stagedDrafts.length > 0;
   const destinationLabel =
     selected.length === 1 ? selected[0]!.label : `${selected.length} environments`;
-  const selectionLabel = selectedIds === null ? "All environments" : destinationLabel;
+  const selectionLabel = selectedIds === null ? "All computers" : destinationLabel;
   const discard = () => {
     setDrafts([]);
     setAttempt(null);
@@ -234,7 +234,7 @@ export function UsagePriceOverrides({
       (destination) =>
         environments.find(
           (environment) => environment.environmentId === destination.environmentId,
-        ) ?? { ...destination, prices: null, aliases: null, unavailable: "Environment removed" },
+        ) ?? { ...destination, prices: null, aliases: null, unavailable: "Computer removed" },
     );
     const changes = new Map(
       targets.map((target) => [target.environmentId, usagePriceTableChanges(target, edits)]),
@@ -284,7 +284,7 @@ export function UsagePriceOverrides({
         <DialogHeader>
           <DialogTitle>Custom model prices</DialogTitle>
           <DialogDescription>
-            Prices and mappings apply to all past and future usage on the environments you select.
+            Prices and mappings apply to all past and future usage on the computers you select.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -310,7 +310,7 @@ export function UsagePriceOverrides({
                     closeOnClick={false}
                     onCheckedChange={(checked) => selectEnvironments(checked ? null : new Set())}
                   >
-                    All environments
+                    All computers
                   </MenuCheckboxItem>
                   <MenuSeparator />
                   {environments.map((environment) => (
@@ -343,8 +343,8 @@ export function UsagePriceOverrides({
           {selected.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {environments.length === 0
-                ? "Connect an environment to set model prices."
-                : "Select an environment to see and change its model prices."}
+                ? "Connect a computer to set model prices."
+                : "Select a computer to see and change its model prices."}
             </p>
           ) : (
             <>
@@ -388,7 +388,7 @@ export function UsagePriceOverrides({
                         <TableCell colSpan={7} className="text-center whitespace-normal">
                           <p className="py-6 text-muted-foreground">
                             {selected.some((environment) => environment.prices === null)
-                              ? "Some environment prices are unavailable."
+                              ? "Some computer prices are unavailable."
                               : "No custom prices or mappings. Add a row to set one."}
                           </p>
                         </TableCell>
@@ -566,7 +566,7 @@ export function UsagePriceOverrides({
                 Blank cache rates use the input price. Enter 0 for free tokens. A mapped model’s
                 usage counts as the model it maps to.
                 {selected.length > 1
-                  ? " Mixed cells keep each environment’s rate until you edit them."
+                  ? " Mixed cells keep each computer’s rate until you edit them."
                   : ""}
               </p>
             </>

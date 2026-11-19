@@ -171,7 +171,7 @@ vi.mock("../../state/projects", () => ({
     create: ({ input }: { input: { workspaceRoot: string } }) => {
       if (!state.scopes.has(AuthOrchestrationOperateScope)) {
         return Promise.resolve(
-          AsyncResult.failure(Cause.fail(new Error("Project creation denied"))),
+          AsyncResult.failure(Cause.fail(new Error("Folder creation denied"))),
         );
       }
       state.projects.push(input.workspaceRoot);
@@ -249,7 +249,7 @@ function cloneAction() {
         repositoryName: "repo",
       }),
     ),
-    "Clone project",
+    "Clone folder",
     true,
   );
   if (!action) throw new Error("Clone action missing");
@@ -292,7 +292,7 @@ describe("clone project permissions", () => {
 
   it.each([
     [
-      "opens the existing project of that repository instead of cloning into its folder",
+      "opens the existing folder of that repository instead of cloning into its folder",
       "example.com/owner/repo",
       false,
     ],
@@ -393,7 +393,7 @@ describe("add project source environment", () => {
     state.dispatch.mockReset();
     state.environments = [
       { environmentId: "environment", environmentLabel: "Environment" },
-      { environmentId: "another-environment", environmentLabel: "Another environment" },
+      { environmentId: "another-environment", environmentLabel: "Another computer" },
     ];
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     const root = createRoot(document.createElement("div"));
@@ -421,8 +421,8 @@ describe("add project source environment", () => {
       state.connectionStates = { environment: "offline" };
       await act(() => root.render(createElement(SourceObserver)));
       expect(findAction(screen, "Local folder")).toBeNull();
-      const select = findAction(screen, "Another environment");
-      if (!select) throw new Error("Connected environment selection missing");
+      const select = findAction(screen, "Another computer");
+      if (!select) throw new Error("Connected computer selection missing");
       await act(() => select());
       const local = findAction(screen, "Local folder");
       if (!local) throw new Error("Manually selected local folder action missing");
@@ -444,7 +444,7 @@ describe("add project source environment", () => {
     const navigation = mountProjectFlow(false, true, false, "AddProject");
     state.environments = [
       { environmentId: "environment", environmentLabel: "Environment" },
-      { environmentId: "another-environment", environmentLabel: "Another environment" },
+      { environmentId: "another-environment", environmentLabel: "Another computer" },
     ];
     state.connectionStates = { environment: "connecting" };
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -458,8 +458,8 @@ describe("add project source environment", () => {
       await act(() => root.render(createElement(SourceObserver)));
       expect(findAction(screen, "Local folder")).toBeNull();
       expect(navigation.getState().routes.at(-1)?.name).toBe("AddProject");
-      const select = findAction(screen, "Another environment");
-      if (!select) throw new Error("Connected environment selection missing");
+      const select = findAction(screen, "Another computer");
+      if (!select) throw new Error("Connected computer selection missing");
       await act(() => select());
       state.connectionStates = {};
       await act(() => root.render(createElement(SourceObserver)));
@@ -483,7 +483,7 @@ describe("add project source environment", () => {
     const navigation = mountProjectFlow(false, true, false, "AddProject");
     state.environments = [
       { environmentId: "environment", environmentLabel: "Environment" },
-      { environmentId: "another-environment", environmentLabel: "Another environment" },
+      { environmentId: "another-environment", environmentLabel: "Another computer" },
     ];
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     const root = createRoot(document.createElement("div"));
@@ -549,9 +549,9 @@ describe("local project navigation", () => {
     state.waitForProject.mockReturnValue(projected.promise);
     const submit = findAction(
       renderScreen(() => AddProjectLocalFolderScreen({ environmentId: "environment" })),
-      "Add project",
+      "Add folder",
     );
-    if (!submit) throw new Error("Add project action missing");
+    if (!submit) throw new Error("Add folder action missing");
     return { created, projected, submit };
   }
 
@@ -565,8 +565,8 @@ describe("local project navigation", () => {
     expect(state.projects).toEqual(["/tmp/t3-mobile-audit-fixture"]);
     expect(state.dispatch).not.toHaveBeenCalled();
     expect(state.alert).toHaveBeenCalledExactlyOnceWith(
-      "Project added",
-      "The project was created but has not reached this device yet. It will appear in the project list once the connection catches up.",
+      "Folder added",
+      "The folder was created but has not reached this device yet. It will appear in the folder list once the connection catches up.",
     );
   });
 
@@ -654,7 +654,7 @@ describe("local project navigation", () => {
         }>(node)
       )
         return false;
-      if (node.props.placeholder === "Project name") {
+      if (node.props.placeholder === "Folder name") {
         node.props.onChangeText!("new-project");
         return true;
       }
@@ -665,8 +665,8 @@ describe("local project navigation", () => {
       await act(() => {
         expect(enterName(screen)).toBe(true);
       });
-      const submit = findAction(screen, "Create project");
-      if (!submit) throw new Error("Create project action missing");
+      const submit = findAction(screen, "Create folder");
+      if (!submit) throw new Error("Create folder action missing");
       await act(async () => {
         submit();
         created.resolve(
@@ -758,7 +758,7 @@ describe("local folder path", () => {
     state.connectionStates = {};
     state.environments = [
       { environmentId: "environment", environmentLabel: "Environment" },
-      { environmentId: "another-environment", environmentLabel: "Another environment" },
+      { environmentId: "another-environment", environmentLabel: "Another computer" },
     ];
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     const root = createRoot(document.createElement("div"));

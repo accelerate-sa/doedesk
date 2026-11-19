@@ -11,7 +11,7 @@ import {
 import { EMPTY_COMPOSER_CONTEXT_RECORDS } from "../composerContextPresentation";
 import { terminalThemeFromApp } from "../ThreadTerminalDrawer";
 import { useRenderedAppearance, useTheme } from "../../hooks/useTheme";
-import { DEFAULT_COMPOSER_PLACEHOLDER } from "../../composerPlaceholder";
+import { composerPlaceholder } from "../../composerPlaceholder";
 import { resolveDiffThemeName, type DiffThemeName } from "../../lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "../../lib/syntaxHighlighting";
 import { GhosttyTerminalSurface } from "~/terminal/ghostty/surface";
@@ -45,11 +45,20 @@ export function PromptFontPreview() {
         contextRecords={EMPTY_COMPOSER_CONTEXT_RECORDS}
         skills={PREVIEW_SKILLS}
         disabled={false}
-        placeholder={DEFAULT_COMPOSER_PLACEHOLDER}
+        placeholder={composerPlaceholder()}
         className="max-h-42"
         onChange={onChange}
         onPaste={noop}
       />
+    </div>
+  );
+}
+
+export function ReadingFontPreview() {
+  return (
+    <div className="chat-markdown reading-prose mt-1 mb-2 rounded-lg border border-border bg-background px-3 py-2 text-foreground">
+      <p>The lease runs for three years from 1 March 2027, at SAR 248,500 a year.</p>
+      <p dir="rtl">مدة العقد ثلاث سنوات تبدأ من 1 مارس 2027، والأجرة السنوية 248,500 ريال.</p>
     </div>
   );
 }

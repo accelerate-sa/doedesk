@@ -66,7 +66,7 @@ describe("mobile environment settings sections", () => {
       environmentId: "environment-cloud",
       isRelayManaged: true,
       connectionState: "reconnecting",
-      connectionError: "Environment did not respond before the connection timeout.",
+      connectionError: "Computer did not respond before the connection timeout.",
     });
 
     const sections = splitEnvironmentSections({

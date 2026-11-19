@@ -37,7 +37,7 @@ const UNDONE_ACTION = {
 } satisfies Record<UndoOptions["action"], string>;
 
 function countLabel(action: UndoOptions["action"], count: number) {
-  const noun = action === "Discarded" ? "draft" : "thread";
+  const noun = action === "Discarded" ? "draft" : "chat";
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 

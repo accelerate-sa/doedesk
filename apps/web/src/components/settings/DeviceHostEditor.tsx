@@ -88,7 +88,7 @@ function DeviceHostEditorForm({
     targets.length === 1 ||
     (expandedChecks?.key === connectionKey ? expandedChecks.open : failed > 0);
   const checkSummary = checking
-    ? "Checking environments…"
+    ? "Checking computers…"
     : results
       ? failed
         ? `${failed} of ${targets.length} failed`
@@ -107,7 +107,7 @@ function DeviceHostEditorForm({
         <DialogDescription>
           {targets.length === 1
             ? `Connect from ${targets[0]?.label}.`
-            : `Connect from ${targets.length} selected environments.`}{" "}
+            : `Connect from ${targets.length} selected computers.`}{" "}
           Hosts on the same machine are skipped.
         </DialogDescription>
       </DialogHeader>
@@ -180,7 +180,7 @@ function DeviceHostEditorForm({
             </label>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Optional. Resolved separately on each environment.
+            Optional. Resolved separately on each computer.
           </p>
         </details>
         <Collapsible

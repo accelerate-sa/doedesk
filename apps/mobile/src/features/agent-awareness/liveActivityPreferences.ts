@@ -64,7 +64,7 @@ export const setLiveActivityUpdatesEnabled = Effect.fn("setLiveActivityUpdatesEn
           updateEnvironmentPreference(connection, input.previousEnabled, clerkToken).pipe(
             Effect.catchCause((cause) =>
               Effect.logWarning(
-                `Could not restore Live Activity preference for environment ${connection.environmentId}.`,
+                `Could not restore Live Activity preference for computer ${connection.environmentId}.`,
                 cause,
               ),
             ),

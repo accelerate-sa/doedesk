@@ -607,10 +607,10 @@ function ConfiguredCloudLinkRow({
             ? "T3 Connect tunnel disabled"
             : "T3 Connect unlinked",
         description: enabled
-          ? "This environment is available through T3 Connect."
+          ? "This computer is available through T3 Connect."
           : publishAgentActivity
             ? "The managed tunnel was removed. Agent activity publishing stays on."
-            : "This environment is no longer available through T3 Connect.",
+            : "This computer is no longer available through T3 Connect.",
       });
     }
     setIsUpdating(false);
@@ -625,8 +625,8 @@ function ConfiguredCloudLinkRow({
         type: "success",
         title: enabled ? "Agent activity enabled" : "Agent activity disabled",
         description: enabled
-          ? "This environment publishes agent activity to your mobile clients."
-          : "This environment will stop publishing agent activity.",
+          ? "This computer publishes agent activity to your mobile clients."
+          : "This computer will stop publishing agent activity.",
       });
     }
     setIsUpdatingPreference(false);
@@ -644,8 +644,8 @@ function ConfiguredCloudLinkRow({
         type: "success",
         title: enabled ? "Webhooks held while offline" : "Webhooks no longer held",
         description: enabled
-          ? "T3 Connect keeps webhook requests for up to 24 hours while this environment is offline."
-          : "Requests to an offline environment now fail. Anything already held is still delivered.",
+          ? "T3 Connect keeps webhook requests for up to 24 hours while this computer is offline."
+          : "Requests to an offline computer now fail. Anything already held is still delivered.",
       });
     }
     setIsUpdatingPreference(false);
@@ -660,18 +660,18 @@ function ConfiguredCloudLinkRow({
             connectDenial !== undefined && !managedTunnelActive
               ? connectDenial
               : signedOut
-                ? "Sign in to make this environment available to your other devices through T3 Connect."
+                ? "Sign in to make this computer available to your other devices through T3 Connect."
                 : linkRevoked
-                  ? "This environment was removed from T3 Connect. Turn it on to link it again."
+                  ? "This computer was removed from T3 Connect. Turn it on to link it again."
                   : managedTunnelActive
                     ? reachability?.status === "unreachable"
-                      ? "T3 Connect is on, but other devices cannot reach this environment."
+                      ? "T3 Connect is on, but other devices cannot reach this computer."
                       : reachability?.status === "reachable"
-                        ? "This environment is available to your other devices through T3 Connect."
+                        ? "This computer is available to your other devices through T3 Connect."
                         : "T3 Connect is on. Reachability has not been checked yet."
                     : managedTunnelOutOfSync
-                      ? "T3 Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn T3 Connect on to repair it."
-                      : "Make this environment available to your other devices through T3 Connect."
+                      ? "T3 Connect is out of sync. This computer is linked only to publish agent activity, so other devices cannot connect. Turn T3 Connect on to repair it."
+                      : "Make this computer available to your other devices through T3 Connect."
           }
           status={operationError ?? cloudLinkState.error ?? reachabilityStatus}
           managed={managedTunnelActive ? undefined : connectDenial}
@@ -695,12 +695,12 @@ function ConfiguredCloudLinkRow({
       ) : linkRevoked ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description="This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again."
+          description="This computer was removed from T3 Connect. Run `t3 connect link` on the host to link it again."
         />
       ) : isElectron ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description="Run `t3 connect link` on the host, then restart T3 Code there."
+          description="Run `t3 connect link` on the host, then restart DoeDesk there."
         />
       ) : null}
       {signedOut && showSwitch ? null : (
@@ -730,11 +730,11 @@ function ConfiguredCloudLinkRow({
       {managedTunnelActive && !signedOut ? (
         <SettingsRow
           title={searchableSetting("hold-webhooks-while-offline").title}
-          description="Keep webhook requests for up to 24 hours while this environment is offline, then deliver them. Off: T3 Connect only forwards requests and stores nothing."
+          description="Keep webhook requests for up to 24 hours while this computer is offline, then deliver them. Off: T3 Connect only forwards requests and stores nothing."
           managed={connectDenial}
           control={
             <CloudLinkSwitch
-              ariaLabel="Hold webhook requests while this environment is offline"
+              ariaLabel="Hold webhook requests while this computer is offline"
               checked={holdWebhooksWhileOffline}
               disabled={switchDisabled}
               disabledReason={disabledReason}
@@ -811,11 +811,11 @@ function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnable
         <ChevronsLeftRightEllipsisIcon />
       </EmptyMedia>
       <EmptyHeader>
-        <EmptyTitle>No saved remote environments</EmptyTitle>
+        <EmptyTitle>No saved remote computers</EmptyTitle>
         <EmptyDescription>
           {cloudEnabled
-            ? "Click “Add environment” to pair another environment, or connect one from T3 Connect."
-            : "Click “Add environment” to pair another environment."}
+            ? "Click “Add computer” to pair another computer, or connect one from T3 Connect."
+            : "Click “Add computer” to pair another computer."}
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

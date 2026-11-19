@@ -1867,7 +1867,11 @@ export const createCodexAdapterV2 = Effect.fn("CodexAdapterV2.createCodexAdapter
   return yield* makeCodexAdapterV2({
     instanceId,
     settings,
-    environment: yield* mergeProviderInstanceEnvironment(environment, hostEnvironment),
+    environment: yield* mergeProviderInstanceEnvironment(
+      environment,
+      hostEnvironment,
+      CODEX_PROVIDER,
+    ),
     clientFactory,
     digest,
     fileSystem,
@@ -2050,7 +2054,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               return yield* new ProviderSetupError({
                 instanceId: adapterOptions.instanceId,
                 operation: "runtime",
-                detail: `Codex ${version} does not work with this T3 Code release. Update Codex to ${target}, then retry.`,
+                detail: `Codex ${version} does not work with this DoeDesk release. Update Codex to ${target}, then retry.`,
               });
             }
             yield* client.notify("initialized", undefined);

@@ -86,6 +86,9 @@ import {
   DeviceStandardToolkit,
 } from "./toolkits/device/tools.ts";
 import * as HtmlHandlers from "./toolkits/html/handlers.ts";
+import * as PrivacyGateway from "../privacy/PrivacyGateway.ts";
+import * as PrivacyHandlers from "./toolkits/privacy/handlers.ts";
+import { PrivacyToolkit } from "./toolkits/privacy/tools.ts";
 import { MessageToolkit } from "./toolkits/message/tools.ts";
 import * as MessageHandlers from "./toolkits/message/handlers.ts";
 import { HtmlPreviewTool, HtmlPreviewToolkit, HtmlRenderToolkit } from "./toolkits/html/tools.ts";
@@ -118,7 +121,7 @@ const unauthorized = (input: {
   return HttpServerResponse.jsonUnsafe(
     {
       error: "invalid_mcp_credential",
-      message: "A valid T3 Code MCP credential is required.",
+      message: "A valid DoeDesk MCP credential is required.",
     },
     {
       status: 401,
@@ -1262,6 +1265,16 @@ export const layerThreadToolkit = toolkitRegistration(ThreadToolkit, ThreadHandl
 
 const layerMessageToolkit = toolkitRegistration(MessageToolkit, MessageHandlers.layer);
 
+/**
+ * The reading tool of the privacy gateway: a file's text with personal data masked. It is listed
+ * and callable only while masking is on and the user has the tool switched on in Settings.
+ */
+const layerPrivacyToolkit = toolkitRegistration(PrivacyToolkit, PrivacyHandlers.layer).pipe(
+  Layer.provide(
+    McpServer.visibility(() => Effect.sync(() => PrivacyGateway.readingToolOffered())).layer,
+  ),
+);
+
 const layerWorktreeToolkitRegistration = toolkitRegistration(
   WorktreeToolkit,
   WorktreeHandlers.layer,
@@ -1329,7 +1342,7 @@ export const layerInProcessMcpServer = McpServer.middleware<{
 
 export const layerMcpTransport = <RA, RE, RR>(registrations: Layer.Layer<RA, RE, RR>) =>
   McpServer.layerHttp({
-    name: "T3 Code",
+    name: "DoeDesk",
     version: packageJson.version,
     path: MCP_HTTP_PATH,
     // The first protocol is the fallback for clients that offer an unknown version.
@@ -1353,6 +1366,7 @@ export const layerTools = Layer.mergeAll(
   layerDeviceToolkit,
   layerHtmlToolkit,
   layerMessageToolkit,
+  layerPrivacyToolkit,
 );
 
 const layerToolExposure = Layer.effect(

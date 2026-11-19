@@ -176,10 +176,10 @@ function PairingForm({
 
   return (
     <SettingsScreen
-      title="Add environment"
+      title="Add computer"
       actions={[
         {
-          accessibilityLabel: connecting ? "Connecting" : "Add environment",
+          accessibilityLabel: connecting ? "Connecting" : "Add computer",
           loading: connecting,
           icon: "checkmark",
           tintColor: headerIconColor,

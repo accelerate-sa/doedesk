@@ -40,8 +40,9 @@ type DesktopThemeBridge = Pick<DesktopBridge, "setTheme">;
 
 const STORAGE_KEY = "t3code:theme";
 const MEDIA_QUERY = "(prefers-color-scheme: dark)";
+// DoeDesk's own theme is the default; it has a light and a dark half and follows the system.
 const DEFAULT_THEME_SNAPSHOT: ThemeSnapshot = {
-  theme: "system",
+  theme: "doedesk",
   resolvedTheme: "light",
   systemDark: false,
   followSystem: true,
@@ -150,6 +151,8 @@ function readStoredFollowSystem(theme: Theme): boolean {
     const raw = window.localStorage.getItem(THEME_FOLLOW_SYSTEM_STORAGE_KEY);
     if (raw === "true") return true;
     if (raw === "false") return false;
+    // Nothing chosen yet: the default theme follows the system appearance.
+    if (window.localStorage.getItem(STORAGE_KEY) === null) return true;
   } catch {}
 
   return theme === "system";

@@ -93,11 +93,11 @@ function LicenseNoticeRow({
           </CollapsibleTrigger>
           {entry.sourceUrl ? (
             <Button
-              aria-label={`View project source for ${entry.name}`}
+              aria-label={`View folder source for ${entry.name}`}
               className="me-3 shrink-0 sm:me-4"
               render={<a href={entry.sourceUrl} rel="noreferrer noopener" target="_blank" />}
               size="icon-micro"
-              title="Project source"
+              title="Folder source"
               variant="ghost-muted"
             >
               <ExternalLinkIcon aria-hidden className="size-3" />

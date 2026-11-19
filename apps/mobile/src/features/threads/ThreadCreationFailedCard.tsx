@@ -16,7 +16,7 @@ export function ThreadCreationFailedCard(props: {
         {props.reason}
       </Text>
       <Text className="font-sans text-xs leading-normal text-foreground-secondary">
-        Your prompt was kept in the project draft.
+        Your prompt was kept in the folder draft.
       </Text>
       <View className="flex-row">
         <Button label="Edit task" tone="primary" onPress={props.onEditTask} />

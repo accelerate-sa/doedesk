@@ -128,7 +128,7 @@ describe("composerSubmissionIntentForKey", () => {
     ["mod-enter", "one line"],
     ["mod-enter-multiline", "two\nlines"],
   ] as const)(
-    "starts a new thread in the foreground on Mod+Enter with %s",
+    "starts a new chat in the foreground on Mod+Enter with %s",
     (sendShortcut, prompt) => {
       const draft = { ...input, isDraftThread: true, sendShortcut, prompt };
       expect(composerSubmissionIntentForKey({ ...draft, event: { ...enter, ctrlKey: true } })).toBe(

@@ -37,7 +37,7 @@ export class ThreadOutboxStorageError extends Schema.TaggedError<ThreadOutboxSto
   },
 ) {
   override get message(): string {
-    return `Thread outbox storage operation ${this.operation} failed for environment ${this.environmentId ?? "unknown"}, thread ${this.threadId ?? "unknown"}, message ${this.messageId ?? "unknown"}, file ${this.fileName ?? "unknown"}.`;
+    return `Chat outbox storage operation ${this.operation} failed for computer ${this.environmentId ?? "unknown"}, chat ${this.threadId ?? "unknown"}, message ${this.messageId ?? "unknown"}, file ${this.fileName ?? "unknown"}.`;
   }
 }
 

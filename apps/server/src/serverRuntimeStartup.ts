@@ -1,3 +1,4 @@
+import { NEW_THREAD_TITLE } from "./orchestration-v2/placeholderThreadTitle.ts";
 import {
   CommandId,
   DEFAULT_MODEL,
@@ -47,7 +48,6 @@ import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerSettings from "./serverSettings.ts";
 import { forkParked, forkParkedFiber } from "./serverActivation.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
-import { getServerOwners } from "./telemetry/Identify.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import { formatHeadlessServeOutput, issueHeadlessServeAccessInfo } from "./startupAccess.ts";
@@ -172,7 +172,6 @@ const recordStartupHeartbeat = Effect.gen(function* () {
     threadCount,
     projectCount,
   });
-  yield* analytics.recordOwners(yield* getServerOwners, "server");
 });
 
 const getAutoBootstrapThreadModelSelection = (): ModelSelection => ({
@@ -298,7 +297,7 @@ const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
         .launch({
           commandId: CommandId.make(yield* randomUUID),
           projectId: project.id,
-          title: "New thread",
+          title: NEW_THREAD_TITLE,
           modelSelection:
             resolveProjectSettings(settings, project.id, project).settings.defaultModelSelection ??
             threadModelSelection,
@@ -354,7 +353,7 @@ const resolveStartupBrowserTarget = Effect.gen(function* () {
 
 /** Prints the one-time admin pairing URL to stdout only; logger records reach trace files and collectors. */
 export const announceStartupPairingUrl = (pairingUrl: string) =>
-  Effect.logInfo("Authentication required. Open T3 Code using the pairing URL.").pipe(
+  Effect.logInfo("Authentication required. Open DoeDesk using the pairing URL.").pipe(
     Effect.andThen(Console.log(`  pairingUrl: ${pairingUrl}`)),
   );
 

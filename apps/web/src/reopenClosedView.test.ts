@@ -252,7 +252,7 @@ describe("planNextReopen", () => {
   it.each([
     ["restores the newest entry", [known, known], [], "a"],
     [
-      "drops a removed environment once the catalog is ready",
+      "drops a removed computer once the catalog is ready",
       [{ ...known, environmentKnown: false }, known],
       ["a"],
       "b",
@@ -264,7 +264,7 @@ describe("planNextReopen", () => {
       null,
     ],
     [
-      "skips but keeps a thread deleted from a live shell",
+      "skips but keeps a chat deleted from a live shell",
       [{ ...known, ownerExists: false }, known],
       [],
       "b",
@@ -282,7 +282,7 @@ describe("planNextReopen", () => {
       null,
     ],
     [
-      "waits when a cached shell lacks the thread",
+      "waits when a cached shell lacks the chat",
       [{ ...known, ownerExists: false, shellLive: false }, known],
       [],
       null,

@@ -146,7 +146,7 @@ function ThreadRouteFallbackLayout(props: { readonly children: ReactNode }) {
     <ThreadScreenFallback
       header={
         inspectorHeaderShown ? undefined : (
-          <AppBar title="Thread" onBackToList={goBack} hideBottomBorder />
+          <AppBar title="Chat" onBackToList={goBack} hideBottomBorder />
         )
       }
     >
@@ -158,7 +158,7 @@ function ThreadRouteFallbackLayout(props: { readonly children: ReactNode }) {
 function OpeningThreadLoadingScreen() {
   return (
     <ThreadRouteFallbackLayout>
-      <LoadingScreen message="Opening thread…" messagePlacement="above-spinner" embedded />
+      <LoadingScreen message="Opening chat…" messagePlacement="above-spinner" embedded />
     </ThreadRouteFallbackLayout>
   );
 }
@@ -194,8 +194,8 @@ function ThreadUnavailableScreen(props: {
         className="bg-screen flex-1 android:bg-transparent"
       >
         <EmptyState
-          title="Thread unavailable"
-          detail="This thread is not available in the current mobile snapshot."
+          title="Chat unavailable"
+          detail="This chat is not available in the current mobile snapshot."
           actionLabel={props.actionLabel}
           onAction={props.onAction}
         />
@@ -336,9 +336,7 @@ function LiveThreadRouteController(props: ThreadRouteScreenProps) {
 
   return withInspectorHeader(
     <ThreadUnavailableScreen
-      actionLabel={
-        routeEnvironmentRuntime === null ? "Manage environments" : "Reconnect environment"
-      }
+      actionLabel={routeEnvironmentRuntime === null ? "Manage computers" : "Reconnect computer"}
       onAction={() => {
         if (routeEnvironmentRuntime !== null) {
           onReconnectEnvironment(environmentId);
@@ -404,25 +402,25 @@ function ThreadRouteContent(
     run: composer.selectedThreadAnnouncedRun,
     detailBehind: composer.selectedThreadDetailBehindShell,
   });
-  const interruptThreadTurn = useAtomCommand(threadEnvironment.interruptTurn, "thread interrupt");
+  const interruptThreadTurn = useAtomCommand(threadEnvironment.interruptTurn, "chat interrupt");
   const resumeThreadQueue = useAtomCommand(threadEnvironment.resumeThreadQueue, {
     label: "resume queue",
     reportFailure: false,
   });
   const continueThreadRun = useAtomCommand(threadEnvironment.startTurn, {
-    label: "continue thread",
+    label: "continue chat",
     reportFailure: false,
   });
   const setThreadRuntimeMode = useAtomCommand(threadEnvironment.setRuntimeMode, {
-    label: "set thread runtime mode",
+    label: "set chat runtime mode",
     reportFailure: false,
   });
   const setThreadInteractionMode = useAtomCommand(threadEnvironment.setInteractionMode, {
-    label: "set thread interaction mode",
+    label: "set chat interaction mode",
     reportFailure: false,
   });
   const loadEarlierHistory = useAtomCommand(threadEnvironment.loadEarlierHistory, {
-    label: "load earlier thread history",
+    label: "load earlier chat history",
     reportFailure: false,
   });
   const historyControls = (() => {
@@ -454,7 +452,7 @@ function ThreadRouteContent(
   const navigation = useNavigation();
   const selectDetail = useSelectWorkspaceDetail();
   const openPullRequest = useOpenPullRequest();
-  const mergeBack = useAtomCommand(threadEnvironment.mergeBack, "merge thread back");
+  const mergeBack = useAtomCommand(threadEnvironment.mergeBack, "merge chat back");
   const mergeBackTargetThreadId = resolveMergeBackTargetThreadId(selectedThreadDetail);
   const mergeBackRun =
     selectedThreadDetail === null ? null : resolveLatestMergeBackRun(selectedThreadDetail);
@@ -701,10 +699,7 @@ function ThreadRouteContent(
     });
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
-      Dialog.alert(
-        "Could not resume thread",
-        error instanceof Error ? error.message : "Try again.",
-      );
+      Dialog.alert("Could not resume chat", error instanceof Error ? error.message : "Try again.");
     }
   };
 

@@ -16,7 +16,7 @@ export { normalizeHostname, isLocalLoopbackHost } from "@t3tools/shared/hostClas
 
 const readEnvironmentUrl = (environmentId: EnvironmentId): URL => {
   const connection = readPreparedConnection(environmentId);
-  if (!connection) throw new Error(`Environment ${environmentId} is not connected.`);
+  if (!connection) throw new Error(`Computer ${environmentId} is not connected.`);
   return new URL(connection.httpBaseUrl);
 };
 
@@ -29,7 +29,7 @@ const resolveEnvironmentPortTarget = (
 ): PreviewUrlResolution => {
   if (!isPrivateNetworkHost(environmentUrl.hostname)) {
     throw new Error(
-      "This environment port needs the planned authenticated preview gateway; its server address is not directly private-network reachable.",
+      "This computer port needs the planned authenticated preview gateway; its server address is not directly private-network reachable.",
     );
   }
   const protocol = target.protocol ?? "http";

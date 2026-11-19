@@ -170,7 +170,7 @@ describe("mobile cloud link environment client", () => {
         ).pipe(Effect.flip);
         expect(error).toMatchObject({
           _tag: "CloudEnvironmentLinkError",
-          message: "Relay returned credentials for a different environment.",
+          message: "Relay returned credentials for a different computer.",
         });
         expect(fetchMock).toHaveBeenCalledTimes(3);
       }),

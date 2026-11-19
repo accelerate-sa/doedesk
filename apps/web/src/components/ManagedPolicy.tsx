@@ -52,7 +52,7 @@ export function ManagedNotice({ children }: { children: ReactNode }) {
 export function ManagedByOrganization({ policy }: { policy: ManagedPolicySummary }) {
   return (
     <ManagedNotice>
-      This environment is managed by {policy.organization}.
+      This computer is managed by {policy.organization}.
       {policy.supportUrl ? (
         <>
           {" "}

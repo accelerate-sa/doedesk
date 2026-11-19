@@ -945,7 +945,7 @@ describe("composer and pull request shortcuts", () => {
 
 describe("Usage shortcuts", () => {
   it.each(["Linux", "MacIntel"])(
-    "preserves desktop numbered thread shortcuts on Usage on %s",
+    "preserves desktop numbered chat shortcuts on Usage on %s",
     (platform) => {
       const shortcut = event({
         key: "2",

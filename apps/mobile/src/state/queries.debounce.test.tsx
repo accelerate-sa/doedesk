@@ -109,7 +109,7 @@ it.each([
 
 it.each([
   { field: "environment", changed: { ...target, environmentId: EnvironmentId.make("other") } },
-  { field: "project directory", changed: { ...target, cwd: "/other" } },
+  { field: "folder directory", changed: { ...target, cwd: "/other" } },
   { field: "query", changed: { ...target, query: "test" } },
   {
     field: "query suffix beyond the request limit",
@@ -137,7 +137,7 @@ it.each([
 
 it.each([
   { field: "environment", changed: { ...target, environmentId: EnvironmentId.make("other") } },
-  { field: "project directory", changed: { ...target, cwd: "/other" } },
+  { field: "folder directory", changed: { ...target, cwd: "/other" } },
 ])("reports settled results as pending when the $field changes", ({ changed }) => {
   using harness = setup();
   harness.render(target);

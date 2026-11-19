@@ -60,7 +60,7 @@ it("shows the titled preview inside and outside search results from a collapsed 
   folder.element().focus();
   await userEvent.keyboard("{Enter}");
   await expect.element(secondRow).not.toBeInTheDocument();
-  await userEvent.fill(page.getByRole("combobox", { name: "Search threads" }), "search-target");
+  await userEvent.fill(page.getByRole("combobox", { name: "Search chats" }), "search-target");
   const result = page.getByRole("option", { name: /Thread search-target/ });
   await expect.element(result).toBeVisible();
   const bounds = result.element().getBoundingClientRect();
@@ -111,7 +111,7 @@ it("keeps focus in the search box when a click picks a search result", async () 
   const onSelect = vi.fn();
   await using screen = await render(
     <>
-      <input aria-label="Search threads" />
+      <input aria-label="Search chats" />
       <ul role="listbox">
         <SidebarSearchResultRow
           isSettled={false}
@@ -133,7 +133,7 @@ it("keeps focus in the search box when a click picks a search result", async () 
       </ul>
     </>,
   );
-  const search = screen.getByRole("textbox", { name: "Search threads" });
+  const search = screen.getByRole("textbox", { name: "Search chats" });
   await userEvent.click(search);
   await userEvent.click(screen.getByRole("option"));
   expect(onSelect).toHaveBeenCalledOnce();

@@ -154,7 +154,7 @@ export function ScheduledTaskBranchPickerRouteScreen() {
       loading={
         query.trim() !== debouncedQuery.trim() || (branches.isPending && branches.data === null)
       }
-      error={project ? branches.error : "This project is no longer available."}
+      error={project ? branches.error : "This folder is no longer available."}
       refreshing={branches.isFetchingNextPage}
       hasMore={branches.data?.nextCursor != null}
       onRefresh={branches.refresh}
@@ -182,7 +182,7 @@ export function ScheduledTaskBranchPickerRouteScreen() {
   );
 }
 
-const THREAD_SEARCH_PLACEHOLDER = "Search threads, including older ones";
+const THREAD_SEARCH_PLACEHOLDER = "Search chats, including older ones";
 
 export function ScheduledTaskThreadPickerRouteScreen() {
   const navigation = useNavigation();
@@ -198,8 +198,8 @@ export function ScheduledTaskThreadPickerRouteScreen() {
     value: query,
     onChangeText: setQuery,
     placeholder: THREAD_SEARCH_PLACEHOLDER,
-    accessibilityLabel: "Search threads",
-    clearAccessibilityLabel: "Clear thread search",
+    accessibilityLabel: "Search chats",
+    clearAccessibilityLabel: "Clear chat search",
     mode: "inline" as const,
     compactToolbar: true,
   };
@@ -232,7 +232,7 @@ export function ScheduledTaskThreadPickerRouteScreen() {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
       .map((thread) => ({
         key: thread.id,
-        title: thread.title.trim() || "Untitled thread",
+        title: thread.title.trim() || "Untitled chat",
         thread,
       })),
   ];
@@ -261,7 +261,7 @@ export function ScheduledTaskThreadPickerRouteScreen() {
             : Math.max(insets.bottom, 16) + 16,
         }}
         ListEmptyComponent={
-          <Text className="p-5 text-center text-sm text-foreground-muted">No matching threads</Text>
+          <Text className="p-5 text-center text-sm text-foreground-muted">No matching chats</Text>
         }
         renderItem={({ item, index }) => (
           <SelectionRow

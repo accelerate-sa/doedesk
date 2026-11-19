@@ -191,7 +191,7 @@ function UsageScreen(props: {
     setSelectedEnvironmentIds((selected) => toggleUsageEnvironment(selected, environments, id));
   };
   const environmentMenu = {
-    title: "Filter usage environments",
+    title: "Filter usage computers",
     icon:
       selectedEnvironmentIds === null
         ? ("line.3.horizontal.decrease" as const)
@@ -199,7 +199,7 @@ function UsageScreen(props: {
     items: [
       {
         id: "all",
-        title: "All environments",
+        title: "All computers",
         selected: selectedEnvironmentIds === null,
         onPress: () => selectEnvironment("all"),
       },
@@ -293,7 +293,7 @@ function UsageScreen(props: {
                   <ChatGptUsageSummary selectedEnvironmentIds={selectedEnvironmentIds} />
                   {merged.duplicateSources.length > 0 ? (
                     <Text className="text-sm text-foreground-muted">
-                      Counted once across environments sharing a transcript directory:{" "}
+                      Counted once across computers sharing a transcript directory:{" "}
                       {merged.duplicateSources.join(", ")}
                     </Text>
                   ) : null}
@@ -304,8 +304,8 @@ function UsageScreen(props: {
                   ) : selectedEnvironments.length === 0 ? (
                     <Text className="py-16 text-center text-base text-foreground-muted">
                       {environments.length === 0
-                        ? "Connect an environment to see usage."
-                        : "Select an environment to see usage."}
+                        ? "Connect a computer to see usage."
+                        : "Select a computer to see usage."}
                     </Text>
                   ) : !canReadDiagnostics ? (
                     <View className="gap-2 py-16">

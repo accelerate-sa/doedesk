@@ -244,7 +244,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
       setSaving(false);
       Dialog.alert(
         "Could not update the API key",
-        "Check the environment connection and your settings permissions.",
+        "Check the computer connection and your settings permissions.",
       );
       return;
     }
@@ -261,7 +261,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
           <ListActionRow
             label={
               !connection
-                ? "Environment not connected"
+                ? "Computer not connected"
                 : keys._tag === "Failure"
                   ? "Could not load keys · Retry"
                   : "Checking API keys…"
@@ -297,7 +297,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                 disabled={key === undefined || (!key && !canManage) || saving}
                 description={
                   key === undefined
-                    ? "Update the environment to use this provider"
+                    ? "Update the computer to use this provider"
                     : isActive && routed
                       ? `${activeModel} · Tap to change model${canManage ? " or key" : ""}`
                       : isActive && key && canManage
@@ -308,7 +308,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                             : "API key saved"
                           : canManage
                             ? "Add an API key to use this provider"
-                            : "Ask an environment administrator to add an API key"
+                            : "Ask a computer administrator to add an API key"
                 }
                 onPress={() => {
                   if (routed) return edit(provider, !isActive);
@@ -370,7 +370,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
         ? (source?.invalidReferenceMessage ?? "Enter a valid API key.")
         : routed
           ? key && !credential
-            ? "Uses the API key saved on this environment. The model choice applies only to this device."
+            ? "Uses the API key saved on this computer. The model choice applies only to this device."
             : `Anyone with dictation access to ${environment.label} can bill this key.`
           : editing.enable
             ? `Anyone with dictation access to ${environment.label} can bill this key.`
@@ -482,7 +482,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
               <Separated>
                 <ListActionRow
                   tone="danger"
-                  label="Remove key from environment"
+                  label="Remove key from computer"
                   disabled={saving}
                   onPress={() =>
                     Dialog.confirm({

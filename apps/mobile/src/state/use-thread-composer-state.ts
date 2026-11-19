@@ -716,7 +716,7 @@ export function useThreadComposerState(input: {
       if (!readEnvironmentScope(selectedThreadShell.environmentId, AuthOrchestrationOperateScope))
         return null;
       if (thread.activeProviderThreadId === null) {
-        Dialog.alert("Start a Codex thread first", "Send a message before you submit feedback.");
+        Dialog.alert("Start a Codex chat first", "Send a message before you submit feedback.");
         return null;
       }
       const metadata = makeQueuedMessageMetadata();
@@ -858,13 +858,13 @@ export function useThreadComposerState(input: {
     if (selectedThreadShell?.lineage.sideChat === true)
       return "Side chats cannot start side chats.";
     if (selectedThreadShell?.lineage.relationshipToParent === "subagent") {
-      return "Subagent threads cannot start side chats.";
+      return "Subagent chats cannot start side chats.";
     }
     if (!selectedThreadShell || !serverConfig) {
       return "Side chats are not ready yet. Try again in a moment.";
     }
     if (serverConfig.environment.capabilities.sideChats !== true) {
-      return "Update this environment's T3 Code server to use side chats.";
+      return "Update this computer's DoeDesk server to use side chats.";
     }
     if (selectedThreadCreation !== null) return "Side chats start after the first message.";
     if (
@@ -873,7 +873,7 @@ export function useThreadComposerState(input: {
         selectedThreadProjection?.projection.runs ?? [],
       )
     ) {
-      return "Available once the thread's worktree is set up.";
+      return "Available once the chat's worktree is set up.";
     }
     return null;
   })();

@@ -140,7 +140,7 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
         destinationPath: input.destinationPath,
       },
     },
-    { label: "Add project to machine", reportFailure: false },
+    { label: "Add folder to machine", reportFailure: false },
   );
   if (started._tag === "Failure") {
     setFileCopy(requestedKey, null);

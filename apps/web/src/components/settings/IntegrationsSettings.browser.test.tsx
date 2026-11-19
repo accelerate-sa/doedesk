@@ -66,7 +66,7 @@ const projects: Project[] = [
   {
     id: ProjectId.make("browser-project"),
     environmentId,
-    title: "Browser project",
+    title: "Browser folder",
     workspaceRoot: "/workspace/browser",
     repositoryIdentity: null,
     defaultModelSelection: null,

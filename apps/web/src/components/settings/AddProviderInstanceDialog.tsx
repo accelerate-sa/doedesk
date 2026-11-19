@@ -25,6 +25,8 @@ import {
   usePersistEnvironmentProviderInstanceMutation,
 } from "../../hooks/useSettings";
 
+import { useDeveloperMode } from "../../doedesk/product";
+import { consumerLoginWarning, isProviderOffered } from "../../doedesk/providerConnections";
 import { cn } from "../../lib/utils";
 import { normalizeProviderAccentColor } from "../../providerInstances";
 import { managedInstanceLocks, useManagedPolicy } from "../../state/managedPolicy";
@@ -162,12 +164,13 @@ export function AddProviderInstanceDialog({
   const [addingChatGptAccount, setAddingChatGptAccount] = useState(false);
   // Drivers the administrator's policy leaves out are not offered at all.
   const managedPolicy = useManagedPolicy(environmentId);
-  const featuredDriverOptions = FEATURED_DRIVER_OPTIONS.filter((option) =>
-    isManagedDriverAllowed(managedPolicy, option.driverKind),
-  );
-  const moreDriverOptions = MORE_DRIVER_OPTIONS.filter((option) =>
-    isManagedDriverAllowed(managedPolicy, option.driverKind),
-  );
+  // Providers that sign in to a consumer plan outside its own program are for Developer mode.
+  const developerMode = useDeveloperMode();
+  const offered = (option: (typeof DRIVER_OPTIONS)[number]) =>
+    isManagedDriverAllowed(managedPolicy, option.driverKind) &&
+    isProviderOffered(option.driverKind, developerMode);
+  const featuredDriverOptions = FEATURED_DRIVER_OPTIONS.filter(offered);
+  const moreDriverOptions = MORE_DRIVER_OPTIONS.filter(offered);
   const acpRegistryAllowed = isManagedDriverAllowed(managedPolicy, ACP_REGISTRY_DRIVER_KIND);
   const [driver, setDriver] = useState<ProviderDriverKind>(
     () =>
@@ -485,6 +488,11 @@ export function AddProviderInstanceDialog({
                 />
                 <MultipleAccountsNote environmentId={environmentId} driver={driver} />
               </div>
+              {consumerLoginWarning(driver) === undefined ? null : (
+                <p role="alert" className="pt-2 text-sm text-destructive">
+                  {consumerLoginWarning(driver)}
+                </p>
+              )}
 
               {wizardStep === 0 && (moreDriverOptions.length > 0 || acpRegistryAllowed) ? (
                 <Collapsible open={showMoreProviders} onOpenChange={setShowMoreProviders}>

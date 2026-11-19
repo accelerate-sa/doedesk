@@ -142,8 +142,8 @@ export function SimlockDeviceHostEditor(props: {
             <DialogTitle>{props.isNew ? "Add Simlock host" : "Edit Simlock host"}</DialogTitle>
             <DialogDescription>
               {several
-                ? "Each selected environment's server leases devices from your Simlock gateway with its own agent token, and releases them when they close."
-                : "The environment's server leases devices from your Simlock gateway and releases them when they close."}
+                ? "Each selected computer's server leases devices from your Simlock gateway with its own agent token, and releases them when they close."
+                : "The computer's server leases devices from your Simlock gateway and releases them when they close."}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -200,9 +200,9 @@ export function SimlockDeviceHostEditor(props: {
                 />
               ))}
               <p className="text-xs text-muted-foreground">
-                Leases, drives, and streams devices. Create one{several ? " per environment" : ""}{" "}
-                with <code>simlock --gateway token create --role agent</code>, or leave it blank to
-                add it later. A blank token uses the machine's{" "}
+                Leases, drives, and streams devices. Create one{several ? " per computer" : ""} with{" "}
+                <code>simlock --gateway token create --role agent</code>, or leave it blank to add
+                it later. A blank token uses the machine's{" "}
                 <code>AGENT_DEVICE_DAEMON_AUTH_TOKEN</code> when its{" "}
                 <code>AGENT_DEVICE_DAEMON_BASE_URL</code> is this gateway.
               </p>

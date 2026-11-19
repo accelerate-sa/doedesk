@@ -116,9 +116,9 @@ const DAYS = [
 ] as const;
 
 const THREAD_MODE_LABELS: Record<ScheduledTaskThreadMode, string> = {
-  new_thread: "New thread each run",
-  continue: "One thread, same conversation",
-  fresh_session: "One thread, fresh session",
+  new_thread: "New chat each run",
+  continue: "One chat, same conversation",
+  fresh_session: "One chat, fresh session",
 };
 
 function describeSchedule(task: ScheduledTask, timeZone?: string): string {
@@ -479,8 +479,8 @@ export function SettingsScheduledTasksRouteScreen() {
         ) : (
           <Text className="px-2 text-base text-foreground-muted">
             {availableTargets.length === 0
-              ? "Connect an environment to view and create scheduled tasks."
-              : "No environments match these filters. Change the filter above."}
+              ? "Connect a computer to view and create scheduled tasks."
+              : "No computers match these filters. Change the filter above."}
           </Text>
         )}
       </ScrollView>
@@ -644,8 +644,8 @@ function SettingsScheduledTaskEditorScreen({ title }: { readonly title: string }
         ) : (
           <Text className="px-2 text-base text-foreground-muted">
             {availableTargets.length === 0
-              ? "Connect an environment to create a scheduled task."
-              : "No environments match the current filters. Change the filters to create a task."}
+              ? "Connect a computer to create a scheduled task."
+              : "No computers match the current filters. Change the filters to create a task."}
           </Text>
         )}
       </ScrollView>
@@ -766,7 +766,7 @@ function TaskForm({
     if (draft.schedule.mode === "once" && !offersOnce) {
       Dialog.alert(
         "Once is not available here",
-        "This environment runs an older T3 Code. Update it to schedule a one-time task, or pick another schedule.",
+        "This computer runs an older DoeDesk. Update it to schedule a one-time task, or pick another schedule.",
       );
       return;
     }
@@ -792,12 +792,12 @@ function TaskForm({
     ) {
       Dialog.alert(
         "Incomplete task",
-        "Add a name, prompt, project, model, valid schedule, and checkout path if needed.",
+        "Add a name, prompt, folder, model, valid schedule, and checkout path if needed.",
       );
       return;
     }
     if (!projects.some((project) => project.id === draft.projectId)) {
-      Dialog.alert("Project unavailable", "Choose a project in this environment.");
+      Dialog.alert("Folder unavailable", "Choose a folder in this computer.");
       return;
     }
     const input: ScheduledTaskUpsertInput = {
@@ -852,7 +852,7 @@ function TaskForm({
 
         {environmentUnavailable ? (
           <Text className="px-1 text-base text-danger-foreground">
-            This environment is disconnected. Reconnect before saving.
+            This computer is disconnected. Reconnect before saving.
           </Text>
         ) : null}
         <SettingsSection>
@@ -898,10 +898,10 @@ function TaskForm({
 
         <SettingsSection title="Context">
           <SelectRow
-            label="Project"
+            label="Folder"
             value={
               projects.find((project) => project.id === draft.projectId)?.title ??
-              (projects.length ? "Choose project" : "No projects available")
+              (projects.length ? "Choose folder" : "No folders available")
             }
             actions={projects.map((project) => ({
               id: project.id,
@@ -955,13 +955,13 @@ function TaskForm({
           title="Destination"
           footer={
             draft.threadMode === "new_thread"
-              ? "Each run starts a new thread."
+              ? "Each run starts a new chat."
               : `${
                   draft.threadMode === "continue"
                     ? "Runs continue one conversation."
-                    : "Runs share one thread, each in a fresh session without earlier runs' context."
+                    : "Runs share one chat, each in a fresh session without earlier runs' context."
                 }${
-                  draft.threadId === null ? " The first run starts the thread." : ""
+                  draft.threadId === null ? " The first run starts the chat." : ""
                 } Deleting it also deletes this task.`
           }
         >
@@ -986,7 +986,7 @@ function TaskForm({
           ) : null}
           {!offersThreadModes || draft.threadMode !== "new_thread" ? (
             <PickerRow
-              label="Thread"
+              label="Chat"
               borderTop={offersThreadModes}
               value={
                 draft.threadId === null && draft.threadMode !== "new_thread"
@@ -1006,7 +1006,7 @@ function TaskForm({
               draft.workspace === "worktree"
                 ? "New worktree"
                 : draft.workspace === "root"
-                  ? "Project checkout"
+                  ? "Folder checkout"
                   : "Specific checkout"
             }
             actions={[
@@ -1017,7 +1017,7 @@ function TaskForm({
               },
               {
                 id: "root",
-                title: "Project checkout",
+                title: "Folder checkout",
                 state: draft.workspace === "root" ? "on" : undefined,
               },
               {
@@ -1359,7 +1359,7 @@ function TaskForm({
         </SettingsSection>
         {draft.schedule.mode === "fixed_time" ? (
           <Text className="px-2 text-sm text-foreground-muted">
-            Time uses the environment's time zone, which may differ from your phone's.
+            Time uses the computer's time zone, which may differ from your phone's.
           </Text>
         ) : null}
       </View>
@@ -1540,7 +1540,7 @@ function EnvironmentTasks({
         <Text className="p-4 text-base text-foreground-muted">Loading tasks…</Text>
       ) : visibleTasks?.length === 0 ? (
         <Text className="p-4 text-base text-foreground-muted">
-          {projectIds === null ? "No scheduled tasks yet." : "No tasks in this project."}
+          {projectIds === null ? "No scheduled tasks yet." : "No tasks in this folder."}
         </Text>
       ) : (
         visibleTasks?.map((task, index) => (
@@ -1586,7 +1586,7 @@ function EnvironmentTasks({
               actions={[
                 { id: "edit", title: "Edit" },
                 ...(task.threadId !== null && scheduledTaskThreadMode(task) !== "new_thread"
-                  ? [{ id: "thread", title: "Open thread" }]
+                  ? [{ id: "thread", title: "Open chat" }]
                   : []),
                 {
                   id: "toggle",

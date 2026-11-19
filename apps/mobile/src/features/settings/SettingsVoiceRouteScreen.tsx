@@ -120,7 +120,7 @@ function saveDestination(id: EnvironmentId | null) {
   } catch {
     Dialog.alert(
       "Could not save transcription choice",
-      "Dictation on an environment is off for this session. Save again before closing the app, or your previous choice may return when it restarts.",
+      "Dictation on a computer is off for this session. Save again before closing the app, or your previous choice may return when it restarts.",
     );
   }
 }
@@ -148,7 +148,7 @@ function EnvironmentChoice({
           ? "Not connected"
           : !usable
             ? "Transcription unavailable"
-            : (environment.displayUrl ?? "Send finished recordings to this environment.")
+            : (environment.displayUrl ?? "Send finished recordings to this computer.")
       }
       separated
       onPress={() => {
@@ -157,7 +157,7 @@ function EnvironmentChoice({
         Dialog.confirm({
           title: `Send microphone audio to ${environment.label}?`,
           message: `Finished recordings will be sent to ${environment.displayUrl ?? environment.label} for transcription. You can switch back to This device at any time.`,
-          confirmText: "Use environment",
+          confirmText: "Use computer",
           onConfirm: () => saveDestination(environment.environmentId),
         });
       }}
@@ -301,7 +301,7 @@ export function SettingsVoiceRouteScreen() {
             ))}
           {isReady && grant && !grantEnvironment ? (
             <ListChoiceRow
-              label="Previously selected environment"
+              label="Previously selected computer"
               description="No longer paired"
               separated
               selected
@@ -337,7 +337,7 @@ export function SettingsVoiceRouteScreen() {
             <Text className="px-2 text-sm text-foreground-muted">
               {permission === "ask"
                 ? "Allow microphone access to record and to see your microphones."
-                : "Turn on microphone access for T3 Code in Settings to use voice input."}
+                : "Turn on microphone access for DoeDesk in Settings to use voice input."}
             </Text>
           </>
         ) : null}

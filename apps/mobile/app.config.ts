@@ -1,3 +1,7 @@
+// @effect-diagnostics nodeBuiltinImport:off -- Expo evaluates this config before any Effect runtime.
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
+
 import type { ExpoConfig } from "expo/config";
 
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
@@ -34,72 +38,69 @@ if (
     !IOS_BUNDLE_IDENTIFIER_PATTERN.test(personalTeamBundleIdentifier))
 ) {
   throw new Error(
-    "T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID must be a reverse-DNS identifier such as com.example.t3code when T3CODE_IOS_PERSONAL_TEAM=1.",
+    "T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID must be a reverse-DNS identifier such as com.example.doedesk when T3CODE_IOS_PERSONAL_TEAM=1.",
   );
 }
 
 const DEVELOPMENT_ASSETS = {
   appIcon: fromRepoRoot(BRAND_ASSET_PATHS.developmentIosIconPng),
   iosIcon: fromRepoRoot(BRAND_ASSET_PATHS.developmentIconComposerProject),
-  splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.developmentIosIconPng),
+  splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.developmentUniversalIconPng),
   androidAdaptiveForeground,
-  androidAdaptiveBackgroundColor: "#347FF8",
-  androidAdaptiveBackgroundImage: "./assets/android-icon-background-dev.png",
+  androidAdaptiveBackgroundColor: "#96531F",
+  androidAdaptiveBackgroundImage: undefined,
   androidSplashIcon: "./assets/android-splash-icon-dev.png",
   androidMonochromeIcon: "./assets/android-icon-mark.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
-  androidNotificationColor: "#00639B",
+  androidNotificationColor: "#96531F",
 } as const;
 
 const PREVIEW_ASSETS = {
   appIcon: fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng),
   iosIcon: fromRepoRoot(BRAND_ASSET_PATHS.nightlyIconComposerProject),
-  splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng),
+  splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.nightlyLinuxIconPng),
   androidAdaptiveForeground,
-  androidAdaptiveBackgroundColor: "#111533",
-  androidAdaptiveBackgroundImage: "./assets/android-icon-background-nightly.png",
+  androidAdaptiveBackgroundColor: "#3A3C37",
+  androidAdaptiveBackgroundImage: undefined,
   androidSplashIcon: "./assets/android-splash-icon-nightly.png",
   androidMonochromeIcon: "./assets/android-icon-mark.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
-  androidNotificationColor: "#7565C7",
+  androidNotificationColor: "#96531F",
 } as const;
 
 const RELEASE_ASSETS = {
   appIcon: fromRepoRoot(BRAND_ASSET_PATHS.productionIosIconPng),
   iosIcon: fromRepoRoot(BRAND_ASSET_PATHS.productionIconComposerProject),
-  splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.productionIosIconPng),
+  splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.productionLinuxIconPng),
   androidAdaptiveForeground,
-  androidAdaptiveBackgroundColor: "#000000",
+  androidAdaptiveBackgroundColor: "#171815",
   androidAdaptiveBackgroundImage: undefined,
   androidSplashIcon: "./assets/android-splash-icon-prod.png",
   androidMonochromeIcon: "./assets/android-icon-mark.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
-  androidNotificationColor: "#FFFFFF",
+  androidNotificationColor: "#96531F",
 } as const;
 
 const VARIANT_CONFIG = {
   development: {
-    appName: "T3 Code Dev",
-    scheme: "t3code-dev",
-    iosBundleIdentifier: "com.t3tools.t3code.dev",
-    androidPackage: "com.t3tools.t3code.dev",
-    relyingParty: "clerk.t3.codes",
+    appName: "DoeDesk Dev",
+    scheme: "doedesk-dev",
+    iosBundleIdentifier: "com.doedesk.app.dev",
+    androidPackage: "com.doedesk.app.dev",
     assets: DEVELOPMENT_ASSETS,
   },
   preview: {
-    appName: "T3 Code Preview",
-    scheme: "t3code-preview",
-    iosBundleIdentifier: "com.t3tools.t3code.preview",
-    androidPackage: "com.t3tools.t3code.preview",
-    relyingParty: "clerk.t3.codes",
+    appName: "DoeDesk Preview",
+    scheme: "doedesk-preview",
+    iosBundleIdentifier: "com.doedesk.app.preview",
+    androidPackage: "com.doedesk.app.preview",
     assets: PREVIEW_ASSETS,
   },
   production: {
-    appName: "T3 Code",
-    scheme: "t3code",
-    iosBundleIdentifier: "com.t3tools.t3code",
-    androidPackage: "com.t3tools.t3code",
-    relyingParty: "clerk.t3.codes",
+    appName: "DoeDesk",
+    scheme: "doedesk",
+    iosBundleIdentifier: "com.doedesk.app",
+    androidPackage: "com.doedesk.app",
     assets: RELEASE_ASSETS,
   },
 } as const;
@@ -118,8 +119,9 @@ function resolveAppVariant(value: string | undefined): AppVariant {
 }
 
 const variant = VARIANT_CONFIG[APP_VARIANT];
-// Copied thread links open the app. app.t3.codes/.well-known lists every variant's identifiers.
-const HOSTED_APP_HOST = "app.t3.codes";
+const easProjectId = repoEnv.DOEDESK_EAS_PROJECT_ID?.trim() || undefined;
+// Copied thread links open the app, once the host serves the matching association files.
+const HOSTED_APP_HOST = "app.doedesk.com";
 const iosBundleIdentifier = isIosPersonalTeamBuild
   ? personalTeamBundleIdentifier!
   : variant.iosBundleIdentifier;
@@ -129,6 +131,62 @@ const dmSansFonts = {
   medium: "@expo-google-fonts/dm-sans/500Medium/DMSans_500Medium.ttf",
   bold: "@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf",
 } as const;
+
+// The brand serif: DoeDesk Serif for Latin (Redaction with Newsreader's digits, made by
+// scripts/build-brand-fonts.py) and a naskh for Arabic. Family names are the files'
+// PostScript names, which is how iOS finds a bundled font.
+const READING_FONTS_DIR = "./assets/fonts";
+type BundledFont = {
+  readonly fontFamily: string;
+  readonly fontDefinitions: Array<{ path: string; weight: number; style?: "italic" }>;
+};
+const readingFonts: Array<BundledFont> = [
+  {
+    fontFamily: "DoeDeskSerif-Regular",
+    fontDefinitions: [
+      { path: `${READING_FONTS_DIR}/DoeDeskSerif-Regular.ttf`, weight: 400 },
+      { path: `${READING_FONTS_DIR}/DoeDeskSerif-Italic.ttf`, weight: 400, style: "italic" },
+    ],
+  },
+  {
+    fontFamily: "DoeDeskSerif-Bold",
+    fontDefinitions: [{ path: `${READING_FONTS_DIR}/DoeDeskSerif-Bold.ttf`, weight: 700 }],
+  },
+  {
+    fontFamily: "NotoNaskhArabic-Regular",
+    fontDefinitions: [{ path: `${READING_FONTS_DIR}/NotoNaskhArabic-Regular.ttf`, weight: 400 }],
+  },
+  {
+    fontFamily: "NotoNaskhArabic-Bold",
+    fontDefinitions: [{ path: `${READING_FONTS_DIR}/NotoNaskhArabic-Bold.ttf`, weight: 700 }],
+  },
+];
+
+// Thmanyah Serif may ship inside the app but not in this repository (its licence forbids
+// redistribution), so an official build names a folder holding the original files.
+const brandFontsDir = process.env.DOEDESK_BRAND_FONTS_DIR?.trim();
+const brandArabicFonts: Array<BundledFont> = brandFontsDir
+  ? [
+      {
+        fontFamily: "thmanyahseriftext-Regular",
+        file: "thmanyah-serif-text-regular.otf",
+        weight: 400,
+      },
+      { fontFamily: "thmanyahseriftext-Bold", file: "thmanyah-serif-text-bold.otf", weight: 700 },
+      {
+        fontFamily: "thmanyahserifdisplay-Medium",
+        file: "thmanyah-serif-display-medium.otf",
+        weight: 500,
+      },
+    ].map(({ fontFamily, file, weight }) => {
+      const path = NodePath.resolve(brandFontsDir, file);
+      if (!NodeFS.existsSync(path)) {
+        throw new Error(`DOEDESK_BRAND_FONTS_DIR is set, but ${path} does not exist.`);
+      }
+      return { fontFamily, fontDefinitions: [{ path, weight }] };
+    })
+  : [];
+const bundledFonts = [...readingFonts, ...brandArabicFonts];
 
 const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
   "expo-widgets",
@@ -143,7 +201,7 @@ const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
       {
         name: "SubscriptionUsage",
         displayName: "Subscription usage",
-        description: "Subscription quotas from your connected T3 Code environments.",
+        description: "Subscription quotas from your connected DoeDesk environments.",
         ios: {
           configuration: {
             title: "Subscription usage",
@@ -193,7 +251,7 @@ const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
       {
         name: "AgentActivity",
         displayName: "Agent Activity",
-        description: "Shows the current state of active T3 Code agents.",
+        description: "Shows the current state of active DoeDesk agents.",
         android: null,
         ios: {
           supportedFamilies: ["systemSmall", "systemMedium", "accessoryRectangular"],
@@ -234,10 +292,10 @@ const sharingPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
 
 const config: ExpoConfig = {
   name: variant.appName,
-  slug: "t3-code",
+  slug: "doedesk",
   platforms: ["ios", "android"],
   scheme: variant.scheme,
-  version: repoEnv.T3CODE_MOBILE_VERSION ?? "2.3.0",
+  version: repoEnv.T3CODE_MOBILE_VERSION ?? "0.1.0",
   runtimeVersion: {
     // Skip costly fingerprinting on dev launches; preview and production OTAs require matching native projects.
     policy: runtimeVersionPolicy,
@@ -246,8 +304,9 @@ const config: ExpoConfig = {
   icon: variant.assets.appIcon,
   userInterfaceStyle: "automatic",
   updates: {
-    enabled: repoEnv.T3CODE_MOBILE_UPDATES_ENABLED !== "0",
-    url: "https://u.expo.dev/d763fcb8-d37c-41ea-a773-b54a0ab4a454",
+    // Off unless a DoeDesk Expo project is named: updates must never come from another app's project.
+    enabled: easProjectId !== undefined && repoEnv.T3CODE_MOBILE_UPDATES_ENABLED !== "0",
+    ...(easProjectId === undefined ? {} : { url: `https://u.expo.dev/${easProjectId}` }),
     checkAutomatically: "ON_LOAD",
     fallbackToCacheTimeout: 0,
   },
@@ -257,12 +316,8 @@ const config: ExpoConfig = {
     requireFullScreen: process.env.T3_SHOWCASE_CAPTURE_BUILD === "1",
     bundleIdentifier: iosBundleIdentifier,
     // Avoid Personal Team fallback: it cannot sign App Groups, Apple sign-in or push entitlements.
-    appleTeamId: "ARK85ZXQ4Z",
-    associatedDomains: [
-      `applinks:${variant.relyingParty}`,
-      `webcredentials:${variant.relyingParty}`,
-      `applinks:${HOSTED_APP_HOST}`,
-    ],
+    appleTeamId: repoEnv.DOEDESK_APPLE_TEAM_ID ?? "WLXATYQ33J",
+    associatedDomains: [`applinks:${HOSTED_APP_HOST}`],
     entitlements: {
       "keychain-access-groups": [`$(AppIdentifierPrefix)${variant.iosBundleIdentifier}`],
     },
@@ -276,8 +331,8 @@ const config: ExpoConfig = {
         NSAllowsArbitraryLoads: true,
       },
       NSLocalNetworkUsageDescription:
-        "Allow T3 Code to connect to T3 Code servers on your local network or tailnet.",
-      NSPhotoLibraryAddUsageDescription: "Allow T3 Code to save images to your photo library.",
+        "Allow DoeDesk to connect to DoeDesk servers on your local network or tailnet.",
+      NSPhotoLibraryAddUsageDescription: "Allow DoeDesk to save images to your photo library.",
       // System picture in picture needs background audio to start and survive outside the app.
       UIBackgroundModes: ["audio"],
       ITSAppUsesNonExemptEncryption: false,
@@ -330,7 +385,12 @@ const config: ExpoConfig = {
       "expo-font",
       {
         ios: {
-          fonts: [dmSansFonts.regular, dmSansFonts.medium, dmSansFonts.bold],
+          fonts: [
+            dmSansFonts.regular,
+            dmSansFonts.medium,
+            dmSansFonts.bold,
+            ...bundledFonts.flatMap((font) => font.fontDefinitions.map(({ path }) => path)),
+          ],
         },
         android: {
           fonts: [
@@ -346,6 +406,7 @@ const config: ExpoConfig = {
               fontFamily: "DMSans-Bold",
               fontDefinitions: [{ path: dmSansFonts.bold, weight: 700 }],
             },
+            ...bundledFonts,
           ],
         },
       },
@@ -364,7 +425,7 @@ const config: ExpoConfig = {
       },
     ],
     // Gate Clerk here: withoutIosPersonalTeamCapabilities runs too early to strip its entitlement.
-    ["@clerk/expo", { theme: "./clerk-theme.json", appleSignIn: !isIosPersonalTeamBuild }],
+    ["@clerk/expo", { theme: "./clerk-theme.json", appleSignIn: false }],
     "expo-web-browser",
     [
       "expo-quick-actions",
@@ -383,7 +444,7 @@ const config: ExpoConfig = {
     [
       "expo-audio",
       {
-        microphonePermission: "Allow T3 Code to use your microphone for voice input.",
+        microphonePermission: "Allow DoeDesk to use your microphone for voice input.",
         recordAudioAndroid: true,
         enableBackgroundPlayback: false,
         enableBackgroundRecording: false,
@@ -392,7 +453,7 @@ const config: ExpoConfig = {
     [
       "expo-camera",
       {
-        cameraPermission: "Allow T3 Code to access your camera so you can scan pairing QR codes.",
+        cameraPermission: "Allow DoeDesk to access your camera so you can scan pairing QR codes.",
         microphonePermission: false,
         barcodeScannerEnabled: true,
         recordAudioAndroid: false,
@@ -403,7 +464,7 @@ const config: ExpoConfig = {
       {
         photosPermission: false,
         // `false` makes this plugin add RECORD_AUDIO to blockedPermissions, breaking Android dictation.
-        microphonePermission: "Allow T3 Code to use your microphone for voice input.",
+        microphonePermission: "Allow DoeDesk to use your microphone for voice input.",
       },
     ],
     [
@@ -411,11 +472,11 @@ const config: ExpoConfig = {
       {
         image: variant.assets.splashIcon,
         resizeMode: "contain",
-        backgroundColor: "#ffffff",
-        imageWidth: 220,
+        backgroundColor: "#f5f3ee",
+        imageWidth: 120,
         dark: {
           image: variant.assets.splashIcon,
-          backgroundColor: "#0a0a0a",
+          backgroundColor: "#121311",
         },
         android: {
           // Android 12+ masks the central two thirds of the 288dp canvas; adaptive layers avoid clipped corners.
@@ -464,6 +525,7 @@ const config: ExpoConfig = {
   ],
   extra: {
     appVariant: APP_VARIANT,
+    brandArabicFonts: brandArabicFonts.length > 0,
     secretsFeatureEnabled: ["1", "true"].includes(
       process.env.T3CODE_FEATURE_SECRETS?.trim().toLowerCase() ?? "",
     ),
@@ -486,11 +548,11 @@ const config: ExpoConfig = {
       tracesToken: repoEnv.EXPO_PUBLIC_OTLP_TRACES_TOKEN ?? null,
     },
     eas: {
-      projectId: "d763fcb8-d37c-41ea-a773-b54a0ab4a454",
+      ...(easProjectId === undefined ? {} : { projectId: easProjectId }),
       observe: { endpointUrl: observeEndpointUrl },
     },
   },
-  owner: "pingdotgg",
+  ...(repoEnv.DOEDESK_EXPO_OWNER ? { owner: repoEnv.DOEDESK_EXPO_OWNER } : {}),
   experiments: {
     // Metro only runs babel-plugin-react-compiler when this is set; see src/reactCompilerCoverage.test.ts.
     reactCompiler: true,

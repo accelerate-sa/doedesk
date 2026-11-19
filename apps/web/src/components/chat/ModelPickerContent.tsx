@@ -870,7 +870,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               ? {
                   disabledInstanceIds: lockedDisabledInstanceIds,
                   getDisabledInstanceTooltip: (entry: ProviderInstanceEntry) =>
-                    `${entry.displayName} is unavailable in this thread. Start a new thread to switch providers.`,
+                    `${entry.displayName} is unavailable in this chat. Start a new chat to switch providers.`,
                 }
               : {})}
           />
@@ -1075,7 +1075,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 selectedInstanceId === "favorites" && !isSearching
                   ? "No favorites yet"
                   : workspaceModelsScanning
-                    ? "Searching project models..."
+                    ? "Searching folder models..."
                     : "No models found"
               }
               onRequestClose={onRequestClose}

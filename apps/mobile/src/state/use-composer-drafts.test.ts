@@ -1596,7 +1596,7 @@ describe("mobile composer drafts", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     onTestFinished(() => warning.mockRestore());
     composerAttachmentCleanupMocks.releaseUploads.mockRejectedValueOnce(
-      new Error("environment disconnected"),
+      new Error("computer disconnected"),
     );
     const file = {
       id: "file-delete-failed",

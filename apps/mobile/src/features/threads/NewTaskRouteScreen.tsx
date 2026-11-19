@@ -61,16 +61,16 @@ function deriveProjectEmptyState(catalogState: WorkspaceState): {
 } {
   if (catalogState.isLoadingConnections) {
     return {
-      title: "Loading environments",
-      detail: "Checking saved environments on this device.",
+      title: "Loading computers",
+      detail: "Checking saved computers on this device.",
       loading: true,
     };
   }
 
   if (!catalogState.hasConnections) {
     return {
-      title: "No environments connected",
-      detail: "Add an environment before creating a task.",
+      title: "No computers connected",
+      detail: "Add a computer before creating a task.",
       loading: false,
     };
   }
@@ -86,10 +86,10 @@ function deriveProjectEmptyState(catalogState: WorkspaceState): {
       title:
         catalogState.connectionState === "unsupported"
           ? "Client not supported"
-          : "Environment unavailable",
+          : "Computer unavailable",
       detail:
         catalogState.connectionError ??
-        "The saved environment is offline. Check the URL or start the environment, then retry.",
+        "The saved computer is offline. Check the URL or start the computer, then retry.",
       loading: false,
     };
   }
@@ -100,15 +100,15 @@ function deriveProjectEmptyState(catalogState: WorkspaceState): {
     catalogState.connectionError === null
   ) {
     return {
-      title: "Connecting to environment",
-      detail: "Loading projects from the saved environment.",
+      title: "Connecting to computer",
+      detail: "Loading folders from the saved computer.",
       loading: true,
     };
   }
 
   return {
-    title: "No projects found",
-    detail: "The connected environment did not report any projects.",
+    title: "No folders found",
+    detail: "The connected computer did not report any folders.",
     loading: false,
   };
 }
@@ -136,7 +136,7 @@ function NewTaskHeader(props: {
           props.canAddProject
             ? [
                 {
-                  accessibilityLabel: "Add project",
+                  accessibilityLabel: "Add folder",
                   icon: "plus",
                   onPress: () => navigation.dispatch(StackActions.push("AddProject")),
                 },
@@ -146,7 +146,7 @@ function NewTaskHeader(props: {
         search={{
           value: props.searchText,
           onChangeText: props.onSearchTextChange,
-          placeholder: "Search projects",
+          placeholder: "Search folders",
         }}
       />
     </>
@@ -172,12 +172,12 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
     : route.params?.draftId;
   const incomingShareSubtitle = incomingShare
     ? incomingShare.attachments.length === 0
-      ? "Choose a project for what you shared"
+      ? "Choose a folder for what you shared"
       : incomingShare.attachments.length === 1
-        ? `Choose a project for the ${incomingShare.attachments[0]?.type === "image" ? "image" : "file"} you shared`
-        : `Choose a project for the ${incomingShare.attachments.length} ${incomingShare.attachments.every((attachment) => attachment.type === "image") ? "images" : "files"} you shared`
+        ? `Choose a folder for the ${incomingShare.attachments[0]?.type === "image" ? "image" : "file"} you shared`
+        : `Choose a folder for the ${incomingShare.attachments.length} ${incomingShare.attachments.every((attachment) => attachment.type === "image") ? "images" : "files"} you shared`
     : null;
-  const screenTitle = incomingShare ? "Start a task" : "Choose project";
+  const screenTitle = incomingShare ? "Start a task" : "Choose folder";
   const projectEmptyState = deriveProjectEmptyState(catalogState);
   const serverConfigs = useServerConfigs();
   const listScopes = pickableProjectGroups(projectScopes).filter(
@@ -221,7 +221,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
         await releaseShareReservation(incomingShare.id, incomingShare.destination);
       } catch (error) {
         Dialog.alert(
-          "Could not change project",
+          "Could not change folder",
           error instanceof Error
             ? error.message
             : "The shared content reservation could not be updated.",
@@ -251,7 +251,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
             () => null,
           );
     if (retargeted === null) {
-      Dialog.alert("Could not change project", "Saved drafts could not be loaded. Try again.");
+      Dialog.alert("Could not change folder", "Saved drafts could not be loaded. Try again.");
       return;
     }
     const draftId = retargeted ? routeDraftId : undefined;
@@ -278,10 +278,10 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         Dialog.alert(
-          "Could not start without a project",
+          "Could not start without a folder",
           error instanceof Error
             ? error.message
-            : "The folder for threads without a project could not be created.",
+            : "The folder for chats without a folder could not be created.",
         );
       }
       return;
@@ -357,7 +357,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                 <NavigationRow
                   className="bg-grouped-card"
                   title="No project"
-                  subtitle="Start a task without a project"
+                  subtitle="Start a task without a folder"
                   disabled={!canStartScratch}
                   onPress={() => void startScratch()}
                   leading={
@@ -393,7 +393,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   <View className="min-w-0 flex-1">
                     <Text className="text-base font-t3-bold leading-snug">No project</Text>
                     <Text className="text-xs leading-snug text-foreground-muted" numberOfLines={1}>
-                      Start a task without a project
+                      Start a task without a folder
                     </Text>
                   </View>
                   <SymbolView
@@ -427,9 +427,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                 <>
                   <View>
                     <Button
-                      label={
-                        catalogState.hasReadyEnvironment ? "Add new project" : "Add environment"
-                      }
+                      label={catalogState.hasReadyEnvironment ? "Add new folder" : "Add computer"}
                       tone="primary"
                       onPress={() =>
                         catalogState.hasReadyEnvironment
@@ -441,7 +439,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   {canStartScratch ? (
                     <View>
                       <Button
-                        label="Start without a project"
+                        label="Start without a folder"
                         tone="secondary"
                         onPress={() => void startScratch()}
                       />
@@ -451,7 +449,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               ) : !catalogState.hasReadyEnvironment ? (
                 <View className="mt-1">
                   <Button
-                    label="Add environment"
+                    label="Add computer"
                     tone="primary"
                     onPress={() => navigation.navigate("ConnectionsNew")}
                   />
@@ -460,7 +458,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                 <>
                   <View className="mt-1">
                     <Button
-                      label="Add new project"
+                      label="Add new folder"
                       tone="primary"
                       onPress={() => navigation.dispatch(StackActions.push("AddProject"))}
                     />
@@ -468,7 +466,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   {canStartScratch ? (
                     <View>
                       <Button
-                        label="Start without a project"
+                        label="Start without a folder"
                         tone="secondary"
                         onPress={() => void startScratch()}
                       />
@@ -480,10 +478,10 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
           ) : visibleScopes.length === 0 ? (
             <View className="items-center gap-2 px-6 py-8">
               <Text className="text-center text-lg font-t3-bold text-foreground">
-                No matching projects
+                No matching folders
               </Text>
               <Text className="text-center text-sm leading-normal text-foreground-muted">
-                Try a different project name or workspace path.
+                Try a different folder name or workspace path.
               </Text>
             </View>
           ) : (

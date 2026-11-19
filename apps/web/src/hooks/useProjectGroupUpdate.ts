@@ -53,7 +53,7 @@ export function useProjectGroupUpdate() {
     if (unavailable) {
       return failWith(
         failureTitle,
-        `Connect ${unavailable.environmentLabel ?? "the selected environment"} and try again.`,
+        `Connect ${unavailable.environmentLabel ?? "the selected computer"} and try again.`,
       );
     }
     for (const member of members) {
@@ -73,7 +73,7 @@ export function useProjectGroupUpdate() {
       if (result._tag === "Failure") {
         reportProjectFailure(
           members.length > 1
-            ? `${failureTitle} on ${member.environmentLabel ?? "the current environment"}`
+            ? `${failureTitle} on ${member.environmentLabel ?? "the current computer"}`
             : failureTitle,
           result,
         );
@@ -115,7 +115,7 @@ export function useProjectPin() {
     void updateProjectGroup(
       group.memberProjects,
       { pinned },
-      pinned ? "Failed to pin project" : "Failed to unpin project",
+      pinned ? "Failed to pin folder" : "Failed to unpin folder",
     );
   };
   return {
@@ -136,7 +136,7 @@ export function checkProjectAccess(
   return denied
     ? failWith(
         failureTitle,
-        `This connection cannot change projects in ${denied.environmentLabel ?? "this environment"}.`,
+        `This connection cannot change folders in ${denied.environmentLabel ?? "this computer"}.`,
       )
     : null;
 }

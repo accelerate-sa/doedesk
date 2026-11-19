@@ -125,7 +125,7 @@ export function ComposerEditor({
       const warnings: string[] = [];
       if (result.failures.length > 0)
         warnings.push(
-          "Some attachments could not be copied. Reconnect to the source environment and copy them again.",
+          "Some attachments could not be copied. Reconnect to the source computer and copy them again.",
         );
       if (result.skippedThreads.length > 0)
         warnings.push(

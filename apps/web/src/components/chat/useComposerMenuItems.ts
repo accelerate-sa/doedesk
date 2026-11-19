@@ -245,7 +245,7 @@ export function useComposerMenuItems({
           type: "slash-command",
           command: "model",
           label: "/model",
-          description: "Switch response model for this thread",
+          description: "Switch response model for this chat",
         },
         ...(sideChatAvailable
           ? ([
@@ -417,13 +417,13 @@ export function useComposerMenuItems({
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {
-        return "Pull requests are not available for this project.";
+        return "Pull requests are not available for this folder.";
       }
       if (
         pullRequestLookup.error !== null ||
         pullRequestLookup.data?.errors.some((error) => error.projectId === pullRequestProjectId)
       ) {
-        return "Pull requests could not be read for this project.";
+        return "Pull requests could not be read for this folder.";
       }
       return composerTrigger?.query
         ? `No pull request matches ${composerTrigger.query}.`

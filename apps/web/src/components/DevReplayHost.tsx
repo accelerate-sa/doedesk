@@ -45,7 +45,7 @@ export function DevReplayHost() {
   const replay = async (scenario?: string): Promise<ThreadId> => {
     const model = scenario ?? scenarios[0]?.slug;
     if (environmentId === null || project === undefined || model === undefined) {
-      throw new Error("Replay needs a dev server with a project and the Replay (dev) provider.");
+      throw new Error("Replay needs a dev server with a folder and the Replay (dev) provider.");
     }
     if (!scenarios.some((candidate) => candidate.slug === model)) {
       throw new Error(`Unknown replay scenario "${model}".`);
@@ -130,7 +130,7 @@ export function DevReplayHost() {
         <DialogPanel>
           {scenarios.length === 0 || project === undefined ? (
             <p className="text-sm text-muted-foreground">
-              Needs a project and the Replay (dev) provider, which dev servers start.
+              Needs a folder and the Replay (dev) provider, which dev servers start.
             </p>
           ) : (
             <div className="flex flex-col items-start gap-1">

@@ -14,19 +14,13 @@ function swipe(target: Element, deltaX: number) {
 
 describe("HistorySwipeNavigation", () => {
   it.each([
-    ["scrolling left inside a shadow-root scroller keeps the thread", "shadow", 100, -130, false],
-    ["scrolling right inside a shadow-root scroller keeps the thread", "shadow", 100, 130, false],
-    [
-      "scrolling after a shadow scroller remount keeps the thread",
-      "shadow-remount",
-      100,
-      130,
-      false,
-    ],
-    ["scrolling left inside a scroller keeps the thread", "light", 100, -130, false],
+    ["scrolling left inside a shadow-root scroller keeps the chat", "shadow", 100, -130, false],
+    ["scrolling right inside a shadow-root scroller keeps the chat", "shadow", 100, 130, false],
+    ["scrolling after a shadow scroller remount keeps the chat", "shadow-remount", 100, 130, false],
+    ["scrolling left inside a scroller keeps the chat", "light", 100, -130, false],
     ["swiping back at a shadow-root scroller's left edge navigates", "shadow", 0, -130, true],
     ["swiping back over a panel without overflow navigates", "none", 0, -130, true],
-    ["a swipe that started in a closed dialog keeps the thread", "closed-dialog", 0, -130, false],
+    ["a swipe that started in a closed dialog keeps the chat", "closed-dialog", 0, -130, false],
   ] as const)("%s", async (_name, scroller, scrollLeft, deltaX, navigates) => {
     navigateHistory.mockReset();
     using _platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
@@ -76,7 +70,7 @@ describe("HistorySwipeNavigation", () => {
   const drift = Array.from({ length: 30 }, () => [-4, 15] as const);
   it.each([
     [
-      "a vertical scroll that starts slightly diagonally keeps the thread",
+      "a vertical scroll that starts slightly diagonally keeps the chat",
       [[-5, 3], ...drift],
       false,
     ],
@@ -89,7 +83,7 @@ describe("HistorySwipeNavigation", () => {
       ],
       true,
     ],
-    ["a single diagonal event past the trigger keeps the thread", [[-130, 100]], false],
+    ["a single diagonal event past the trigger keeps the chat", [[-130, 100]], false],
   ] as const)("%s", async (_name, events, navigates) => {
     navigateHistory.mockReset();
     using _platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");

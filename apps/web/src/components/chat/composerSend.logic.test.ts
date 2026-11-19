@@ -85,7 +85,7 @@ describe("loadBalancingSendWarning", () => {
         threadContexts: [localThread, remoteThread],
         candidateEnvironmentIds: [local, remote],
       }).description,
-    ).toMatch(/No machine can read every attached thread/);
+    ).toMatch(/No machine can read every attached chat/);
   });
 
   it("blames resources when one machine can read every attached thread", () => {
@@ -127,7 +127,7 @@ describe("multipleModelSendBlock", () => {
     { isGitRepo: false },
     { branch: null },
     { selectionCount: 0 },
-  ])("needs a new Git thread with a branch and models (%o)", (override) => {
+  ])("needs a new Git chat with a branch and models (%o)", (override) => {
     expect(multipleModelSendBlock({ ...ready, ...override })).toBe("needs-new-git-thread");
   });
 });

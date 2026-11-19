@@ -142,7 +142,7 @@ export function mergeUnavailableReason(
 ) {
   if (pr.state === "merged") return `This ${terminology.singular} has been merged.`;
   if (pr.state === "closed") return `Reopen this ${terminology.singular} before merging.`;
-  if (!connectionAllowsWrites) return "This environment connection is read-only.";
+  if (!connectionAllowsWrites) return "This computer connection is read-only.";
   if (!pr.capabilities.actions.includes("merge"))
     return "This provider does not support merging here.";
   if (!pr.viewerPermissions.actions.includes("merge"))

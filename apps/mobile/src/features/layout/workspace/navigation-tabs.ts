@@ -24,6 +24,9 @@ export const NAVIGATION_TAB_ICONS = {
   usage: "chart.bar.xaxis",
 } as const satisfies Readonly<Record<NavigationTab, AppSymbolName>>;
 
+/** Sections that are only for source code. They show in Developer mode. */
+const DEVELOPER_TABS: readonly NavigationTab[] = ["pullRequests"];
+
 export function useNavigationTabOrder() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const saved = AsyncResult.isSuccess(preferences)
@@ -37,7 +40,10 @@ export function useHiddenNavigationTabs() {
   const saved = AsyncResult.isSuccess(preferences)
     ? preferences.value.hiddenNavigationTabs
     : undefined;
-  return navigationCustomizationAvailable() ? resolveHiddenNavigationTabs(saved) : [];
+  const chosen = navigationCustomizationAvailable() ? resolveHiddenNavigationTabs(saved) : [];
+  const developerMode =
+    AsyncResult.isSuccess(preferences) && preferences.value.developerMode === true;
+  return developerMode ? chosen : [...new Set([...chosen, ...DEVELOPER_TABS])];
 }
 
 export function useEnabledNavigationTabs() {

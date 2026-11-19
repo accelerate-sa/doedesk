@@ -64,7 +64,7 @@ const ensureRelayClientAvailable = Effect.fn("linkEnvironment.ensureRelayClientA
     if (status.status === "available") return;
     if (status.status === "unsupported") {
       return yield* new CloudEnvironmentLinkError({
-        message: `T3 Code cannot install the relay client automatically on ${status.platform}-${status.arch}.`,
+        message: `DoeDesk cannot install the relay client automatically on ${status.platform}-${status.arch}.`,
       });
     }
 
@@ -100,7 +100,7 @@ const ensureRelayClientAvailable = Effect.fn("linkEnvironment.ensureRelayClientA
       return yield* new CloudEnvironmentLinkError({
         message:
           installedStatus.status === "unsupported"
-            ? `T3 Code cannot install the relay client automatically on ${installedStatus.platform}-${installedStatus.arch}.`
+            ? `DoeDesk cannot install the relay client automatically on ${installedStatus.platform}-${installedStatus.arch}.`
             : "The relay client is still unavailable after installation.",
       });
     }
@@ -169,7 +169,7 @@ function ensureLinkedEnvironmentMatches(input: {
 }): Effect.Effect<void, CloudEnvironmentLinkError> {
   if (input.link.environmentId !== input.expectedEnvironmentId) {
     return new CloudEnvironmentLinkError({
-      message: "Relay returned credentials for a different environment.",
+      message: "Relay returned credentials for a different computer.",
     });
   }
   if (input.link.endpoint.providerKind !== input.expectedProviderKind) {
@@ -219,13 +219,11 @@ const preparedEndpoint = (target: CloudLinkTarget) =>
       ),
     ),
   ).pipe(
-    Effect.mapError(environmentApiError("Could not reach the environment.")),
+    Effect.mapError(environmentApiError("Could not reach the computer.")),
     Effect.flatMap(
       Option.match({
         onNone: () =>
-          Effect.fail(
-            new CloudEnvironmentLinkError({ message: "The environment is not connected." }),
-          ),
+          Effect.fail(new CloudEnvironmentLinkError({ message: "The computer is not connected." })),
         onSome: ({ httpBaseUrl, target }) =>
           Effect.succeed({
             httpBaseUrl,
@@ -253,7 +251,7 @@ export const readCloudLinkState: (input: {
         url: (urls) => urls.linkState(),
         request: ({ client, headers }) => client.linkState({ headers }),
       },
-      "Could not read environment cloud link state.",
+      "Could not read computer cloud link state.",
     );
   });
 
@@ -294,7 +292,7 @@ export const updateCloudPreferences: (input: {
       url: (urls) => urls.preferences(),
       request: ({ client, headers }) => client.preferences({ headers, payload }),
     },
-    "Could not update environment cloud preferences.",
+    "Could not update computer cloud preferences.",
   );
 });
 
@@ -316,7 +314,7 @@ export const unlinkEnvironmentFromCloud: (input: {
       url: (urls) => urls.unlink(),
       request: ({ client, headers }) => client.unlink({ headers }),
     },
-    "Could not unlink the environment from cloud.",
+    "Could not unlink the computer from cloud.",
   );
 
   const configuredRelayUrl = relayUrl();
@@ -330,7 +328,7 @@ export const unlinkEnvironmentFromCloud: (input: {
       .pipe(
         Effect.mapError(
           decodedRelayClientError(
-            "Disconnected locally, but T3 Connect did not confirm it removed this environment",
+            "Disconnected locally, but T3 Connect did not confirm it removed this computer",
           ),
         ),
       );
@@ -403,7 +401,7 @@ export const linkEnvironmentToCloud: (input: {
           },
         }),
     },
-    "Could not obtain environment link proof.",
+    "Could not obtain computer link proof.",
   );
   const link = yield* relayClient
     .linkEnvironment({
@@ -444,6 +442,6 @@ export const linkEnvironmentToCloud: (input: {
           },
         }),
     },
-    "Could not configure environment relay access.",
+    "Could not configure computer relay access.",
   );
 });

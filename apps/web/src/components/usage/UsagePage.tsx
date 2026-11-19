@@ -106,6 +106,7 @@ import {
   saveUsagePagePreferences,
   type UsagePagePreferences,
 } from "./usagePagePreferences";
+import { useDeveloperMode } from "~/doedesk/product";
 
 function isUsageMetric(value: string | null | undefined): value is UsageMetric {
   return METRIC_OPTIONS.some((option) => option.value === value);
@@ -194,7 +195,9 @@ export function UsagePage() {
       preferences.windowDays === 1 ? "hour" : "day",
     ),
   }));
-  const metric = preferences.metric;
+  // Outside Developer mode the page answers one question: how much of the plan is left.
+  const developerMode = useDeveloperMode();
+  const metric = developerMode ? preferences.metric : "limits";
   const showingLimits = metric === "limits";
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
@@ -410,21 +413,23 @@ export function UsagePage() {
             ))}
           </ToggleGroup>
         )}
-        <ToggleGroup
-          aria-label="Usage metric"
-          variant="segmented"
-          value={[metric]}
-          onValueChange={(next) => {
-            const value = next[0];
-            if (isUsageMetric(value)) selectMetric(value);
-          }}
-        >
-          {METRIC_OPTIONS.map((option) => (
-            <Toggle key={option.value} value={option.value} title={shortcutTitle(option)}>
-              {option.label}
-            </Toggle>
-          ))}
-        </ToggleGroup>
+        {developerMode ? (
+          <ToggleGroup
+            aria-label="Usage metric"
+            variant="segmented"
+            value={[metric]}
+            onValueChange={(next) => {
+              const value = next[0];
+              if (isUsageMetric(value)) selectMetric(value);
+            }}
+          >
+            {METRIC_OPTIONS.map((option) => (
+              <Toggle key={option.value} value={option.value} title={shortcutTitle(option)}>
+                {option.label}
+              </Toggle>
+            ))}
+          </ToggleGroup>
+        ) : null}
         <Button
           onClick={refreshWindow}
           aria-label={showingLimits ? "Refresh limits" : "Refresh usage"}
@@ -462,30 +467,32 @@ export function UsagePage() {
             </SelectPopup>
           </Select>
         )}
-        <Select
-          value={metric}
-          onValueChange={(value) => {
-            if (isUsageMetric(value)) selectMetric(value);
-          }}
-        >
-          <SelectTrigger
-            aria-label="Usage metric"
-            size="compact"
-            variant="ghost"
-            className="w-auto min-w-0"
+        {developerMode ? (
+          <Select
+            value={metric}
+            onValueChange={(value) => {
+              if (isUsageMetric(value)) selectMetric(value);
+            }}
           >
-            <SelectValue>
-              {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectPopup align="end" alignItemWithTrigger={false}>
-            {METRIC_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value} title={shortcutTitle(option)}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
+            <SelectTrigger
+              aria-label="Usage metric"
+              size="compact"
+              variant="ghost"
+              className="w-auto min-w-0"
+            >
+              <SelectValue>
+                {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {METRIC_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value} title={shortcutTitle(option)}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        ) : null}
         <Button
           onClick={refreshWindow}
           aria-label={showingLimits ? "Refresh limits" : "Refresh usage"}
@@ -513,8 +520,8 @@ export function UsagePage() {
             {selectedEnvironments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {environments.length === 0
-                  ? `Connect an environment to see ${showingLimits ? "limits" : "usage"}.`
-                  : `Select an environment to see ${showingLimits ? "limits" : "usage"}.`}
+                  ? `Connect a computer to see ${showingLimits ? "limits" : "usage"}.`
+                  : `Select a computer to see ${showingLimits ? "limits" : "usage"}.`}
               </p>
             ) : showingLimits ? (
               <UsageLimitsSection
@@ -1101,7 +1108,7 @@ function UsageCoverageNotice({
       ))}
       {duplicateSources.length > 0 ? (
         <span>
-          Counted once across environments sharing a transcript directory:{" "}
+          Counted once across computers sharing a transcript directory:{" "}
           {duplicateSources.join(", ")}
         </span>
       ) : null}
@@ -1134,7 +1141,7 @@ function UsageEnvironmentFilter({
 }) {
   const allSelected = selectedEnvironmentIds === null;
   const label = allSelected
-    ? "All environments"
+    ? "All computers"
     : selectedEnvironments.length === 1
       ? selectedEnvironments[0]!.label
       : `${selectedEnvironments.length} environments`;
@@ -1150,7 +1157,7 @@ function UsageEnvironmentFilter({
           {showUsageStatus && hasIssue ? (
             <CircleAlertIcon
               className="size-3.5 text-warning-foreground"
-              aria-label="Some environments could not report usage"
+              aria-label="Some computers could not report usage"
             />
           ) : (
             <ChevronDownIcon
@@ -1166,7 +1173,7 @@ function UsageEnvironmentFilter({
           closeOnClick={false}
           onCheckedChange={(checked) => onSelectionChange(checked ? null : new Set())}
         >
-          All environments
+          All computers
         </MenuCheckboxItem>
         <MenuSeparator />
         {environments.map((environment) => {
@@ -1221,11 +1228,11 @@ function UsageEnvironmentFilter({
           );
         })}
         {environments.length === 0 ? (
-          <p className="px-2 py-2 text-xs text-muted-foreground">No environments connected.</p>
+          <p className="px-2 py-2 text-xs text-muted-foreground">No computers connected.</p>
         ) : null}
         {showUsageStatus && isPartial ? (
           <p className="px-2 py-2 text-xs text-muted-foreground">
-            Totals are partial while selected environments scan.
+            Totals are partial while selected computers scan.
           </p>
         ) : null}
         {showUsageStatus ? (

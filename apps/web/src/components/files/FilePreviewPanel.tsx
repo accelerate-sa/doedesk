@@ -1882,7 +1882,7 @@ export function WorkspaceLargeTextPreview(props: {
             setSaving(true);
             void (async () => {
               const url = await refreshAssetUrl();
-              if (!url) throw new Error("Reconnect to the environment and try again.");
+              if (!url) throw new Error("Reconnect to the computer and try again.");
               const response = await fetch(url);
               if (!response.ok) throw new Error("The file could not be loaded. Try again.");
               const downloadUrl = URL.createObjectURL(await response.blob());

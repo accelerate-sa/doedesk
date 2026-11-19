@@ -278,14 +278,14 @@ describe("serializeRenderedMarkdownFragment", () => {
         ),
         new FakeText(" or "),
         new FakeElement("A", [], { href: "/environment-one/thread-one" }).append(
-          new FakeText("the thread"),
+          new FakeText("the chat"),
         ),
         new FakeText("."),
       ),
     );
     const copied = serializeRenderedMarkdownFragment(asNode(container));
     expect(copied).toBe(
-      "Write to support@example.com, [Support](mailto:support@example.com?subject=Help), [Support](mailto:support@example.com?subject=Help\\)) or the thread.",
+      "Write to support@example.com, [Support](mailto:support@example.com?subject=Help), [Support](mailto:support@example.com?subject=Help\\)) or the chat.",
     );
     const paragraph = parseMarkdownWithMath(copied).children[0];
     if (paragraph?.type !== "paragraph") throw new Error("Expected a paragraph");

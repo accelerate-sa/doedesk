@@ -696,7 +696,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
                 error ? null : (
                   <ContentStatus
                     title="No review diffs"
-                    detail="This thread has no ready turn diffs and the worktree diff is empty."
+                    detail="This chat has no ready turn diffs and the worktree diff is empty."
                   />
                 )
               ) : selectedSection.isLoading && selectedSection.diff === null ? (

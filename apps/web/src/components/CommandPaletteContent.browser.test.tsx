@@ -16,9 +16,9 @@ function SubmenuPalette() {
       <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandDialogPopup aria-label="Command palette">
           <CommandPaletteContent
-            items={["Project A"]}
+            items={["Folder A"]}
             inputProps={{
-              placeholder: "Search projects",
+              placeholder: "Search folders",
               startAddon: (
                 <button type="button" aria-label="Back">
                   Back
@@ -42,6 +42,6 @@ describe("CommandPaletteContent", () => {
 
     await userEvent.click(page.getByRole("button", { name: "Open" }));
 
-    await expect.element(page.getByPlaceholder("Search projects")).toHaveFocus();
+    await expect.element(page.getByPlaceholder("Search folders")).toHaveFocus();
   });
 });

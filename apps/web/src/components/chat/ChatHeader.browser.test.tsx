@@ -46,11 +46,11 @@ function header(title: string) {
 it.each(["blur", "Enter"] as const)(
   "preserves a concurrent title update when an untouched rename ends with %s",
   async (finish) => {
-    persisted.title = "New thread";
+    persisted.title = "New chat";
     await using screen = await render(header(persisted.title));
-    await screen.getByRole("button", { name: "Thread actions for New thread" }).dblClick();
-    const input = screen.getByRole("textbox", { name: "Thread title" });
-    await expect.element(input).toHaveValue("New thread");
+    await screen.getByRole("button", { name: "Chat actions for New chat" }).dblClick();
+    const input = screen.getByRole("textbox", { name: "Chat title" });
+    await expect.element(input).toHaveValue("New chat");
 
     persisted.title = "Fix login redirect";
     await screen.rerender(header(persisted.title));
@@ -61,13 +61,13 @@ it.each(["blur", "Enter"] as const)(
     expect(persisted.title).toBe("Fix login redirect");
 
     await screen.rerender(header(persisted.title));
-    await screen.getByRole("button", { name: "Thread actions for Fix login redirect" }).dblClick();
-    await screen.getByRole("textbox", { name: "Thread title" }).fill("My edited title");
+    await screen.getByRole("button", { name: "Chat actions for Fix login redirect" }).dblClick();
+    await screen.getByRole("textbox", { name: "Chat title" }).fill("My edited title");
     persisted.title = "Another concurrent title";
     await screen.rerender(header(persisted.title));
     await userEvent.keyboard("{Enter}");
     await expect
-      .element(screen.getByRole("textbox", { name: "Thread title" }))
+      .element(screen.getByRole("textbox", { name: "Chat title" }))
       .not.toBeInTheDocument();
     expect(persisted.title).toBe("My edited title");
   },
@@ -76,16 +76,16 @@ it.each(["blur", "Enter"] as const)(
 it("opens the thread menu on a desktop title click without waiting", async () => {
   openMenu.mockClear();
   using _bridge = stubGlobal("desktopBridge", {});
-  await using screen = await render(header("New thread"));
-  await screen.getByRole("button", { name: "Thread actions for New thread" }).click();
+  await using screen = await render(header("New chat"));
+  await screen.getByRole("button", { name: "Chat actions for New chat" }).click();
   expect(openMenu).toHaveBeenCalledOnce();
 });
 
 it("keeps the Escape that cancels a rename from also reaching window shortcuts", async () => {
-  persisted.title = "New thread";
+  persisted.title = "New chat";
   await using screen = await render(header(persisted.title));
-  await screen.getByRole("button", { name: "Thread actions for New thread" }).dblClick();
-  const input = screen.getByRole("textbox", { name: "Thread title" });
+  await screen.getByRole("button", { name: "Chat actions for New chat" }).dblClick();
+  const input = screen.getByRole("textbox", { name: "Chat title" });
   await input.fill("Unsaved title");
 
   // The thread find bar closes from a window keydown listener that skips handled events.
@@ -100,6 +100,6 @@ it("keeps the Escape that cancels a rename from also reaching window shortcuts",
   await userEvent.keyboard("{Escape}");
 
   await expect.element(input).not.toBeInTheDocument();
-  expect(persisted.title).toBe("New thread");
+  expect(persisted.title).toBe("New chat");
   expect(windowEscapes).toEqual([true]);
 });

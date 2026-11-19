@@ -53,7 +53,7 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
     >
       <SettingsRow
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
-        title="Environment"
+        title="Computer"
         description="Device that runs this provider."
         control={
           <div className="flex min-w-0 flex-col gap-2 sm:items-end">
@@ -73,7 +73,7 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
       ) : props.provider?.setup === undefined ? (
         <SettingsRow
           title="Update required"
-          description="Update this environment to manage Antigravity."
+          description="Update this computer to manage Antigravity."
         />
       ) : (
         <ProviderSetupActions
@@ -178,7 +178,7 @@ function ProviderSetupActions({
 
   async function removeRuntime() {
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      `Remove the downloaded Antigravity runtime from ${environmentLabel}? Google sign-in and thread history are kept.`,
+      `Remove the downloaded Antigravity runtime from ${environmentLabel}? Google sign-in and chat history are kept.`,
     );
     if (confirmed) {
       await runCommand("Removing runtime", () => removeInstall(target));
@@ -205,7 +205,7 @@ function ProviderSetupActions({
             ) : null}
             {!installed && !provider.setup?.canInstall ? (
               <p className="text-muted-foreground">
-                Automatic installation unavailable. Set a binary path or use another environment.
+                Automatic installation unavailable. Set a binary path or use another computer.
               </p>
             ) : null}
           </div>

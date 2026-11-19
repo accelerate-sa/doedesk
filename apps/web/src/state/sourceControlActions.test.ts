@@ -132,7 +132,7 @@ beforeEach(() => {
 });
 
 describe("source control callback grants", () => {
-  it.each(cases)("$name uses the selected environment's permission", async ({ create }) => {
+  it.each(cases)("$name uses the selected computer's permission", async ({ create }) => {
     const action = create();
     expect(action.isAllowed).toBe(false);
     expect((await action.run())._tag).toBe("Failure");
@@ -157,7 +157,7 @@ describe("pull request worktree attachment permission", () => {
     ["worktree", threadId, false, false],
     ["worktree", threadId, true, true],
   ] as const)(
-    "mode %s / thread %s / task grant %s",
+    "mode %s / chat %s / task grant %s",
     async (mode, attachedThreadId, operate, allowed) => {
       state.scopes.get(secondary)!.add(AuthSourceControlWriteScope);
       if (operate) state.scopes.get(secondary)!.add(AuthOrchestrationOperateScope);

@@ -49,7 +49,7 @@ export function PullRequestLabelsScreen({ route }: StaticScreenProps<PullRequest
       : !connected
         ? "Reconnect to change labels."
         : !canWrite
-          ? "This device isn't allowed to change source control on this environment."
+          ? "This device isn't allowed to change source control on this computer."
           : pr.capabilities.labels !== true
             ? "This provider doesn't support changing labels."
             : "Changing labels needs triage access on this repository.";

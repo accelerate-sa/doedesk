@@ -8,7 +8,7 @@ import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
-import { readClaudeSettingsEnv } from "./ClaudeSkills.ts";
+import packageJson from "../../../package.json" with { type: "json" };
 
 const quotePath = Schema.encodeSync(Schema.fromJsonString(Schema.String));
 
@@ -60,31 +60,35 @@ const CLAUDE_HOST_SESSION_VARIABLES = [
   "CLAUDE_EFFORT",
   "CLAUDE_PID",
   "CLAUDE_AGENT_SDK_VERSION",
+  // Names the program that started that session. A claude DoeDesk starts is not that program.
+  "CLAUDE_CODE_ENTRYPOINT",
 ];
 
+/** How DoeDesk names itself to Anthropic: the product and its version, nothing else. */
+const CLAUDE_CLIENT_APP = `doedesk/${packageJson.version}`;
+
 /**
- * Base env for the Claude processes T3 Code runs, before `makeClaudeEnvironment`.
- * Claude Code reads its entrypoint from the process env, not its settings `env`, so T3 Code applies that override itself.
+ * Base env for the Claude processes DoeDesk runs, before `makeClaudeEnvironment`.
+ * `CLAUDE_AGENT_SDK_CLIENT_APP` is the Agent SDK's documented way for an app to name itself in
+ * the user agent. Claude Code's own entry point label is left as the SDK sets it.
  */
 export const mergeClaudeProcessEnvironment = Effect.fn("mergeClaudeProcessEnvironment")(function* (
-  config: Pick<ClaudeSettings, "homePath">,
   instanceEnvironment: ProviderInstanceEnvironment | undefined,
   hostEnvironment: NodeJS.ProcessEnv,
 ) {
   const baseEnvironment: NodeJS.ProcessEnv = {
     ...hostEnvironment,
-    CLAUDE_CODE_ENTRYPOINT: "t3-code",
+    CLAUDE_AGENT_SDK_CLIENT_APP: CLAUDE_CLIENT_APP,
   };
   for (const name of CLAUDE_HOST_SESSION_VARIABLES) delete baseEnvironment[name];
   // The desktop runs the server as Node through Electron. Commands Claude runs inherit its env, so
-  // an Electron app they start (T3 Code itself, VS Code) would run as Node and exit.
+  // an Electron app they start (DoeDesk itself, VS Code) would run as Node and exit.
   delete baseEnvironment.ELECTRON_RUN_AS_NODE;
-  const environment = yield* mergeProviderInstanceEnvironment(instanceEnvironment, baseEnvironment);
-  const settingsEntrypoint = (yield* readClaudeSettingsEnv(config, undefined, environment))
-    .CLAUDE_CODE_ENTRYPOINT;
-  return settingsEntrypoint
-    ? { ...environment, CLAUDE_CODE_ENTRYPOINT: settingsEntrypoint }
-    : environment;
+  return yield* mergeProviderInstanceEnvironment(
+    instanceEnvironment,
+    baseEnvironment,
+    "claudeAgent",
+  );
 });
 
 /** managed-mcp.json excludes other MCP config and forbids --strict-mcp-config; omit the flag when present. */

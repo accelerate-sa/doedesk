@@ -70,7 +70,7 @@ export function usePullRequestDraftThread(input: PullRequestDraftThreadInput) {
     checkoutPullRequest: DraftCheckoutPullRequest;
   }) => {
     if (!activeProject) {
-      throw new Error("No active project is available for this pull request.");
+      throw new Error("No active folder is available for this pull request.");
     }
     const activeProjectRef = scopeProjectRef(activeProject.environmentId, activeProject.id);
     const logicalProjectKey = deriveLogicalProjectKeyFromSettings(

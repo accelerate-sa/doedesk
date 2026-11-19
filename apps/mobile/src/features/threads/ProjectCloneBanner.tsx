@@ -57,7 +57,7 @@ export function ProjectCloneBanner(props: {
         </Text>
       ) : null}
       <View className="mt-2 flex-row justify-end gap-2">
-        <BannerAction label="Remove project" onPress={props.onRemove} />
+        <BannerAction label="Remove folder" onPress={props.onRemove} />
         <BannerAction label="Retry" onPress={props.onRetry} />
       </View>
     </View>

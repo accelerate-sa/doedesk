@@ -429,8 +429,8 @@ export function UsageLimitsSection({
       externalLinks.length === 0 ? (
         <Text className="py-12 text-center text-base text-foreground-muted">
           {selected.size === 0
-            ? "Select an environment to see limits."
-            : "No provider on the selected environments reports subscription limits."}
+            ? "Select a computer to see limits."
+            : "No provider on the selected computers reports subscription limits."}
         </Text>
       ) : null}
       {pools.map((pool) => {
@@ -548,7 +548,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
       >
         {!account || !window ? (
           <Text className="text-base text-foreground-muted">
-            This account is no longer reporting limits on the selected environments.
+            This account is no longer reporting limits on the selected computers.
           </Text>
         ) : (
           <>

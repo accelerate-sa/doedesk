@@ -170,7 +170,7 @@ export function useComposerContextImport(input: {
     if (!file) {
       const sourceConnection = readPreparedConnection(sourceEnvironmentId);
       if (!sourceConnection) {
-        fail("The environment it came from is not connected.");
+        fail("The computer it came from is not connected.");
         return;
       }
       const result = await createAssetUrl({
@@ -185,7 +185,7 @@ export function useComposerContextImport(input: {
         const cause = result._tag === "Failure" ? Cause.squash(result.cause) : null;
         fail(
           isUnreachable(cause)
-            ? "The environment it came from is not reachable right now."
+            ? "The computer it came from is not reachable right now."
             : "The original attachment is no longer available.",
         );
         return;

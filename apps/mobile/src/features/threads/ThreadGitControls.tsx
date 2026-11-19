@@ -267,9 +267,9 @@ export function threadTerminalMenu(props: ThreadGitControlsProps): AppBarMenu | 
         : [
             {
               id: "script-none",
-              title: "No project scripts",
+              title: "No folder scripts",
               icon: "play",
-              subtitle: "This project has no saved scripts yet",
+              subtitle: "This folder has no saved scripts yet",
               disabled: true,
               onPress: () => {},
             },
@@ -293,7 +293,7 @@ export function threadTerminalMenu(props: ThreadGitControlsProps): AppBarMenu | 
         id: "terminal-new",
         title: "Open new terminal",
         icon: "plus",
-        subtitle: "Start another shell for this thread",
+        subtitle: "Start another shell for this chat",
         disabled: !props.canOperateTerminal,
         onPress: props.onOpenNewTerminal,
       },
@@ -344,7 +344,7 @@ export function useThreadGitMenuDefinition(props: ThreadGitMenuProps): AppBarMen
               id: "git-merge-back",
               title: "Merge back to source",
               icon: PullRequestGlyph.merged,
-              subtitle: "Bring this thread's latest turn into its source",
+              subtitle: "Bring this chat's latest turn into its source",
               onPress: props.onMergeBack,
             },
           ]

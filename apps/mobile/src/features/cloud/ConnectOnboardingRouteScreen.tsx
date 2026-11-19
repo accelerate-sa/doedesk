@@ -63,7 +63,7 @@ function ConfiguredConnectOnboardingRouteScreen() {
         title="Set up T3 Connect"
         onClose={handleClose}
         refresh={{
-          accessibilityLabel: "Refresh environments",
+          accessibilityLabel: "Refresh computers",
           disabled: isRefreshing,
           onPress: handleRefresh,
         }}

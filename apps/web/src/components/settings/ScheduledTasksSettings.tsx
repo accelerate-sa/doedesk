@@ -161,7 +161,7 @@ const NEW_THREAD_DESTINATION = " new-thread";
 
 const WORKSPACE_MODE_LABELS: Record<WorkspaceMode, string> = {
   worktree: "Create a new worktree",
-  root: "Use the project checkout",
+  root: "Use the folder checkout",
   existing_worktree: "Use a specific checkout",
 };
 
@@ -463,8 +463,8 @@ export function ScheduledTasksSettings(target: {
               <EmptyMedia variant="icon">
                 <Clock3Icon />
               </EmptyMedia>
-              <EmptyTitle>No environments available</EmptyTitle>
-              <EmptyDescription>Connect an environment to manage scheduled tasks.</EmptyDescription>
+              <EmptyTitle>No computers available</EmptyTitle>
+              <EmptyDescription>Connect a computer to manage scheduled tasks.</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : environments.length > 1 ? (
@@ -599,14 +599,14 @@ function ScheduledTaskEnvironmentList({
       {taskId && linkedState?.tasks && linkedState.error === null && !linkedTask ? (
         <SettingsRow
           title="Task unavailable"
-          description="This task was deleted or belongs to a different project. Check your project filter."
+          description="This task was deleted or belongs to a different folder. Check your folder filter."
           role="status"
         />
       ) : null}
       {populated.length === 0 && loaded.length > 0 ? (
         <SettingsRow
           title="No scheduled tasks"
-          description="No tasks match this environment and project selection."
+          description="No tasks match this computer and folder selection."
         />
       ) : null}
       {Object.entries(summaries).map(([label, entries]) => {
@@ -687,7 +687,7 @@ function ScheduledTaskEnvironmentSection({
     >
       {!connected ? (
         <SettingsRow
-          title="Environment disconnected"
+          title="Computer disconnected"
           description={`Reconnect ${environment.label} to view its scheduled tasks.`}
         />
       ) : tasksQuery.error ? (
@@ -699,14 +699,14 @@ function ScheduledTaskEnvironmentSection({
           {taskId && !linkedTask ? (
             <SettingsRow
               title="Task unavailable"
-              description="This task was deleted or belongs to a different project. Check your project filter."
+              description="This task was deleted or belongs to a different folder. Check your folder filter."
               role="status"
             />
           ) : null}
           {tasks.length === 0 ? (
             <SettingsRow
               title="No scheduled tasks"
-              description="No tasks match this environment and project selection."
+              description="No tasks match this computer and folder selection."
             />
           ) : (
             tasks.map((task) => (
@@ -881,7 +881,7 @@ function ScheduledTaskThreadLink({
       params={buildThreadRouteParams(ref)}
       className="max-w-64 truncate underline underline-offset-2 hover:text-foreground"
     >
-      {title || "Open thread"}
+      {title || "Open chat"}
     </Link>
   );
 }
@@ -1142,8 +1142,8 @@ function WebhookDeliveryMode({ environmentId }: { readonly environmentId: Enviro
   return (
     <p className="text-xs text-muted-foreground">
       {cloudLink.data.holdWebhooksWhileOffline
-        ? "Held for up to 24 hours while this environment is offline. "
-        : "Forwarded live. Requests fail while this environment is offline. "}
+        ? "Held for up to 24 hours while this computer is offline. "
+        : "Forwarded live. Requests fail while this computer is offline. "}
       <Link to="/settings/access" className="underline underline-offset-2">
         Change in Sharing & access
       </Link>
@@ -1183,9 +1183,9 @@ function ScheduledTaskEditorDialog({
 }
 
 const THREAD_MODE_LABELS: Record<ScheduledTaskThreadMode, string> = {
-  new_thread: "New thread each run",
-  continue: "One thread, continuing the conversation",
-  fresh_session: "One thread, fresh session each run",
+  new_thread: "New chat each run",
+  continue: "One chat, continuing the conversation",
+  fresh_session: "One chat, fresh session each run",
 };
 
 function useScheduledTaskThread(environmentId: EnvironmentId, threadId: ThreadId | null) {
@@ -1224,7 +1224,7 @@ function ScheduledTaskDestination({
     ref !== null
       ? thread?.title.trim() || `Thread ${ref.threadId}`
       : threadMode === "new_thread"
-        ? "New thread each run"
+        ? "New chat each run"
         : "Started by the first run";
   const shells = useVisibleThreadShells(open);
   // Mounts older settled threads matching the query, which shells may leave out.
@@ -1250,14 +1250,14 @@ function ScheduledTaskDestination({
   };
   const detail =
     threadMode === "new_thread"
-      ? "Each run starts a new thread with the workspace and model below."
+      ? "Each run starts a new chat with the workspace and model below."
       : ref === null
         ? threadMode === "continue"
-          ? "The first run starts a thread with the workspace and model below. Later runs continue that conversation."
-          : "The first run starts a thread with the workspace and model below. Later runs post there, each in a fresh session without earlier runs' context."
+          ? "The first run starts a chat with the workspace and model below. Later runs continue that conversation."
+          : "The first run starts a chat with the workspace and model below. Later runs post there, each in a fresh session without earlier runs' context."
         : threadMode === "continue"
           ? "Each run continues this conversation, in its workspace and with its current model."
-          : "Each run starts a fresh session in this thread, without earlier runs' context.";
+          : "Each run starts a fresh session in this chat, without earlier runs' context.";
   return (
     <Field label="Destination" htmlFor="scheduled-task-destination">
       {onThreadModeChange ? (
@@ -1303,7 +1303,7 @@ function ScheduledTaskDestination({
                 ? "scheduled-task-destination-thread"
                 : "scheduled-task-destination"
             }
-            aria-label={onThreadModeChange ? "Destination thread" : undefined}
+            aria-label={onThreadModeChange ? "Destination chat" : undefined}
             disabled={disabled}
             render={<Button variant="outline" size="sm" />}
             className="w-full justify-between"
@@ -1314,21 +1314,21 @@ function ScheduledTaskDestination({
           </ComboboxTrigger>
           <ComboboxPopup align="start" side="bottom" className="w-80">
             <ComboboxSearchInput
-              aria-label="Search threads"
-              placeholder="Search all threads..."
+              aria-label="Search chats"
+              placeholder="Search all chats..."
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <ComboboxEmpty>No threads found.</ComboboxEmpty>
+            <ComboboxEmpty>No chats found.</ComboboxEmpty>
             <ComboboxList className="max-h-72">
               {items.map((value, index) => (
                 <ComboboxItem key={value} index={index} value={value}>
                   <span className="block truncate">
                     {value === NEW_THREAD_DESTINATION
-                      ? "New thread each run"
+                      ? "New chat each run"
                       : value === threadId
                         ? currentLabel
-                        : threads.find((row) => row.id === value)?.title || "Untitled thread"}
+                        : threads.find((row) => row.id === value)?.title || "Untitled chat"}
                   </span>
                 </ComboboxItem>
               ))}
@@ -1339,7 +1339,7 @@ function ScheduledTaskDestination({
       <div className="space-y-1 text-sm">
         <p className="text-muted-foreground">{detail}</p>
         {threadMode !== "new_thread" ? (
-          <p className="text-muted-foreground">Deleting the thread also deletes this task.</p>
+          <p className="text-muted-foreground">Deleting the chat also deletes this task.</p>
         ) : null}
       </div>
     </Field>
@@ -1477,7 +1477,7 @@ function ScheduledTaskEditorForm({
       !projects.some((project) => project.id === selectedProjectId) ||
       selection === null
     ) {
-      reportFailure("Scheduled task is incomplete", "Add a title, prompt, project, and model.");
+      reportFailure("Scheduled task is incomplete", "Add a title, prompt, folder, and model.");
       return;
     }
     const parsedFilters = parseWebhookFilterDrafts(draft.filters);
@@ -1510,7 +1510,7 @@ function ScheduledTaskEditorForm({
     if (schedule.type === "once" && !offersOnce) {
       reportFailure(
         "Once is not available here",
-        "This environment runs an older T3 Code. Update it to schedule a one-time task, or pick another schedule.",
+        "This computer runs an older DoeDesk. Update it to schedule a one-time task, or pick another schedule.",
       );
       return;
     }
@@ -1581,7 +1581,7 @@ function ScheduledTaskEditorForm({
         {/* Fieldsets default to min-width: min-content, which lets one wide control widen the form past the dialog. */}
         <fieldset disabled={saving} className="min-w-0 space-y-5">
           {!connected ? (
-            <p className="text-sm text-destructive">Reconnect this environment before saving.</p>
+            <p className="text-sm text-destructive">Reconnect this computer before saving.</p>
           ) : null}
           <Field label="Runs on" htmlFor="scheduled-task-environment">
             <Select
@@ -1609,7 +1609,7 @@ function ScheduledTaskEditorForm({
                       kind={resolveEnvironmentMachineKind(environment?.serverConfig ?? null)}
                       className="size-4"
                     />
-                    {environment?.label ?? "Unavailable environment"}
+                    {environment?.label ?? "Unavailable computer"}
                   </span>
                 </SelectValue>
               </SelectTrigger>
@@ -1691,7 +1691,7 @@ function ScheduledTaskEditorForm({
           />
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Project" htmlFor="scheduled-task-project">
+            <Field label="Folder" htmlFor="scheduled-task-project">
               <Select
                 value={selectedProjectId}
                 onValueChange={(projectId) =>
@@ -1699,7 +1699,7 @@ function ScheduledTaskEditorForm({
                 }
               >
                 <SelectTrigger size="sm" id="scheduled-task-project">
-                  <SelectValue placeholder="Select a project">{selectedProject?.title}</SelectValue>
+                  <SelectValue placeholder="Select a folder">{selectedProject?.title}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
                   {projects.map((project) => (
@@ -1733,7 +1733,7 @@ function ScheduledTaskEditorForm({
                 </SelectTrigger>
                 <SelectPopup>
                   <SelectItem value="worktree">Create a new worktree</SelectItem>
-                  <SelectItem value="root">Use the project checkout</SelectItem>
+                  <SelectItem value="root">Use the folder checkout</SelectItem>
                   <SelectItem value="existing_worktree">Use a specific checkout</SelectItem>
                 </SelectPopup>
               </Select>

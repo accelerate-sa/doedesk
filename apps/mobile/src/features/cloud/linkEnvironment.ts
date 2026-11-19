@@ -134,7 +134,7 @@ function ensureLinkedEnvironmentMatches(input: {
 }): Effect.Effect<void, CloudEnvironmentLinkError> {
   if (input.link.environmentId !== input.expectedEnvironmentId) {
     return new CloudEnvironmentLinkError({
-      message: "Relay returned credentials for a different environment.",
+      message: "Relay returned credentials for a different computer.",
     });
   }
   if (input.link.endpoint.providerKind !== input.expectedProviderKind) {
@@ -202,7 +202,7 @@ export const linkEnvironmentToCloudWithPreference = Effect.fn(
         origin: endpointOrigin(input.connection.httpBaseUrl),
       },
     })
-    .pipe(Effect.mapError(cloudEnvironmentLinkError("Could not obtain environment link proof.")));
+    .pipe(Effect.mapError(cloudEnvironmentLinkError("Could not obtain computer link proof.")));
   const link = yield* relayClient
     .linkEnvironment({
       clerkToken: input.clerkToken,
@@ -235,7 +235,5 @@ export const linkEnvironmentToCloudWithPreference = Effect.fn(
         endpointRuntime: link.endpointRuntime,
       },
     })
-    .pipe(
-      Effect.mapError(cloudEnvironmentLinkError("Could not configure environment relay access.")),
-    );
+    .pipe(Effect.mapError(cloudEnvironmentLinkError("Could not configure computer relay access.")));
 });

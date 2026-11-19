@@ -683,7 +683,7 @@ describe("getFallbackThreadIdAfterDelete", () => {
         },
       },
     ],
-  ] as const)("skips a %s thread the sidebar does not list", (_state, parked) => {
+  ] as const)("skips a %s chat the sidebar does not list", (_state, parked) => {
     const fallbackThreadId = getFallbackThreadIdAfterDelete({
       threads: [
         makeThread({
@@ -726,12 +726,12 @@ describe("sortScopedProjectsForSidebar", () => {
       makeProject({
         environmentId: localEnvironmentId,
         id: sharedProjectId,
-        title: "Local project",
+        title: "Local folder",
       }),
       makeProject({
         environmentId: remoteEnvironmentId,
         id: sharedProjectId,
-        title: "Remote project",
+        title: "Remote folder",
       }),
     ];
     const threads = [
@@ -749,19 +749,19 @@ describe("sortScopedProjectsForSidebar", () => {
 
     const sorted = sortScopedProjectsForSidebar(projects, threads, "updated_at");
 
-    expect(sorted.map((project) => project.title)).toEqual(["Remote project", "Local project"]);
+    expect(sorted.map((project) => project.title)).toEqual(["Remote folder", "Local folder"]);
   });
 
   it("does not use archived threads as project activity", () => {
     const projects = [
       makeProject({
         id: ProjectId.make("project-visible"),
-        title: "Visible project",
+        title: "Visible folder",
         updatedAt: "2026-03-09T10:01:00.000Z",
       }),
       makeProject({
         id: ProjectId.make("project-archived"),
-        title: "Archived-only project",
+        title: "Archived-only folder",
         updatedAt: "2026-03-09T10:00:00.000Z",
       }),
     ];
@@ -782,8 +782,8 @@ describe("sortScopedProjectsForSidebar", () => {
     const sorted = sortScopedProjectsForSidebar(projects, threads, "updated_at");
 
     expect(sorted.map((project) => project.title)).toEqual([
-      "Visible project",
-      "Archived-only project",
+      "Visible folder",
+      "Archived-only folder",
     ]);
   });
 });
@@ -795,12 +795,12 @@ describe("sortSidebarV2ProjectGroups", () => {
     const olderRootThreadId = ThreadId.make("thread-older-root");
     const projects = [
       {
-        ...makeProject({ id: olderProjectId, title: "A older project" }),
+        ...makeProject({ id: olderProjectId, title: "A older folder" }),
         projectKey: "logical-older",
         memberProjectRefs: [{ environmentId: localEnvironmentId, projectId: olderProjectId }],
       },
       {
-        ...makeProject({ id: newerProjectId, title: "Z newer project" }),
+        ...makeProject({ id: newerProjectId, title: "Z newer folder" }),
         projectKey: "logical-newer",
         memberProjectRefs: [{ environmentId: localEnvironmentId, projectId: newerProjectId }],
       },
@@ -976,7 +976,7 @@ describe("unseen completion with background work", () => {
       receded: true,
       pill: "Waiting",
     },
-  ] as const)("presents a completed thread with a $roster roster", (expected) => {
+  ] as const)("presents a completed chat with a $roster roster", (expected) => {
     const thread = presentThreadShell(localEnvironmentId, {
       ...makeThreadFixture().source,
       latestRunId: RunId.make("run-background-completion"),
@@ -1142,7 +1142,7 @@ describe("Working shelf (beta)", () => {
       ["active", "a2"],
       ["settled", "s1"],
     ] as const)(
-      "does not move a Working thread into %s when its reference drag ends in the sidebar",
+      "does not move a Working chat into %s when its reference drag ends in the sidebar",
       (section, overKey) => {
         const target = resolveSidebarDropTarget(items, "w1", overKey);
         expect(target?.section).toBe(section);

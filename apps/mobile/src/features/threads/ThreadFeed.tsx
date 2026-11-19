@@ -102,7 +102,7 @@ import { CHAT_LIST_ANCHOR_OFFSET, resolveChatListAnchoredEndSpace } from "@t3too
 import { imageMimeType } from "@t3tools/shared/image";
 import { videoMimeType } from "@t3tools/shared/video";
 import { SymbolView, type AppSymbolName } from "../../components/ui/AppSymbol";
-import { textDirection } from "@t3tools/shared/textDirection";
+import { markdownProseDirection, textDirection } from "@t3tools/shared/textDirection";
 import { useFocusEffect, useIsFocused, useNavigation } from "@react-navigation/native";
 import { useNativeWorkspaceColumnsSupported } from "../../native/NativeWorkspaceColumns";
 import { useDeviceType } from "../../native/native-layout-metrics";
@@ -164,6 +164,7 @@ import { NativeScrollViewMarker } from "../../native/NativeScrollViewMarker";
 import Animated, { FadeIn, FadeInDown, type SharedValue } from "react-native-reanimated";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { FONT_FAMILIES } from "../../lib/fontFamilies";
+import { READING_FONT_FAMILIES, readingTextStyle } from "../../lib/readingFonts";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
 import { downloadAndShareAttachment } from "../../lib/attachmentDownload";
@@ -462,7 +463,7 @@ function AssistantForkButton(props: {
             if (result._tag !== "Success") {
               Dialog.alert(
                 "Could not confirm fork",
-                "Reconnect and check the thread list before trying again.",
+                "Reconnect and check the chat list before trying again.",
               );
               return;
             }
@@ -472,7 +473,7 @@ function AssistantForkButton(props: {
             if (!targetThreadReady) {
               Dialog.alert(
                 "Fork created",
-                "Its thread data did not reach this client. Reconnect and try opening it from the thread list.",
+                "Its chat data did not reach this client. Reconnect and try opening it from the chat list.",
               );
               return;
             }
@@ -1213,7 +1214,10 @@ interface MarkdownLinkHandlers {
 
 interface MarkdownStyleSets {
   readonly user: MarkdownStyleSet;
+  /** The assistant's answers, in the reading serif. */
   readonly assistant: MarkdownStyleSet;
+  /** Reasoning and other working text, in the interface font. */
+  readonly work: MarkdownStyleSet;
 }
 
 interface MarkdownStyleSet {
@@ -1370,7 +1374,10 @@ function AssistantMarkdownBlocks(props: {
           )}
           skills={props.skills}
           models={props.models}
-          textStyle={props.markdownStyles.nativeTextStyle}
+          textStyle={readingTextStyle(
+            props.markdownStyles.nativeTextStyle,
+            markdownProseDirection(segment.markdown),
+          )}
           {...props.linkHandlers}
           renderImage={props.renderImage}
         />
@@ -1438,6 +1445,26 @@ function useMarkdownStyles(): MarkdownStyleSets {
   const markdownUserFenceBg = theme["--color-md-user-fence-bg"];
   const regularFontFamily = FONT_FAMILIES.regular;
   const boldFontFamily = FONT_FAMILIES.bold;
+  const workTextStyle: NativeMarkdownTextStyle = {
+    color: markdownBodyColor,
+    strongColor: markdownStrongColor,
+    mutedColor: markdownBodyColor,
+    linkColor: markdownLinkColor,
+    inlineCodeColor: markdownInlineCodeText,
+    codeColor: markdownCodeText,
+    codeBackgroundColor: markdownCodeBg,
+    codeBlockBackgroundColor: markdownCodeBg,
+    fileTextColor: markdownCodeText,
+    quoteMarkerColor: markdownBlockquoteBorder,
+    dividerColor: markdownHrColor,
+    contextChipBorderColor,
+    fontSize: nativeMarkdownTypography.fontSize,
+    lineHeight: nativeMarkdownTypography.lineHeight,
+    headingFontSizes: nativeMarkdownTypography.headingFontSizes,
+    fontFamily: regularFontFamily,
+    headingFontFamily: boldFontFamily,
+    boldFontFamily,
+  };
 
   return {
     user: {
@@ -1463,27 +1490,16 @@ function useMarkdownStyles(): MarkdownStyleSets {
       },
     },
     assistant: {
+      // Redaction runs small, so reading text is a point larger than the interface.
       nativeTextStyle: {
-        color: markdownBodyColor,
-        strongColor: markdownStrongColor,
-        mutedColor: markdownBodyColor,
-        linkColor: markdownLinkColor,
-        inlineCodeColor: markdownInlineCodeText,
-        codeColor: markdownCodeText,
-        codeBackgroundColor: markdownCodeBg,
-        codeBlockBackgroundColor: markdownCodeBg,
-        fileTextColor: markdownCodeText,
-        quoteMarkerColor: markdownBlockquoteBorder,
-        dividerColor: markdownHrColor,
-        contextChipBorderColor,
-        fontSize: nativeMarkdownTypography.fontSize,
-        lineHeight: nativeMarkdownTypography.lineHeight,
-        headingFontSizes: nativeMarkdownTypography.headingFontSizes,
-        fontFamily: regularFontFamily,
-        headingFontFamily: boldFontFamily,
-        boldFontFamily,
+        ...workTextStyle,
+        ...READING_FONT_FAMILIES,
+        fontSize: workTextStyle.fontSize + 1,
+        lineHeight: Math.round((workTextStyle.fontSize + 1) * 1.5),
+        headingFontSizes: nativeMarkdownTypography.headingFontSizes.map((size) => size + 2),
       },
     },
+    work: { nativeTextStyle: workTextStyle },
   };
 }
 
@@ -1561,7 +1577,7 @@ function OpenSenderThreadButton(props: {
         })
       }
     >
-      <Text className="font-t3-medium text-xs text-foreground-secondary">Open thread</Text>
+      <Text className="font-t3-medium text-xs text-foreground-secondary">Open chat</Text>
     </Pressable>
   );
 }
@@ -1680,7 +1696,7 @@ function ThreadAutomationMessageRow(props: {
   );
 }
 
-/** Leads with why T3 Code compacted, when it did so without being asked. */
+/** Leads with why DoeDesk compacted, when it did so without being asked. */
 function compactionLabel(label: string, title: string | undefined) {
   return title !== undefined && label.startsWith("Context compacted")
     ? title + label.slice("Context compacted".length)
@@ -2158,7 +2174,7 @@ function renderFeedEntry(
         >
           {presentation.attribution === "t3code" ? (
             <Text className="mb-1 pr-1 font-t3-medium text-2xs text-foreground-muted opacity-60">
-              Sent by T3 Code
+              Sent by DoeDesk
             </Text>
           ) : null}
           {presentation.guestName !== undefined ? (
@@ -3277,7 +3293,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
           title:
             appAtomRegistry.get(environmentThreadShells.threadShellAtom(thread))?.title ?? "Thread",
           actions: [
-            { id: "open-thread", title: "Open thread" },
+            { id: "open-thread", title: "Open chat" },
             { id: "copy-thread-link", title: "Copy link" },
           ],
         };
@@ -3464,7 +3480,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     <AssistantMarkdownContent
       markdown={text}
       environmentId={props.environmentId}
-      markdownStyles={markdownStyles.assistant}
+      markdownStyles={markdownStyles.work}
       linkHandlers={markdownLinkHandlers}
       renderImage={renderMarkdownImage}
       skills={props.skills}
@@ -4105,7 +4121,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
           >
             <ThreadFeedPlaceholder
               title="No conversation yet"
-              detail="Ask the agent to inspect the repo, run a command, or continue the active thread."
+              detail="Ask the agent to inspect the repo, run a command, or continue the active chat."
               topInset={topContentInset}
               bottomInset={bottomContentInset}
               horizontalPadding={horizontalPadding}

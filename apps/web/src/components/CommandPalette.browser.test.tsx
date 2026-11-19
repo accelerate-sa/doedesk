@@ -39,7 +39,7 @@ describe("CommandPalette open intents", () => {
     const environmentId = EnvironmentId.make("remote");
     const threadId = ThreadId.make("dragged-thread");
     setup({
-      threads: [makeThreadFixture({ environmentId, id: threadId, title: "Drag this thread" })],
+      threads: [makeThreadFixture({ environmentId, id: threadId, title: "Drag this chat" })],
     });
     const onDrop = vi.fn();
     await using screen = await render(
@@ -56,7 +56,7 @@ describe("CommandPalette open intents", () => {
       </CommandPalette>,
     );
     const pathname = screen.router?.state.location.pathname;
-    openCommandPalette({ query: "Drag this thread" });
+    openCommandPalette({ query: "Drag this chat" });
     const row = page.getByRole("option", { name: /Drag this thread/ });
     await expect.element(row).toBeVisible();
     const bounds = row.element().getBoundingClientRect();
@@ -82,7 +82,7 @@ describe("CommandPalette open intents", () => {
     });
     expect(onDrop).toHaveBeenCalledOnce();
     expect((onDrop.mock.calls[0]![0] as CustomEvent).detail).toEqual([
-      { environmentId, threadId, title: "Drag this thread" },
+      { environmentId, threadId, title: "Drag this chat" },
     ]);
     expect(screen.router?.state.location.pathname).toBe(pathname);
   });
@@ -116,7 +116,7 @@ describe("CommandPalette open intents", () => {
 
     openCommandPalette({});
     await expect
-      .element(page.getByPlaceholder("Search commands, projects, and threads..."))
+      .element(page.getByPlaceholder("Search commands, folders, and chats..."))
       .toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     await expect
@@ -135,7 +135,7 @@ describe("CommandPalette open intents", () => {
 
     openCommandPalette({ query: "acme" });
 
-    const input = page.getByPlaceholder("Search commands, projects, and threads...");
+    const input = page.getByPlaceholder("Search commands, folders, and chats...");
     await expect.element(input).toHaveFocus();
     await expect.element(input).toHaveValue("acme");
   });

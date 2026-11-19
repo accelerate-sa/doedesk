@@ -187,7 +187,7 @@ export function ReviewThreadCard({
   completionScope,
   pending,
   fixPending,
-  fixLabel = "Fix in a thread",
+  fixLabel = "Fix in a chat",
   onFix,
   onAddToChat,
   onReply,

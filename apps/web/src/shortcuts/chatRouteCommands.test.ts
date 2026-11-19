@@ -36,7 +36,7 @@ describe("new thread commands", () => {
     { mode: "boring", count: 2, command: "chat.new", picker: true },
     { mode: "boring", count: 1, command: "chat.new", picker: false },
     { mode: "boring", count: 2, command: "chat.newLocal", picker: false },
-  ] as const)("$mode sidebar, $count projects, $command: picker=$picker", (scenario) => {
+  ] as const)("$mode sidebar, $count folders, $command: picker=$picker", (scenario) => {
     using _settings = vi.spyOn(settings, "getClientSettings").mockReturnValue({
       ...DEFAULT_CLIENT_SETTINGS,
       boringSidebarEnabled: scenario.mode === "boring",
@@ -82,7 +82,7 @@ describe("preview commands", () => {
     { command: "preview.find", action: "find" },
     { command: "preview.refresh", action: "refresh" },
     { command: "preview.focusUrl", action: "focus-url" },
-  ] as const)("$command reaches the right panel on a draft thread", ({ command, action }) => {
+  ] as const)("$command reaches the right panel on a draft chat", ({ command, action }) => {
     const draftId = DraftId.make("draft-1");
     useComposerDraftStore
       .getState()

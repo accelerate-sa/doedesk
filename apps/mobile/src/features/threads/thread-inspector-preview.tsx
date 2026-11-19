@@ -31,7 +31,7 @@ export function ThreadInspectorHeader(
         subtitle={props.subtitle}
         actions={[
           {
-            accessibilityLabel: "Maximize thread",
+            accessibilityLabel: "Maximize chat",
             icon: "arrow.up.left.and.arrow.down.right",
             onPress: props.onMaximize,
           },
@@ -44,7 +44,7 @@ export function ThreadInspectorHeader(
       title={props.title}
       subtitle={props.subtitle}
       onClose={props.onClose}
-      accessibilityLabel="Close thread"
+      accessibilityLabel="Close chat"
     />
   );
 }

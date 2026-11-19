@@ -157,7 +157,7 @@ it("expects a primary environment only on desktops with the local environment en
 });
 
 it.each([undefined, "", "Server update required"])(
-  "settles fallback for an unsupported remembered environment: %s",
+  "settles fallback for an unsupported remembered computer: %s",
   (unsupportedReason) => {
     const catalog = catalogState([LOCAL, REMOTE]);
     const entries = new Map(catalog.entries);

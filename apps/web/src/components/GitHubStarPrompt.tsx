@@ -1,4 +1,5 @@
 import { type EnvironmentId, SourceControlProviderKind } from "@t3tools/contracts";
+import { isDeveloperMode } from "~/doedesk/product";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 import * as Schema from "effect/Schema";
 import { StarIcon } from "lucide-react";
@@ -43,7 +44,7 @@ function showStarPrompt(environmentId: EnvironmentId) {
       toastManager.update(id, {
         type: "success",
         title: "Thanks for the star!",
-        description: "It really helps T3 Code grow.",
+        description: "It really helps DoeDesk grow.",
         timeout: 5_000,
         actionProps: undefined,
         data: {},
@@ -57,7 +58,7 @@ function showStarPrompt(environmentId: EnvironmentId) {
     toastManager.update(id, { actionProps: { children: "Open GitHub", onClick: openInBrowser } });
   };
   const id = toastManager.add({
-    title: "Enjoying T3 Code?",
+    title: "Enjoying DoeDesk?",
     description: "Give us a star on GitHub to let us know!",
     timeout: 0,
     onClose: dismiss,
@@ -143,6 +144,8 @@ async function starRepository(environmentId: EnvironmentId) {
  * unless the environment's GitHub account already starred the repo. Waits until the user is idle.
  */
 export async function recordPromptSent(environmentId: EnvironmentId): Promise<void> {
+  // The prompt asks for a star on the coding tool's repository; it has no place in DoeDesk.
+  if (!isDeveloperMode()) return;
   if (shownThisSession) return;
   try {
     if (getLocalStorageItem(DISMISSED_KEY, Schema.Boolean)) return;

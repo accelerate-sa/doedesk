@@ -289,7 +289,7 @@ export function LocalModelChoice(props: {
         label="Local model"
         description={
           !voice.connection
-            ? "Not available on this environment"
+            ? "Not available on this computer"
             : status?.supported === false
               ? status.reason
               : "Checking…"
@@ -316,7 +316,7 @@ export function LocalModelChoice(props: {
             ? `Local model · ${formatBytes(active.size)}`
             : voice.canManage
               ? "No model installed · Choose one to download"
-              : `No model installed · Add one using T3 Code on ${props.label}`
+              : `No model installed · Add one using DoeDesk on ${props.label}`
       }
       selected={props.selected}
       onPress={() => {

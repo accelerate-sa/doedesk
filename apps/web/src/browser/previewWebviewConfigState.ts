@@ -18,7 +18,7 @@ export class PreviewWebviewBridgeUnavailableError extends Schema.TaggedError<Pre
   { environmentId: Schema.String },
 ) {
   override get message(): string {
-    return `Desktop preview configuration is unavailable for environment "${this.environmentId}".`;
+    return `Desktop preview configuration is unavailable for computer "${this.environmentId}".`;
   }
 }
 
@@ -30,7 +30,7 @@ export class PreviewWebviewConfigLoadError extends Schema.TaggedError<PreviewWeb
   },
 ) {
   override get message(): string {
-    return `Failed to load desktop preview configuration for environment "${this.environmentId}".`;
+    return `Failed to load desktop preview configuration for computer "${this.environmentId}".`;
   }
 }
 

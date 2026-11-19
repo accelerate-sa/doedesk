@@ -28,9 +28,9 @@ export function canTurnThreadIntoProject(thread: EnvironmentThreadShell): boolea
 }
 
 export async function turnThreadIntoProject(thread: EnvironmentThreadShell): Promise<void> {
-  const title = "Could not turn thread into a project";
+  const title = "Could not turn chat into a folder";
   if (!readEnvironmentScope(thread.environmentId, AuthOrchestrationOperateScope)) {
-    Dialog.alert(title, "This connection cannot change threads.");
+    Dialog.alert(title, "This connection cannot change chats.");
     return;
   }
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

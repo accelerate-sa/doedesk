@@ -49,7 +49,7 @@ export function SettingsEnvironmentsRouteScreen() {
   const relaySession = useAtomValue(managedRelaySessionAtom);
   const refreshRelayEnvironments = useAtomCommand(
     relayEnvironmentDiscovery.refresh,
-    "relay environment refresh",
+    "relay computer refresh",
   );
   const [isRefreshingCloud, setIsRefreshingCloud] = useState(false);
   const cloudRefreshPendingRef = useRef(false);
@@ -91,11 +91,11 @@ export function SettingsEnvironmentsRouteScreen() {
 
   return (
     <SettingsScreen
-      title="Environments"
+      title="Computers"
       refresh={
         relaySession
           ? {
-              accessibilityLabel: "Refresh cloud environments",
+              accessibilityLabel: "Refresh cloud computers",
               disabled: isRefreshingCloud,
               onPress: () => void refreshCloudEnvironments(),
             }
@@ -103,7 +103,7 @@ export function SettingsEnvironmentsRouteScreen() {
       }
       actions={[
         {
-          accessibilityLabel: "Add environment",
+          accessibilityLabel: "Add computer",
           icon: "plus",
           tintColor: headerIconColor,
           onPress: () => navigation.navigate("SettingsEnvironmentNew"),

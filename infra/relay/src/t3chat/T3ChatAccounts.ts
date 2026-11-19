@@ -1,4 +1,3 @@
-import { createClerkClient } from "@clerk/backend";
 import { hmac } from "@noble/hashes/hmac";
 import { sha256 } from "@noble/hashes/sha2";
 import * as Context from "effect/Context";
@@ -113,27 +112,10 @@ export const make = Effect.gen(function* () {
     );
   });
 
-  const lookupClerkPrimaryEmail = Effect.fn("relay.t3chat.lookup_clerk_primary_email")(function* (
-    userId: string,
-  ) {
-    return yield* Effect.tryPromise({
-      try: async () => {
-        const user = await createClerkClient({
-          secretKey: Redacted.value(config.clerkSecretKey),
-          publishableKey: config.clerkPublishableKey,
-        }).users.getUser(userId);
-        const email = user.primaryEmailAddress?.emailAddress;
-        if (!email) throw new Error("Clerk user has no primary email address.");
-        return email;
-      },
-      catch: (cause) => new ClerkUserLookupFailed({ cause }),
-    }).pipe(
-      Effect.timeoutOrElse({
-        duration: T3CHAT_REQUEST_TIMEOUT,
-        orElse: () => Effect.fail(new ClerkUserLookupFailed({ cause: "timed out" })),
-      }),
-    );
-  });
+  // T3 Chat links an account by its email, which this relay never learns: DoeDesk accounts are
+  // known here only by id. Linking stays unavailable until the account service offers a lookup.
+  const lookupClerkPrimaryEmail = (_userId: string) =>
+    Effect.fail(new ClerkUserLookupFailed({ cause: "account email lookup is not available" }));
 
   return T3ChatAccounts.of({
     available: settings !== undefined,

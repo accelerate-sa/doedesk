@@ -36,15 +36,15 @@ export function useConnectionController() {
     reportFailure: false,
   });
   const updateBearer = useAtomCommand(updateBearerConnection, { reportFailure: false });
-  const registerEnvironment = useAtomCommand(environmentCatalog.register, "environment register");
-  const removeEnvironmentMutation = useAtomCommand(environmentCatalog.remove, "environment remove");
+  const registerEnvironment = useAtomCommand(environmentCatalog.register, "computer register");
+  const removeEnvironmentMutation = useAtomCommand(environmentCatalog.remove, "computer remove");
   const setEnvironmentEnabledMutation = useAtomCommand(
     environmentCatalog.setEnabled,
-    "environment toggle",
+    "computer toggle",
   );
   const refreshRelayEnvironments = useAtomCommand(
     relayEnvironmentDiscovery.refresh,
-    "relay environment refresh",
+    "relay computer refresh",
   );
 
   const registeredIds = useMemo(

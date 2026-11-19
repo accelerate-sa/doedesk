@@ -670,7 +670,7 @@ export function useComposerCommandMenu({
     error:
       trigger?.kind === "pull-request"
         ? pullRequestProjectId === null || pullRequestRepository === null
-          ? "Pull requests are unavailable for this project."
+          ? "Pull requests are unavailable for this folder."
           : pullRequestSearch.error
         : null,
     onSelect,

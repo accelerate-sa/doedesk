@@ -624,7 +624,7 @@ function ThreadDetailBody(
     if (result.value.outcome === "shared") {
       Dialog.alert(
         "Turn stopped; the agent process kept running",
-        `It is shared with ${others === 0 ? "other" : others} working ${others === 1 ? "thread" : "threads"}. Stop those to free it.`,
+        `It is shared with ${others === 0 ? "other" : others} working ${others === 1 ? "chat" : "chats"}. Stop those to free it.`,
       );
     }
   };
@@ -734,10 +734,7 @@ function ThreadDetailBody(
     );
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
-      Dialog.alert(
-        "Could not update thread",
-        error instanceof Error ? error.message : "Try again.",
-      );
+      Dialog.alert("Could not update chat", error instanceof Error ? error.message : "Try again.");
     }
   };
   const pendingBackgroundWork = presentPendingBackgroundWork(
@@ -778,7 +775,7 @@ function ThreadDetailBody(
                   Dialog.confirm({
                     title: "Force stop the agent?",
                     message:
-                      "It has not answered Stop. Force stop ends the turn and kills the agent's processes, unless other working threads share them.",
+                      "It has not answered Stop. Force stop ends the turn and kills the agent's processes, unless other working chats share them.",
                     confirmText: "Force stop",
                     destructive: true,
                     onConfirm: () => void forceStop(runStop.runId),

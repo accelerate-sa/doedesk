@@ -40,7 +40,7 @@ export function useResourceTelemetry(
   });
   const retry = async () => {
     if (environmentId === null) {
-      throw new Error("No environment is selected.");
+      throw new Error("No computer is selected.");
     }
     if (
       !readEnvironmentScope(environmentId, AuthEnvironmentMaintainScope) ||

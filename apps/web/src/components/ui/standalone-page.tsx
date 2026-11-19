@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { T3Wordmark } from "../T3Wordmark";
+import { BrandMark } from "../BrandMark";
 
 export function StandalonePage({ children }: { readonly children: ReactNode }) {
   return (
@@ -23,13 +23,13 @@ export function StandalonePageHeader({
   return (
     <>
       <div className="flex items-baseline justify-between gap-3 text-muted-foreground">
-        <span className="flex items-baseline gap-1.5" role="img" aria-label="T3 Code">
-          <T3Wordmark className="h-3 w-auto shrink-0 text-foreground" aria-hidden />
-          <span className="text-lg font-medium tracking-tight">Code</span>
+        <span className="flex items-center gap-1.5 text-foreground">
+          <BrandMark className="h-[1.125rem] w-auto shrink-0" aria-hidden />
+          <span className="brand-wordmark text-xl leading-none">DoeDesk</span>
         </span>
         {context ? <span className="text-sm">{context}</span> : null}
       </div>
-      <h1 className="mt-6 text-xl leading-tight font-semibold">{title}</h1>
+      <h1 className="mt-6 font-display text-2xl leading-tight">{title}</h1>
       <p className="mt-2 text-sm text-muted-foreground">{description}</p>
     </>
   );

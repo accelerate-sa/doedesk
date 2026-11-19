@@ -5,6 +5,11 @@ import * as NodePath from "node:path";
 import tailwindColors from "tailwindcss/colors";
 import { BUILT_IN_THEME_IDS, type BuiltInThemeId } from "@t3tools/shared/themePalettes";
 
+// The mobile default theme carries DoeDesk's palette, so the built-in of that name gets no variants here.
+const MOBILE_BUILT_IN_THEME_IDS = BUILT_IN_THEME_IDS.filter(
+  (themeId): themeId is Exclude<BuiltInThemeId, "doedesk"> => themeId !== "doedesk",
+);
+
 import {
   createMobileThemeVariables,
   getMobileThemeColors,
@@ -157,7 +162,7 @@ const ADAPTIVE_COLORS: Readonly<Record<string, readonly [light: string, dark: st
   "--color-adaptive-zinc-600-300": [color("zinc", 600), color("zinc", 300)],
 };
 
-export const customThemeNames = BUILT_IN_THEME_IDS.flatMap((themeId) =>
+export const customThemeNames = MOBILE_BUILT_IN_THEME_IDS.flatMap((themeId) =>
   APPEARANCES.map((appearance) => `${themeId}-${appearance}`),
 );
 
@@ -227,7 +232,7 @@ export const renderUniwindThemesCSS = () => {
         ...clerkVariablesFor(appearance),
       }),
     ),
-    ...BUILT_IN_THEME_IDS.flatMap((themeId) =>
+    ...MOBILE_BUILT_IN_THEME_IDS.flatMap((themeId) =>
       APPEARANCES.map((appearance) =>
         renderVariant(`${themeId}-${appearance}`, variablesFor(themeId, appearance)),
       ),

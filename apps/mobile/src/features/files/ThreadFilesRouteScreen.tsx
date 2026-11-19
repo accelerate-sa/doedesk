@@ -411,7 +411,7 @@ function useThreadFilesWorkspace(params: {
 
 function FilesUnavailable({
   title = "Files unavailable",
-  detail = "This thread does not have an active workspace path.",
+  detail = "This chat does not have an active workspace path.",
   onBack,
 }: {
   title?: string;

@@ -87,7 +87,7 @@ function deferred<T>() {
 }
 
 it.each([{ cpu: null, accelerated: 2.1 }, { cpu: 5, accelerated: null }, { accelerated: 2.1 }])(
-  "uses the destination environment's benchmark tier across switches with measurements %j",
+  "uses the destination computer's benchmark tier across switches with measurements %j",
   async (secondsPer30s) => {
     const target = new PrimaryConnectionTarget({
       environmentId: EnvironmentId.make("voice-local"),
@@ -227,7 +227,7 @@ it.each([{ cpu: null, accelerated: 2.1 }, { cpu: 5, accelerated: null }, { accel
 it("tests the selected model after download and preserves its transcript across filters", async () => {
   const target = new PrimaryConnectionTarget({
     environmentId: EnvironmentId.make("voice-filter"),
-    label: "Test environment",
+    label: "Test computer",
     httpBaseUrl: window.location.origin,
     wsBaseUrl: "ws://localhost",
   });
@@ -465,7 +465,7 @@ it("loads the models of a relay-connected destination", async () => {
 it("recovers from a failed download progress poll without notifying, but reports a failed initial load", async () => {
   const target = new PrimaryConnectionTarget({
     environmentId: EnvironmentId.make("voice-progress"),
-    label: "Test environment",
+    label: "Test computer",
     httpBaseUrl: window.location.origin,
     wsBaseUrl: "ws://localhost",
   });
@@ -579,7 +579,7 @@ it("keeps a missing destination selected without claiming it cannot transcribe",
   );
   await expect
     .element(screen.getByRole("combobox", { name: "Transcribe with" }))
-    .toHaveTextContent("Chosen environment (unavailable)");
+    .toHaveTextContent("Chosen computer (unavailable)");
   await expect.element(screen.getByText(/can’t transcribe audio/)).not.toBeInTheDocument();
 });
 

@@ -479,13 +479,13 @@ function EmptyEnvironmentState() {
 
   return (
     <View className="items-center gap-3 rounded-2xl bg-grouped-card px-5 py-8">
-      <Text className="text-center text-lg font-t3-bold">Environment unavailable</Text>
+      <Text className="text-center text-lg font-t3-bold">Computer unavailable</Text>
       <Text className="text-center text-sm leading-normal text-foreground-muted">
-        Start or reconnect an environment before adding a project.
+        Start or reconnect a computer before adding a folder.
       </Text>
       <View className="mt-1">
         <Button
-          label="Add environment"
+          label="Add computer"
           tone="primary"
           onPress={() => navigation.dispatch(StackActions.replace("ConnectionsNew"))}
         />
@@ -573,12 +573,12 @@ export function AddProjectSourceScreen(props: { readonly environmentId?: string 
   const readiness = buildAddProjectRemoteSourceReadiness(discoveryState.data);
 
   return (
-    <AddProjectShell title="Add project">
+    <AddProjectShell title="Add folder">
       {selectedEnvironment === null ? <EmptyEnvironmentState /> : null}
 
       {environmentOptions.length > 1 || (selectedEnvironment !== null && !isConnected) ? (
         <>
-          <SectionTitle>Environments</SectionTitle>
+          <SectionTitle>Computers</SectionTitle>
           <ListSection>
             {environmentOptions.map((environment, index) => (
               <ListRow
@@ -625,7 +625,7 @@ export function AddProjectSourceScreen(props: { readonly environmentId?: string 
           <ListSection>
             {selectedEnvironment.newProjectsRoot !== null ? (
               <ListRow
-                title="New project"
+                title="New folder"
                 subtitle="Start a new Git repository from a name"
                 disabled={!isConnected}
                 icon={
@@ -649,9 +649,7 @@ export function AddProjectSourceScreen(props: { readonly environmentId?: string 
             <ListRow
               title="Local folder"
               subtitle={
-                canCreateProject
-                  ? "Browse a folder on disk"
-                  : "This connection cannot add projects."
+                canCreateProject ? "Browse a folder on disk" : "This connection cannot add folders."
               }
               icon={
                 <SymbolView
@@ -687,7 +685,7 @@ export function AddProjectSourceScreen(props: { readonly environmentId?: string 
                 ready={canCloneProject && readiness(candidate).ready}
                 hint={
                   !canCloneProject
-                    ? "This connection cannot clone projects."
+                    ? "This connection cannot clone folders."
                     : readiness(candidate).ready
                       ? addProjectRemoteSourcePathHint(candidate)
                       : (readiness(candidate).hint ?? "")
@@ -752,7 +750,7 @@ async function draftWithPrompt(
 function useOpenExistingProject(environment: EnvironmentOption | null) {
   const openNewTaskDraft = useOpenNewTaskDraft();
   const updateProject = useAtomCommand(projectEnvironment.update, {
-    label: "project unarchive",
+    label: "folder unarchive",
   });
   const projects = useProjects();
 
@@ -787,7 +785,7 @@ function useOpenExistingProject(environment: EnvironmentOption | null) {
         })
       )._tag === "Success";
     Dialog.alert(
-      "Project already exists",
+      "Folder already exists",
       unarchived ? existing.title : `${existing.title} is still archived. Try again later.`,
     );
     openNewTaskDraft(
@@ -825,8 +823,8 @@ function useCreateProject(environment: EnvironmentOption | null) {
       !readEnvironmentScope(environment.environmentId, AuthOrchestrationOperateScope)
     ) {
       Dialog.alert(
-        "Project not added",
-        `This connection cannot add projects right now. Any existing files remain at ${workspaceRoot}.`,
+        "Folder not added",
+        `This connection cannot add folders right now. Any existing files remain at ${workspaceRoot}.`,
       );
       return;
     }
@@ -856,8 +854,8 @@ function useCreateProject(environment: EnvironmentOption | null) {
     );
     if (project === null) {
       Dialog.alert(
-        "Project added",
-        "The project was created but has not reached this device yet. It will appear in the project list once the connection catches up.",
+        "Folder added",
+        "The folder was created but has not reached this device yet. It will appear in the folder list once the connection catches up.",
       );
       return result;
     }
@@ -1227,7 +1225,7 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
     if (project === null) {
       setName("");
       setError(
-        "The project was created but has not reached this device yet. It will appear in the project list once the connection catches up.",
+        "The folder was created but has not reached this device yet. It will appear in the folder list once the connection catches up.",
       );
       return;
     }
@@ -1242,7 +1240,7 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
   };
 
   return (
-    <AddProjectShell title="New project">
+    <AddProjectShell title="New folder">
       {error ? <ErrorBanner message={error} /> : null}
       {environment ? (
         <>
@@ -1252,7 +1250,7 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
             onChangeText={setName}
             autoCorrect={false}
             autoFocus
-            placeholder="Project name"
+            placeholder="Folder name"
             returnKeyType="done"
             onSubmitEditing={() => void submit()}
           />
@@ -1325,14 +1323,14 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
             </ListSection>
           ) : null}
           <PrimaryActionButton
-            label="Create project"
+            label="Create folder"
             disabled={isSubmitting || trimmedName.length === 0}
             onPress={() => void submit()}
             loading={isSubmitting}
           />
           <ListSection>
             <ListRow
-              title="Add existing project"
+              title="Add existing folder"
               subtitle="Open a folder or clone a repository"
               icon={
                 <SymbolView
@@ -1403,12 +1401,10 @@ export function AddProjectLocalFolderScreen(props: { readonly environmentId?: st
       {error ? <ErrorBanner message={error} /> : null}
       {environment ? (
         <>
-          {!canCreateProject ? (
-            <ErrorBanner message="This connection cannot add projects." />
-          ) : null}
+          {!canCreateProject ? <ErrorBanner message="This connection cannot add folders." /> : null}
           <ProjectPathInput value={pathInput} onChangeText={setPathInput} onSubmit={submitPath} />
           <PrimaryActionButton
-            label="Add project"
+            label="Add folder"
             disabled={!canCreateProject || isBrowseNavigating || isSubmitting}
             onPress={submitPath}
             loading={isSubmitting}
@@ -1524,7 +1520,7 @@ export function AddProjectDestinationScreen(props: {
       );
       if (project === null) {
         setError(
-          "The project was created but has not reached this device yet. It will appear in the project list once the connection catches up.",
+          "The folder was created but has not reached this device yet. It will appear in the folder list once the connection catches up.",
         );
       } else {
         openNewTaskDraft(
@@ -1562,14 +1558,14 @@ export function AddProjectDestinationScreen(props: {
         <>
           <ProjectPathInput value={pathInput} onChangeText={setPathInput} onSubmit={submitPath} />
           <PrimaryActionButton
-            label="Clone project"
+            label="Clone folder"
             disabled={!canCloneProject || isBrowseNavigating || isSubmitting || !remoteUrl}
             onPress={submitPath}
             loading={isSubmitting}
           />
           {!canCloneProject ? (
             <Text className="text-sm text-foreground-muted">
-              This connection cannot clone projects.
+              This connection cannot clone folders.
             </Text>
           ) : null}
           <FolderBrowser

@@ -114,9 +114,9 @@ const threadA = {
 };
 // The panel stays mounted across both kinds of switch.
 const switches = [
-  ["another thread", { environmentId: threadA.environmentId, threadId: ThreadId.make("thread-2") }],
+  ["another chat", { environmentId: threadA.environmentId, threadId: ThreadId.make("thread-2") }],
   [
-    "the same thread id in another environment",
+    "the same chat id in another computer",
     { ...threadA, environmentId: EnvironmentId.make("environment-b") },
   ],
 ] as const;

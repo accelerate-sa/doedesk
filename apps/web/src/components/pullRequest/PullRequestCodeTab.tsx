@@ -394,7 +394,7 @@ function PullRequestCodeTab({
   selectedCommitOid,
   onSelectedCommitChange,
   pendingFinding,
-  fixFindingLabel = "Fix in a thread",
+  fixFindingLabel = "Fix in a chat",
   onFixFinding,
   onAddToChat,
   onAddToAgentSelection,
@@ -1441,8 +1441,8 @@ function PullRequestCodeTab({
                   </TooltipTrigger>
                   <TooltipPopup side="bottom">
                     This host keeps no shared record of which files you have read, so these ticks
-                    are kept by this environment. They follow you between the apps connected to it,
-                    but the host's own web UI will not show them.
+                    are kept by this computer. They follow you between the apps connected to it, but
+                    the host's own web UI will not show them.
                   </TooltipPopup>
                 </Tooltip>
               ) : null}

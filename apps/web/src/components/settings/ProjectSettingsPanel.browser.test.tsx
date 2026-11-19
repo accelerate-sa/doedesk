@@ -328,7 +328,7 @@ async function expectProjectAccessDeniedToast(title: string) {
       expect.objectContaining({
         type: "error",
         title,
-        description: "This connection cannot change projects in remote.",
+        description: "This connection cannot change folders in remote.",
       }),
     ),
   );
@@ -388,7 +388,7 @@ describe("project settings permissions", () => {
       firstUpdate.resolve(AsyncResult.success(undefined));
       await firstUpdate.promise;
     });
-    await expectProjectAccessDeniedToast("Failed to rename project");
+    await expectProjectAccessDeniedToast("Failed to rename folder");
     expect(state.update).toHaveBeenCalledOnce();
     expect(state.update.mock.calls[0]![0].environmentId).toBe(primaryId);
   });
@@ -463,7 +463,7 @@ describe("project settings permissions", () => {
       confirmed.resolve(true);
       await confirmed.promise;
     });
-    await expectProjectAccessDeniedToast("Failed to remove project");
+    await expectProjectAccessDeniedToast("Failed to remove folder");
     expect(state.delete).not.toHaveBeenCalled();
     expect(state.releaseUploads).not.toHaveBeenCalled();
     expect(state.clearDraft).not.toHaveBeenCalled();
@@ -479,7 +479,7 @@ describe("project settings permissions", () => {
     await act(async () => {
       nameInput(screen).dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
     });
-    await expectProjectAccessDeniedToast("Failed to rename project");
+    await expectProjectAccessDeniedToast("Failed to rename folder");
     expect(state.update).not.toHaveBeenCalled();
     expect(nameInput(screen).disabled).toBe(true);
 
@@ -529,14 +529,14 @@ describe("project identity reset", () => {
     state.projects = [{ ...asScratch(state.projects[0]!), faviconPath: null, projectIcon: null }];
     await using screen = await mountPanel();
 
-    await userEvent.click(resetButton(screen, "project name")!);
+    await userEvent.click(resetButton(screen, "folder name")!);
     await vi.waitFor(() =>
       expect(state.update).toHaveBeenCalledWith({
         environmentId: primaryId,
         input: { projectId: state.projects[0]!.id, title: "No project" },
       }),
     );
-    await userEvent.click(resetButton(screen, "project icon")!);
+    await userEvent.click(resetButton(screen, "folder icon")!);
     await vi.waitFor(() =>
       expect(state.update).toHaveBeenLastCalledWith({
         environmentId: primaryId,
@@ -551,8 +551,8 @@ describe("project identity reset", () => {
     state.projects = [asScratch(primary!), { ...remote!, faviconPath: "logo.png" }];
     await using screen = await mountPanel();
 
-    expect(resetButton(screen, "project name")).toBeNull();
-    await userEvent.click(resetButton(screen, "project icon")!);
+    expect(resetButton(screen, "folder name")).toBeNull();
+    await userEvent.click(resetButton(screen, "folder icon")!);
     await vi.waitFor(() => expect(state.update).toHaveBeenCalledTimes(2));
     expect(state.update.mock.calls.map(([request]) => request)).toEqual([
       {
@@ -590,13 +590,13 @@ describe("project identity reset", () => {
     expect(appAtomRegistry.get(iconUrl).value.relativeUrl).toBe("/project-favicon-missing");
 
     iconExists = true;
-    await userEvent.click(resetButton(screen, "project icon")!);
+    await userEvent.click(resetButton(screen, "folder icon")!);
 
     await vi.waitFor(() =>
       expect(appAtomRegistry.get(iconUrl).value.relativeUrl).toBe("/restored-icon.svg"),
     );
     expect(state.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Failed to update project icon on remote" }),
+      expect.objectContaining({ title: "Failed to update folder icon on remote" }),
     );
   });
 });
@@ -638,7 +638,7 @@ it("opens the fallback search target across all environments from a checkout", a
     </RegistryContext.Provider>,
     { router: false },
   );
-  await userEvent.click(page.getByRole("button", { name: "Open all environments" }));
+  await userEvent.click(page.getByRole("button", { name: "Open all computers" }));
   await vi.waitFor(() => expect(router.state.location.search).toEqual({}));
   expect(router.state.location.hash).toBe("fallback-model");
 });
@@ -690,7 +690,7 @@ describe("project settings scope", () => {
     state.projects = state.projects.filter((project) => project.environmentId === primaryId);
     await using _screen = await mountSettings({ project: projectKey() });
 
-    await expect.element(page.getByRole("textbox", { name: "Project name" })).toBeVisible();
+    await expect.element(page.getByRole("textbox", { name: "Folder name" })).toBeVisible();
     await userEvent.click(environmentMenu());
     await expect.element(primaryOption()).toBeVisible();
     await expect.element(remoteOption()).not.toBeInTheDocument();
@@ -744,12 +744,12 @@ describe("project settings scope", () => {
   });
 
   it.each([
-    [undefined, "This project has no checkout on this environment."],
+    [undefined, "This folder has no checkout on this computer."],
     [
       "removed-checkout",
-      "This checkout is no longer available in the selected project and environment.",
+      "This checkout is no longer available in the selected folder and computer.",
     ],
-  ])("recovers a stale environment link with checkout %s", async (checkout, message) => {
+  ])("recovers a stale computer link with checkout %s", async (checkout, message) => {
     setup();
     state.projects = state.projects.filter((project) => project.environmentId === primaryId);
     const key = projectKey();
@@ -762,20 +762,20 @@ describe("project settings scope", () => {
     await expect.element(page.getByText(message, { exact: true })).toBeVisible();
     await expect.element(page.getByRole("button", { name: /^Project scope:/ })).toBeVisible();
     await expect
-      .element(page.getByRole("button", { name: "Environment scope: remote" }))
+      .element(page.getByRole("button", { name: "Computer scope: remote" }))
       .toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "Show all environments" }));
+    await userEvent.click(page.getByRole("button", { name: "Show all computers" }));
 
     await expect
-      .element(page.getByRole("textbox", { name: "Project name" }))
+      .element(page.getByRole("textbox", { name: "Folder name" }))
       .toHaveValue("Shared repo");
     expect(screen.router.state.location.search).toEqual({ project: key });
     await expect
-      .element(page.getByRole("button", { name: "Environment scope: All environments" }))
+      .element(page.getByRole("button", { name: "Computer scope: All computers" }))
       .toBeVisible();
     await expect.element(page.getByText(message, { exact: true })).not.toBeInTheDocument();
     await expect
-      .element(page.getByRole("button", { name: "Remove project", exact: true }))
+      .element(page.getByRole("button", { name: "Remove folder", exact: true }))
       .toBeEnabled();
   });
 });
@@ -785,7 +785,7 @@ it("returns to the project overview after removal, clearing the selection but ke
   state.projects = [state.projects[1]!];
   await using screen = await mountPanel({ machine: remoteId, checkout: "remote:/work/remote" });
   const removeProject = [...screen.container.querySelectorAll("button")].find(
-    (button) => button.textContent === "Remove project",
+    (button) => button.textContent === "Remove folder",
   )!;
 
   await userEvent.click(removeProject);

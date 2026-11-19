@@ -26,7 +26,7 @@ export function useOpenLocalWorkspace() {
   const primaryEnvironment = usePrimaryEnvironment();
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
   const updateProject = useOrchestrationCommand(projectEnvironment.update, {
-    label: "project unarchive",
+    label: "folder unarchive",
   });
   const openThread = useNewThreadHandler();
   const shellHasSnapshot = useEnvironmentShellHasSnapshot(
@@ -70,7 +70,7 @@ export function useOpenLocalWorkspace() {
         });
         if (result._tag === "Failure") {
           const error = squashAtomCommandFailure(result);
-          throw error instanceof Error ? error : new Error("T3 Code could not add the project.");
+          throw error instanceof Error ? error : new Error("DoeDesk could not add the folder.");
         }
         return projectId;
       },
@@ -88,7 +88,7 @@ export function useOpenLocalWorkspace() {
           void updateProject({
             environmentId: projectRef.environmentId,
             input: { projectId: projectRef.projectId, archived: false },
-          }).then((result) => reportProjectFailure("Failed to unarchive project", result));
+          }).then((result) => reportProjectFailure("Failed to unarchive folder", result));
         }
         return openThread(projectRef);
       },

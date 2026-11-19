@@ -292,7 +292,7 @@ beforeEach(() => {
 });
 
 describe("thread action permissions", () => {
-  it.each(operations)("$name requires the target environment's grant", async ({ run }) => {
+  it.each(operations)("$name requires the target computer's grant", async ({ run }) => {
     const result = await run(useThreadActions(), target);
     expect(result._tag).toBe("Failure");
     expect(state.requests).toEqual([]);
@@ -351,7 +351,7 @@ describe("thread action permissions", () => {
     state.confirm.mockResolvedValue(false);
     await useThreadActions().confirmAndDeleteThread(target, "Archived release notes");
     expect(state.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Delete thread "Archived release notes"?'),
+      expect.stringContaining('Delete chat "Archived release notes"?'),
       { variant: "destructive" },
     );
     expect(state.requests).toEqual([]);
@@ -418,7 +418,7 @@ describe("thread action permissions", () => {
   it.each([
     { reason: "without source-control permission", sessionLookupFails: false },
     { reason: "when the permission lookup fails", sessionLookupFails: true },
-  ])("deletes a worktree thread and keeps its worktree $reason", async ({ sessionLookupFails }) => {
+  ])("deletes a worktree chat and keeps its worktree $reason", async ({ sessionLookupFails }) => {
     state.scopes.get(secondary)!.add(AuthOrchestrationOperateScope);
     state.threads[0]!.worktreePath = "/worktrees/thread";
     state.sessionLookupFails = sessionLookupFails;

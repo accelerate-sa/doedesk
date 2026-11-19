@@ -1773,6 +1773,7 @@ export const make = Effect.gen(function* () {
           const environment = yield* mergeProviderInstanceEnvironment(
             instance.environment,
             hostEnvironment,
+            instance.driver,
           ).pipe(Effect.provideService(HostProcess.HomeDirectory, homeDir));
           homePath = resolvePiSessionsDir(
             environment,

@@ -31,7 +31,7 @@ export function useFileChipShare(
     const request = new AbortController();
     requestRef.current = request;
     void (async () => {
-      if (httpBaseUrl === null) throw new Error("Reconnect to the environment and try again.");
+      if (httpBaseUrl === null) throw new Error("Reconnect to the computer and try again.");
       const result = await createUrl({ environmentId, input: { resource: source.resource } });
       if (request.signal.aborted) return;
       const url =

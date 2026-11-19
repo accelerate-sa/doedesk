@@ -11,7 +11,7 @@ import type { ScopedMobileSettingsTarget } from "./settings-scoped-server";
 
 export function useSettingsWriter() {
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: "environment settings update",
+    label: "computer settings update",
     reportFailure: true,
   });
 

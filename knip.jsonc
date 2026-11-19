@@ -68,9 +68,11 @@
       // The Vite+ web build prerequisite.
       // Native and disk-loaded provider packages stay external to the bundle; the
       // CLI archive and desktop sidecar stage them from this manifest.
+      // sharp is the privacy gateway's image library, staged from here as the other natives are.
       "ignoreDependencies": [
         "@effect/platform-node-shared",
         "@t3tools/web",
+        "sharp",
         "@napi-rs/keyring",
         "ffi-rs",
         "transcribe-cpp",
@@ -167,6 +169,16 @@
       "includeEntryExports": true,
       "entry": ["test/fixtures/*.ts"],
       "ignoreIssues": { "src/_generated/**": ["exports", "types"] },
+    },
+    "packages/privacy-gateway": {
+      // Maintainers run the conformance session by path; it starts the planted MCP server by path.
+      // The evaluation repository runs the redaction corpus by path; the live check is run by hand.
+      "entry": [
+        "scripts/conformance-real.ts",
+        "scripts/planted-mcp-server.mjs",
+        "scripts/redaction-corpus.ts",
+        "scripts/redaction-live.ts",
+      ],
     },
     "packages/source-control-github": {
       // graphqlgen reads its config; the generated operations export every selection's class.

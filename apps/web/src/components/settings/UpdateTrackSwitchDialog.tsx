@@ -59,7 +59,7 @@ export function UpdateTrackSwitchDialog({
             {AsyncResult.isFailure(release)
               ? npmReleaseFailureMessage(release.cause)
               : AsyncResult.isSuccess(release)
-                ? `Could not find the latest ${label} release in this environment's npm registry.`
+                ? `Could not find the latest ${label} release in this computer's npm registry.`
                 : "Checking releases…"}
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -177,7 +177,7 @@ function SwitchPlan({
           ? ["This app's updates are off here, so reinstall it yourself to switch."]
           : []),
         ...(switchesLocal && isMacPlatform(navigator.platform)
-          ? ["If T3 Code does not reopen after it restarts, open it again."]
+          ? ["If DoeDesk does not reopen after it restarts, open it again."]
           : []),
       ]}
       restarts={everything.restarts}

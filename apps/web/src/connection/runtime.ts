@@ -61,7 +61,7 @@ const layerConnection = BackgroundActivityReporter.layer.pipe(
 const layerForPage = Layer.unwrap(
   Effect.suspend((): Effect.Effect<typeof layerConnection> =>
     isGuestPage()
-      ? Effect.die(new Error("The guest page has no environment connection."))
+      ? Effect.die(new Error("The guest page has no computer connection."))
       : Effect.succeed(layerConnection),
   ),
 );

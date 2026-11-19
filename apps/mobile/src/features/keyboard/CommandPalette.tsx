@@ -2,6 +2,7 @@ import { LegendList, type LegendListRef } from "@legendapp/list/react-native";
 import { useAtomValue } from "@effect/atom-react";
 import { uuidv4 } from "../../lib/uuid";
 import { useNavigation } from "@react-navigation/native";
+import { useDeveloperMode } from "../../doedesk/product";
 import {
   claimThreadOpen,
   nextShownOrder,
@@ -227,6 +228,7 @@ export function CommandPalette(props: {
   const { themeVariables } = useAppearancePreferences();
   const selectDetail = useSelectWorkspaceDetail();
   const runCommand = props.onCommand;
+  const developerMode = useDeveloperMode();
   const projects = useProjects();
   const threads = useVisibleThreadShells();
   const delegatedUnderParent = useDelegatedUnderParent();
@@ -296,14 +298,14 @@ export function CommandPalette(props: {
       {
         key: "newTask",
         kind: "action",
-        title: "New thread in…",
+        title: "New chat in…",
         searchTerms: ["new task", "chat", "create", "project"],
         run: () => runCommand("newTask"),
       },
       {
         key: "addProject",
         kind: "action",
-        title: "Add project",
+        title: "Add folder",
         searchTerms: ["folder", "clone", "repository", "git"],
         run: () => navigation.navigate("AddProject"),
       },
@@ -324,7 +326,7 @@ export function CommandPalette(props: {
       {
         key: "environments",
         kind: "action",
-        title: "Manage environments",
+        title: "Manage computers",
         searchTerms: ["connections", "server", "remote"],
         run: () => openSettings(navigation, "SettingsEnvironments"),
       },
@@ -345,7 +347,7 @@ export function CommandPalette(props: {
       {
         key: "archive",
         kind: "action",
-        title: "Archived threads",
+        title: "Archived chats",
         searchTerms: ["restore", "history"],
         run: () => openSettings(navigation, "SettingsArchive"),
       },
@@ -371,7 +373,7 @@ export function CommandPalette(props: {
       actions.unshift({
         key: "newThread",
         kind: "action",
-        title: `New thread in ${activeProject.title}`,
+        title: `New chat in ${activeProject.title}`,
         searchTerms: ["new task", "chat", "create"],
         run: () =>
           selectDetail({
@@ -392,16 +394,18 @@ export function CommandPalette(props: {
         ["files", "Go to file", ["open", "files", "browse", "search"]],
         ["terminal", "Open terminal", ["shell", "console"]],
         ["review", "Review changes", ["diff", "git", "pull request"]],
-        ["copyThreadReference", "Copy PR link or thread", ["reference", "clipboard"]],
+        ["copyThreadReference", "Copy PR link or chat", ["reference", "clipboard"]],
       ] as const;
       actions.push(
-        ...threadActions.map(([command, title, searchTerms]) => ({
-          key: command,
-          kind: "action" as const,
-          title,
-          searchTerms,
-          run: () => runCommand(command),
-        })),
+        ...threadActions
+          .filter(([command]) => developerMode || command !== "terminal")
+          .map(([command, title, searchTerms]) => ({
+            key: command,
+            kind: "action" as const,
+            title,
+            searchTerms,
+            run: () => runCommand(command),
+          })),
       );
     }
     const openProjects = projects.filter((project) => project.archivedAt == null);
@@ -413,8 +417,8 @@ export function CommandPalette(props: {
       kind: "project",
       project,
       title: project.title,
-      detail: `New thread · ${savedConnectionsById[project.environmentId]?.environmentLabel ?? project.environmentId}`,
-      searchTerms: [project.workspaceRoot, "new thread", "project"],
+      detail: `New chat · ${savedConnectionsById[project.environmentId]?.environmentLabel ?? project.environmentId}`,
+      searchTerms: [project.workspaceRoot, "new chat", "project"],
       run: () =>
         selectDetail({
           name: "Thread",
@@ -445,7 +449,7 @@ export function CommandPalette(props: {
         return {
           key: scopedThreadKey(thread.environmentId, thread.id),
           kind: "thread",
-          title: thread.title || "Untitled thread",
+          title: thread.title || "Untitled chat",
           detail: [project?.title, environment].filter(Boolean).join(" · "),
           searchTerms: [],
           threadSearch: threadSearchSubject(
@@ -485,6 +489,7 @@ export function CommandPalette(props: {
     startTriage,
     threads,
     delegatedUnderParent,
+    developerMode,
     triageEnvironmentId,
   ]);
   const rankedMessageKeys = useMemo(() => {
@@ -651,8 +656,8 @@ export function CommandPalette(props: {
                   />
                   <TextInput
                     ref={inputRef}
-                    accessibilityLabel="Search commands, projects, and threads"
-                    placeholder="Search commands, projects, and threads…"
+                    accessibilityLabel="Search commands, folders, and chats"
+                    placeholder="Search commands, folders, and chats…"
                     placeholderTextColorClassName="accent-placeholder"
                     autoCorrect={false}
                     autoCapitalize="none"

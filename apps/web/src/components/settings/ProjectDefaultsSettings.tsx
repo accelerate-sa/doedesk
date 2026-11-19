@@ -19,7 +19,11 @@ import { firstManagedDenial } from "../../state/managedPolicy";
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
 import { resolveEnvModeLabel, WORKTREE_SUBMODULES_LABELS } from "../BranchToolbar.logic";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
-import { runtimeModeConfig, runtimeModeOptions } from "../chat/runtimeModeConfig";
+import {
+  offeredRuntimeModes,
+  runtimeModeConfig,
+  runtimeModeOptions,
+} from "../chat/runtimeModeConfig";
 import { PULL_REQUEST_MERGE_METHOD_LABELS } from "../pullRequest/pullRequestDetail.logic";
 import { TraitsPicker } from "../chat/TraitsPicker";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
@@ -134,14 +138,14 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       title="Model"
       description={
         isProjectScope
-          ? "Model for new threads in this project."
+          ? "Model for new chats in this folder."
           : !unavailable && modelSource !== "project" && automaticModel
-            ? "Default model for new threads, selected automatically. Projects can override it."
-            : "Default model for new threads. Projects can override it."
+            ? "Default model for new chats, selected automatically. Folders can override it."
+            : "Default model for new chats. Folders can override it."
       }
       status={
         mixedModel
-          ? `${automaticModel ? "Automatic defaults differ." : "Defaults differ."} Select one environment or choose a shared model to edit effort.`
+          ? `${automaticModel ? "Automatic defaults differ." : "Defaults differ."} Select one computer or choose a shared model to edit effort.`
           : (presentation.providerNote ?? effortDisabledReason)
       }
       resetAction={
@@ -206,8 +210,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       title="Workspace"
       description={
         isProjectScope
-          ? "Where new threads in this project start."
-          : "Where new threads start. Projects and their t3.json can override it."
+          ? "Where new chats in this folder start."
+          : "Where new chats start. Folders and their t3.json can override it."
       }
       resetAction={
         !isProjectScope && settings.defaultThreadEnvMode !== null ? (
@@ -251,7 +255,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["fallbackModelSelection"]}
       mixed={mixedFallback}
       {...searchableSetting("fallback-model")}
-      description="Used for new threads when the default model's provider is out of usage."
+      description="Used for new chats when the default model's provider is out of usage."
       resetAction={
         mixedFallback || settings.fallbackModelSelection !== null ? (
           <SettingResetButton
@@ -327,7 +331,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   return (
     <SettingsSection
       id={category === "source-control" ? "source-control-defaults" : "project-defaults"}
-      title={category === "source-control" ? "Repositories" : "New threads"}
+      title={category === "source-control" ? "Repositories" : "New chats"}
     >
       {category === "project" ? (
         <>
@@ -346,8 +350,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             {...searchableSetting("default-permissions")}
             description={
               isProjectScope
-                ? "Permissions for new threads in this project."
-                : "Default permissions for new threads. Projects can override them."
+                ? "Permissions for new chats in this folder."
+                : "Default permissions for new chats. Folders can override them."
             }
             resetAction={
               settings.defaultRuntimeMode !== DEFAULT_SERVER_SETTINGS.defaultRuntimeMode ? (
@@ -379,34 +383,36 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  {runtimeModeOptions.map((mode) => {
-                    const option = runtimeModeConfig[mode];
-                    const Icon = option.icon;
-                    const managedReason = firstManagedDenial(
-                      connectedEnvironments.map(
-                        (environment) => environment.serverConfig?.managedPolicy,
-                      ),
-                      (policy) => managedRuntimeModeDenial(policy, mode),
-                    );
-                    return (
-                      <SelectItem
-                        key={mode}
-                        value={mode}
-                        disabled={managedReason !== undefined}
-                        className="min-w-64"
-                      >
-                        <div className="grid gap-0.5">
-                          <span className="inline-flex items-center gap-1.5 font-medium">
-                            <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                            {option.label}
-                          </span>
-                          <span className="text-xs leading-4 text-muted-foreground">
-                            {managedReason ?? option.description}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                  {offeredRuntimeModes(runtimeModeOptions, settings.defaultRuntimeMode).map(
+                    (mode) => {
+                      const option = runtimeModeConfig[mode];
+                      const Icon = option.icon;
+                      const managedReason = firstManagedDenial(
+                        connectedEnvironments.map(
+                          (environment) => environment.serverConfig?.managedPolicy,
+                        ),
+                        (policy) => managedRuntimeModeDenial(policy, mode),
+                      );
+                      return (
+                        <SelectItem
+                          key={mode}
+                          value={mode}
+                          disabled={managedReason !== undefined}
+                          className="min-w-64"
+                        >
+                          <div className="grid gap-0.5">
+                            <span className="inline-flex items-center gap-1.5 font-medium">
+                              <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                              {option.label}
+                            </span>
+                            <span className="text-xs leading-4 text-muted-foreground">
+                              {managedReason ?? option.description}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    },
+                  )}
                 </SelectPopup>
               </Select>
             }
@@ -423,8 +429,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             title="Automatically pull"
             description={
               isProjectScope
-                ? "Keeps this project's default branch current when the checkout has no local changes or commits."
-                : "Keeps the default branch current when the checkout has no local changes or commits. Projects can override it."
+                ? "Keeps this folder's default branch current when the checkout has no local changes or commits."
+                : "Keeps the default branch current when the checkout has no local changes or commits. Folders can override it."
             }
             resetAction={
               settings.defaultAutoPull ? (
@@ -477,7 +483,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             {...searchableSetting("pull-request-merge-method")}
             description={
               isProjectScope
-                ? "Pull requests in this project start with this method."
+                ? "Pull requests in this folder start with this method."
                 : "Pull requests start with this method. Last selected reuses whatever you chose most recently on this device."
             }
             resetAction={
@@ -543,8 +549,8 @@ export function WorktreeSubmodulesRow() {
       {...searchableSetting("worktree-submodules")}
       description={
         isProjectScope
-          ? "How new worktrees in this project populate git submodules."
-          : "How new worktrees populate git submodules. Projects and their t3.json can override it."
+          ? "How new worktrees in this folder populate git submodules."
+          : "How new worktrees populate git submodules. Folders and their t3.json can override it."
       }
       resetAction={
         !isProjectScope && settings.worktreeSubmodules !== null ? (

@@ -106,7 +106,7 @@ it.each([
   if (action === "merge") {
     await screen.getByRole("button", { name: "Merge back to source conversation" }).click();
   } else {
-    await screen.getByRole("button", { name: "More thread actions" }).click();
+    await screen.getByRole("button", { name: "More chat actions" }).click();
     await page.getByRole("menuitem", { name: "Disconnect agent session" }).click();
   }
 
@@ -114,7 +114,7 @@ it.each([
   await expect
     .element(
       screen.getByRole("button", {
-        name: action === "merge" ? "Merge back to source conversation" : "More thread actions",
+        name: action === "merge" ? "Merge back to source conversation" : "More chat actions",
       }),
     )
     .toBeEnabled();
@@ -141,7 +141,7 @@ it.each([
     if (action === "merge") {
       await screen.getByRole("button", { name: "Merge back to source conversation" }).click();
     } else {
-      await screen.getByRole("button", { name: "More thread actions" }).click();
+      await screen.getByRole("button", { name: "More chat actions" }).click();
       await page.getByRole("menuitem", { name: "Disconnect agent session" }).click();
     }
   };
@@ -160,7 +160,7 @@ it.each([
     );
   });
   if (action === "disconnect") {
-    await expect.element(screen.getByRole("button", { name: "More thread actions" })).toBeEnabled();
+    await expect.element(screen.getByRole("button", { name: "More chat actions" })).toBeEnabled();
   }
 });
 
@@ -269,7 +269,7 @@ it("shows a side chat's full title in its tooltip", async () => {
 
 it("shows a remote subagent's full title in its tooltip even when its environment is unavailable", async () => {
   setup();
-  const longTitle = "Investigate a remote subagent issue across linked environments";
+  const longTitle = "Investigate a remote subagent issue across linked computers";
   const remoteEnvId = EnvironmentId.make("remote-env");
   const remoteThreadId = ThreadId.make("remote-thread");
   const now = DateTime.makeUnsafe("2026-10-31T20:00:00.000Z");
@@ -331,7 +331,7 @@ it("shows a remote subagent's full title in its tooltip even when its environmen
     expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(longTitle),
   );
   expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(
-    "Runs on Remote VM with a long machine name in the office. Connect to it to open the thread there.",
+    "Runs on Remote VM with a long machine name in the office. Connect to it to open the chat there.",
   );
 
   await row.click({ force: true });
@@ -394,7 +394,7 @@ it("shows a delegated-from thread's full title in its tooltip even when its envi
     expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(longTitle),
   );
   expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(
-    "Delegated from a linked environment. Connect to it to open the parent thread.",
+    "Delegated from a linked computer. Connect to it to open the parent chat.",
   );
 
   await row.click({ force: true });
@@ -464,7 +464,7 @@ it.each([1, 18])("continues scrolling the panel past a list of %i subagents", as
     await screen.getByRole("button", { name: "Show 12 more" }).click();
     await expect.element(screen.getByText("Subagent 17", { exact: true })).toBeInTheDocument();
   }
-  const list = screen.getByRole("list", { name: "Related threads" }).element();
+  const list = screen.getByRole("list", { name: "Related chats" }).element();
   const viewport = screen
     .getByTestId("panel")
     .element()

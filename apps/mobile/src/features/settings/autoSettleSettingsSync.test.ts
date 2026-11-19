@@ -25,7 +25,7 @@ describe("auto-settle settings sync", () => {
         continueThreadsAfterServerUpdate: true,
         sourceControlWritingStyle: {
           ...reference.settings.sourceControlWritingStyle,
-          customInstructions: "Keep this environment's writing instructions.",
+          customInstructions: "Keep this computer's writing instructions.",
         },
       },
     };

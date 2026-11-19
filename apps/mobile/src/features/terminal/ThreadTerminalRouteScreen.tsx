@@ -312,8 +312,8 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     return (
       <View className="flex-1 bg-screen">
         <EmptyState
-          title="Thread unavailable"
-          detail="This terminal route needs an active thread and workspace."
+          title="Chat unavailable"
+          detail="This terminal route needs an active chat and workspace."
         />
       </View>
     );
@@ -793,7 +793,7 @@ function ThreadTerminal(props: {
       <View className="flex-1 bg-screen">
         <EmptyState
           title="Terminal unavailable"
-          detail="This thread does not have a workspace root yet, so there is nowhere to open a shell."
+          detail="This chat does not have a workspace root yet, so there is nowhere to open a shell."
         />
       </View>
     );

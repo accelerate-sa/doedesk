@@ -9,6 +9,6 @@ export function describePullRequestDiffError(error: string, providerName: string
 
   return {
     title: "Couldn't load the changes",
-    description: `The environment couldn't load this ${term}'s diff. Try again, or view the changes on ${providerName}.`,
+    description: `The computer couldn't load this ${term}'s diff. Try again, or view the changes on ${providerName}.`,
   };
 }

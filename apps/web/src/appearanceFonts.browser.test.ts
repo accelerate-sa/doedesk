@@ -33,6 +33,7 @@ describe("applyAppearanceFontVariables", () => {
       sans: "",
       code: "",
       composer: "",
+      reading: "",
       sizeInterface: 20,
       sizePrompt: 14,
       sizeCode: 13,
@@ -53,6 +54,48 @@ describe("applyAppearanceFontVariables", () => {
     }
   });
 
+  it("puts a chosen reading font ahead of the brand serif in prose and titles", () => {
+    const root = document.documentElement;
+    const style = root.getAttribute("style");
+    const families = (reading: string) => {
+      applyAppearanceFontVariables(root, {
+        sans: "",
+        code: "",
+        composer: "",
+        reading,
+        sizeInterface: 16,
+        sizePrompt: 14,
+        sizeCode: 13,
+        smoothing: true,
+        separate: false,
+      });
+      return ["font-reading", "font-display"].map((className) => {
+        const probe = document.createElement("div");
+        probe.className = className;
+        document.body.append(probe);
+        try {
+          return getComputedStyle(probe).fontFamily;
+        } finally {
+          probe.remove();
+        }
+      });
+    };
+    try {
+      // Digits come first, from their own face: Redaction's 1 reads as a lowercase l.
+      const text = '"DoeDesk Figures", Redaction, "Thmanyah Serif Text", "Noto Naskh Arabic"';
+      const display = '"DoeDesk Figures", Redaction, "Thmanyah Serif Display", "Noto Naskh Arabic"';
+      const chosen = families("Georgia");
+      expect(chosen[0]?.startsWith(`Georgia, ${text}`)).toBe(true);
+      expect(chosen[1]?.startsWith(`Georgia, ${display}`)).toBe(true);
+      const brand = families("");
+      expect(brand[0]?.startsWith(text)).toBe(true);
+      expect(brand[1]?.startsWith(display)).toBe(true);
+    } finally {
+      if (style === null) root.removeAttribute("style");
+      else root.setAttribute("style", style);
+    }
+  });
+
   it("widens the numbered-list gutter only when the interface font's marker would clip", () => {
     const root = document.documentElement;
     const style = root.getAttribute("style");
@@ -61,6 +104,7 @@ describe("applyAppearanceFontVariables", () => {
         sans,
         code: "",
         composer: "",
+        reading: "",
         sizeInterface: 16,
         sizePrompt: 14,
         sizeCode: 13,

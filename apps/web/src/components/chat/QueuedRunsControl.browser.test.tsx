@@ -300,14 +300,14 @@ it("shows who sent a queued message and folds automation and agent prompts", asy
   await expect.element(page.getByRole("link", { name: "Open automation" })).toBeInTheDocument();
 
   await expect.element(page.getByRole("button", { name: /Release lead/ })).toBeVisible();
-  await page.getByRole("button", { name: "Open thread" }).nth(0).click({ force: true });
+  await page.getByRole("button", { name: "Open chat" }).nth(0).click({ force: true });
   expect(onOpenThread).toHaveBeenCalledExactlyOnceWith("thread:lead", "environment:test");
   // A sender in a connected linked environment keeps the title it sent and opens there.
   await expect.element(page.getByRole("button", { name: /Title when sent/ })).toBeVisible();
-  await page.getByRole("button", { name: "Open thread" }).nth(1).click({ force: true });
+  await page.getByRole("button", { name: "Open chat" }).nth(1).click({ force: true });
   expect(onOpenThread).toHaveBeenLastCalledWith("thread:linked-lead", "environment:linked");
 
-  await expect.element(page.getByText("Sent by T3 Code")).toBeVisible();
+  await expect.element(page.getByText("Sent by DoeDesk")).toBeVisible();
   await expect.element(page.getByText("Continue where you left off.")).toBeVisible();
 });
 

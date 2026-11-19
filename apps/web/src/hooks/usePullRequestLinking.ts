@@ -56,7 +56,7 @@ export function usePullRequestLinking(environmentId: EnvironmentId | null | unde
       threadRef.environmentId !== environmentId ||
       (linked && !canLink(url))
     )
-      throw new Error("The pull request is not available in this environment.");
+      throw new Error("The pull request is not available in this computer.");
     const mutation = planThreadPullRequestMutation({
       capabilities: appAtomRegistry.get(environmentServerConfigsAtom).get(threadRef.environmentId)
         ?.environment.capabilities,
@@ -65,7 +65,7 @@ export function usePullRequestLinking(environmentId: EnvironmentId | null | unde
       linked,
     });
     if (mutation === null)
-      throw new Error("This environment does not support linking this pull request.");
+      throw new Error("This computer does not support linking this pull request.");
     const result = await (mutation.type === "thread.pull-request.link"
       ? link({ environmentId: threadRef.environmentId, input: mutation.input })
       : unlink({ environmentId: threadRef.environmentId, input: mutation.input }));

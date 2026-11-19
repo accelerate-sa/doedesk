@@ -84,7 +84,7 @@ describe("sidebar header new thread", () => {
     { mode: "boring", count: 2, shift: false, picker: true },
     { mode: "boring", count: 2, shift: true, picker: false },
     { mode: "boring", count: 1, shift: false, picker: false },
-  ] as const)("$mode sidebar, $count projects, shift=$shift: picker=$picker", async (scenario) => {
+  ] as const)("$mode sidebar, $count folders, shift=$shift: picker=$picker", async (scenario) => {
     using stack = new DisposableStack();
     const previousSettings = getClientSettings();
     stack.defer(() => __setClientSettingsForTests(previousSettings));
@@ -115,7 +115,7 @@ describe("sidebar header new thread", () => {
       </SidebarProvider>,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "New thread", exact: true }), {
+    await userEvent.click(screen.getByRole("button", { name: "New chat", exact: true }), {
       modifiers: scenario.shift ? ["Shift"] : [],
     });
 
@@ -191,7 +191,7 @@ describe("sidebar render isolation", () => {
     await act(() => terminalInput.blur());
     expect(
       rowRenders() - beforeShortcut,
-      "thread rows re-rendered while opening the terminal with a quick Mod shortcut",
+      "chat rows re-rendered while opening the terminal with a quick Mod shortcut",
     ).toBe(0);
 
     const jumpLabelsSince = (start: number) =>
@@ -251,7 +251,7 @@ describe("sidebar thread rename", () => {
       );
       await using screen = await render(tree());
       await userEvent.dblClick(screen.getByText("Fix the login redirect").first());
-      const input = screen.getByRole("textbox", { name: "Thread title" });
+      const input = screen.getByRole("textbox", { name: "Chat title" });
       await expect.element(input).toHaveValue("Fix the login redirect");
 
       vi.mocked(useQuietThreadShells).mockReturnValue([shellTitled("Generated title")]);
@@ -327,7 +327,7 @@ describe("sidebar settled pagination", () => {
         environmentId: activeProject.environmentId,
         projectId: activeProject.id,
         id: ThreadId.make(`settled-${index}`),
-        title: `Settled thread ${index}`,
+        title: `Settled chat ${index}`,
         settledOverride: "settled",
         settledAt: "2026-01-01T00:00:00.000Z",
       }),

@@ -77,7 +77,7 @@ describe("liveActivityPreferences", () => {
 
   it.effect("restores relay preferences when an environment update fails", () => {
     vi.mocked(linkEnvironmentToCloudWithPreference).mockImplementationOnce(() =>
-      Effect.fail(new CloudEnvironmentLinkError({ message: "environment update failed" })),
+      Effect.fail(new CloudEnvironmentLinkError({ message: "computer update failed" })),
     );
 
     return Effect.gen(function* () {

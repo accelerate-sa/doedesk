@@ -107,12 +107,12 @@ const WORKSPACE_CHOICES: ReadonlyArray<{
   {
     mode: "local",
     label: "Current checkout",
-    description: "Start new threads in the existing workspace.",
+    description: "Start new chats in the existing workspace.",
   },
   {
     mode: "worktree",
     label: "New worktree",
-    description: "Give each new thread a separate checkout.",
+    description: "Give each new chat a separate checkout.",
   },
 ];
 
@@ -294,15 +294,15 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
         {!hasConnectedSelection || reference === null ? (
           <Text className="px-2 text-base text-foreground-muted">
             {projectSelected
-              ? "Select a project with a checkout on a connected environment."
-              : "Use the filter above to select a connected environment."}
+              ? "Select a folder with a checkout on a connected computer."
+              : "Use the filter above to select a connected computer."}
           </Text>
         ) : (
           <>
             <ManagedPolicyNotice targets={targets} />
             {projectSelected ? (
               <SettingsProjectOverridesSection
-                projectLabel={selectedProject?.label ?? "Unavailable project"}
+                projectLabel={selectedProject?.label ?? "Unavailable folder"}
                 hasOverrides={targets.some((target) =>
                   PAGE_PROJECT_KEYS[props.page].some((key) => target.sources[key] === "project"),
                 )}
@@ -409,7 +409,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   />
                 )}
                 {projectSelected ? null : (
-                  <SettingsSection title="Project sources">
+                  <SettingsSection title="Folder sources">
                     {sourceControlClients.definitions.map((definition) => {
                       const offered = displayTargets.map((target) =>
                         isSourceControlProviderOffered(
@@ -463,7 +463,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   <SettingsSwitchRow
                     icon="folder"
                     label="Clone into host folders"
-                    subtitle="Clones go to github.com/owner/repo under the Add project folder, like ghq."
+                    subtitle="Clones go to github.com/owner/repo under the Add folder folder, like ghq."
                     value={uniform("ghqCloneLayout")}
                     disabled={disabledFor("ghqCloneLayout")}
                     onValueChange={(value) => write({ ghqCloneLayout: value })}
@@ -539,7 +539,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   />
                 ) : null}
                 {!projectSelected ? (
-                  <SettingsSection title="Manage environments">
+                  <SettingsSection title="Manage computers">
                     {selectedTargets.map((target) => (
                       <SettingsRow
                         key={target.environmentId}
@@ -562,7 +562,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     subtitle={managedSubtitle(
                       "enableProviderUpdateChecks",
                       projectSelected
-                        ? "Environment-wide setting. Select All projects to change it."
+                        ? "Environment-wide setting. Select All folders to change it."
                         : "Check installed provider CLIs for newer versions and fetch model catalog updates. When off, new models may not appear.",
                     )}
                     value={uniform("enableProviderUpdateChecks")}
@@ -575,7 +575,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                       label="Continue after restart"
                       subtitle={managedSubtitle(
                         "continueThreadsAfterServerUpdate",
-                        "Resume interrupted threads after an update or restart.",
+                        "Resume interrupted chats after an update or restart.",
                       )}
                       value={uniform("continueThreadsAfterServerUpdate")}
                       disabled={disabledFor("continueThreadsAfterServerUpdate")}
@@ -589,7 +589,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                       subtitle={managedSubtitle(
                         "keepAwakeWhileAgentsWork",
                         projectSelected
-                          ? "Environment-wide setting. Select All projects to change it."
+                          ? "Environment-wide setting. Select All folders to change it."
                           : "Stop the computer from sleeping while agents work. Closing a laptop lid still sleeps it.",
                       )}
                       value={uniform("keepAwakeWhileAgentsWork")}
@@ -612,8 +612,8 @@ function MixedValuesLabel(props: { readonly projectSelected: boolean }) {
     <Text
       accessibilityLabel={
         props.projectSelected
-          ? "Selected project checkouts use different values"
-          : "Selected environments use different values"
+          ? "Selected folder checkouts use different values"
+          : "Selected computers use different values"
       }
       className="px-2 text-sm text-foreground-muted android:px-4"
     >

@@ -38,14 +38,14 @@ export const accessConfig: Record<
 > = {
   "read-only": {
     label: "Read only",
-    description: "Read projects and threads. Cannot start, message or change anything.",
+    description: "Read folders and chats. Cannot start, message or change anything.",
     icon: EyeIcon,
   },
   ...runtimeModeConfig,
 };
 
 const ARM_DELAY_MS = 700;
-const UNSAFE_REDIRECT = "The environment returned an address this page will not open.";
+const UNSAFE_REDIRECT = "The computer returned an address this page will not open.";
 
 function followRedirect(url: string): boolean {
   const safe = agentRedirectUrl(url);
@@ -62,7 +62,7 @@ type Loaded =
   | { readonly status: "invalid"; readonly message: string }
   | { readonly status: "ready"; readonly details: AuthMcpApprovalDetails };
 
-const UNREACHABLE = "Could not reach this environment. Try again.";
+const UNREACHABLE = "Could not reach this computer. Try again.";
 const isApprovalError = Schema.is(AuthMcpApprovalError);
 
 export type McpApprovalAnswer<A> =
@@ -225,7 +225,7 @@ export function McpConsent({
       <StandalonePage>
         <ConnectAgentHeading
           title="Checking the sign-in request"
-          description="One moment while this environment verifies the agent's request."
+          description="One moment while this computer verifies the agent's request."
         />
         <Spinner className="mt-6" size="lg" tone="muted" />
       </StandalonePage>
@@ -250,7 +250,7 @@ export function McpConsent({
     pending === null &&
     access !== null &&
     resolveApprovalDecision({ code: pairingCode, access, details }) !== null;
-  // A code from "Use T3 Code in another app" names its level, so the page does not ask again.
+  // A code from "Use DoeDesk in another app" names its level, so the page does not ask again.
   const codeAccess = parseMcpApprovalCode(pairingCode)?.access;
   const approveLevel = codeAccess ?? access;
 
@@ -260,7 +260,7 @@ export function McpConsent({
         title={`Connect ${details.clientName}`}
         description={
           <>
-            This agent wants to use the threads in every project on{" "}
+            This agent wants to use the chats in every folder on{" "}
             <span className="font-medium text-foreground">
               {environmentLabel ?? details.environmentHost}
             </span>
@@ -316,7 +316,7 @@ export function McpConsent({
               value={pairingCode}
             />
             <p className="text-xs text-muted-foreground">
-              Get one from Use T3 Code in another app (MCP), Settings → Sharing & access, or{" "}
+              Get one from Use DoeDesk in another app (MCP), Settings → Sharing & access, or{" "}
               <code>t3 auth pairing create</code> on this machine.
             </p>
           </div>
@@ -347,8 +347,8 @@ export function McpConsent({
               ))}
             </RadioGroup>
             <p className="text-xs text-muted-foreground">
-              Beyond read only, it can start, message and stop threads, and none of them can run
-              with more than the mode you pick.
+              Beyond read only, it can start, message and stop chats, and none of them can run with
+              more than the mode you pick.
             </p>
           </div>
         )}

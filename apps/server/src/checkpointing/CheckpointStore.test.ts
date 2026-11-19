@@ -120,6 +120,59 @@ it.layer(layerTest)("CheckpointStore.layer", (it) => {
       expect(yield* checkpointStore.isGitRepository(nested)).toBe(true);
     }),
   );
+  it.effect("keeps history for a plain folder outside it, so undo and changes work", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const folder = yield* makeTmpDir("plain-folder-");
+      const letter = NodePath.join(folder, "letter.txt");
+      yield* writeTextFile(letter, "Dear Khalid,\n");
+      const checkpointStore = yield* CheckpointStore.CheckpointStore;
+      const { stateDir } = yield* ServerConfig.ServerConfig;
+
+      expect(yield* checkpointStore.isGitRepository(folder)).toBe(false);
+      expect(yield* checkpointStore.ensureRepository(folder)).toBe(true);
+      // The folder gets a pointer, not a repository: the history is in the app's data folder.
+      const pointer = yield* fileSystem.readFileString(NodePath.join(folder, ".git"));
+      expect(pointer.startsWith("gitdir:")).toBe(true);
+      expect(pointer).toContain(NodePath.join(stateDir, "folder-history"));
+
+      const threadId = ThreadId.make("thread-plain-folder");
+      const before = checkpointRefForThreadTurn(threadId, 0);
+      const after = checkpointRefForThreadTurn(threadId, 1);
+      yield* checkpointStore.captureCheckpoint({ cwd: folder, checkpointRef: before });
+      yield* writeTextFile(letter, "Dear Khalid,\nYour extension is approved.\n");
+      yield* writeTextFile(NodePath.join(folder, ".DS_Store"), "noise");
+      yield* checkpointStore.captureCheckpoint({
+        cwd: folder,
+        checkpointRef: after,
+        previousCheckpointRef: before,
+      });
+
+      const diff = yield* checkpointStore.diffCheckpoints({
+        cwd: folder,
+        fromCheckpointRef: before,
+        toCheckpointRef: after,
+        ignoreWhitespace: false,
+      });
+      expect(diff).toContain("+Your extension is approved.");
+      expect(diff).not.toContain(".DS_Store");
+
+      expect(yield* checkpointStore.restoreCheckpoint({ cwd: folder, checkpointRef: before })).toBe(
+        true,
+      );
+      expect(yield* fileSystem.readFileString(letter)).toBe("Dear Khalid,\n");
+    }),
+  );
+
+  it.effect("does not start tracking the home folder", () =>
+    Effect.gen(function* () {
+      const checkpointStore = yield* CheckpointStore.CheckpointStore;
+      const home = yield* HostProcess.HomeDirectory;
+      if (yield* checkpointStore.isGitRepository(home)) return;
+      expect(yield* checkpointStore.ensureRepository(home)).toBe(false);
+    }),
+  );
+
   it.effect("fails the repository probe that other callers read as no repository", () =>
     Effect.gen(function* () {
       const tmp = yield* makeTmpDir();

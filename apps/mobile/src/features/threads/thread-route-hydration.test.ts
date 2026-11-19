@@ -122,7 +122,7 @@ describe("threadRouteOpensDraft", () => {
 });
 
 describe("threadDetailErrorIsCurrent", () => {
-  const oldError = Option.some("Could not synchronize the thread.");
+  const oldError = Option.some("Could not synchronize the chat.");
 
   it("ignores the error a thread kept from before the connection came back", () => {
     const detailHasError = threadDetailErrorIsCurrent({
@@ -140,7 +140,7 @@ describe("threadDetailErrorIsCurrent", () => {
     expect(
       threadDetailErrorIsCurrent({
         connectionState: "connected",
-        error: Option.some("Could not synchronize the thread."),
+        error: Option.some("Could not synchronize the chat."),
         errorBeforeConnected: oldError,
       }),
     ).toBe(true);

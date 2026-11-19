@@ -55,7 +55,7 @@ function NativeVideoPreview(props: {
     if (playbackUrl !== null) return playbackUrl;
     throw new Error(
       preparedConnection._tag === "None"
-        ? "Reconnect to this environment and open the video again."
+        ? "Reconnect to this computer and open the video again."
         : "Could not load this video. Check the connection and try again.",
     );
   });

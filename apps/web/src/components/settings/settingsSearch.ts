@@ -17,6 +17,7 @@ import { commandLabel } from "./KeybindingsSettings.logic";
 import type { ResolvedSettingsScope } from "./settingsScope";
 
 export type SettingsPath =
+  | "/settings/privacy"
   | "/settings/projects"
   | "/settings/general"
   | "/settings/diagnostics"
@@ -93,22 +94,23 @@ export interface SettingsSearchAvailability {
 }
 
 export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
+  "/settings/privacy": msg("Privacy"),
   "/settings/diagnostics": msg("Diagnostics"),
-  "/settings/projects": msg("Projects"),
+  "/settings/projects": msg("Folders"),
   "/settings/general": msg("General"),
   "/settings/appearance": msg("Appearance"),
   "/settings/chat": msg("Chat"),
   "/settings/diffs": msg("Diffs & pull requests"),
   "/settings/keybindings": msg("Keybindings"),
-  "/settings/snap-shot": msg("SnapShots"),
-  "/settings/providers": msg("Providers"),
-  "/settings/threads": msg("Threads"),
+  "/settings/snap-shot": msg("Window capture"),
+  "/settings/providers": msg("AI accounts"),
+  "/settings/threads": msg("Chats"),
   "/settings/browser": msg("Browser"),
   "/settings/devices": msg("Devices"),
   "/settings/scheduled-tasks": msg("Scheduled tasks"),
   "/settings/source-control": msg("Source control"),
   "/settings/worktrees": msg("Worktrees"),
-  "/settings/connections": msg("Environments"),
+  "/settings/connections": msg("Computers"),
   "/settings/access": msg("Sharing & access"),
   "/settings/secrets": msg("Secrets"),
   "/settings/maintenance": msg("Maintenance"),
@@ -118,16 +120,52 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/archived": msg("Archive"),
 };
 
-/** Sidebar order. A group with a hidden heading is set apart on screen by space alone. */
-export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
+export interface SettingsNavGroup {
   readonly heading: string;
   readonly headingHidden?: true;
   readonly paths: ReadonlyArray<SettingsPath>;
-}> = [
+}
+
+/** Sidebar order. A group with a hidden heading is set apart on screen by space alone. */
+export const SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
   {
     heading: msg("Preferences"),
     headingHidden: true,
     paths: [
+      "/settings/privacy",
+      "/settings/general",
+      "/settings/appearance",
+      "/settings/chat",
+      "/settings/voice",
+      "/settings/keybindings",
+      "/settings/snap-shot",
+    ],
+  },
+  {
+    heading: msg("AI"),
+    paths: [
+      "/settings/providers",
+      "/settings/threads",
+      "/settings/projects",
+      "/settings/browser",
+      "/settings/scheduled-tasks",
+    ],
+  },
+  {
+    heading: msg("More"),
+    headingHidden: true,
+    // "Sharing & access" holds the pairing link and code for the phone app.
+    paths: ["/settings/access", "/settings/maintenance", "/settings/about", "/settings/archived"],
+  },
+];
+
+/** With Developer mode on: every page, including the ones about code and remote machines. */
+const DEVELOPER_SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
+  {
+    heading: msg("Preferences"),
+    headingHidden: true,
+    paths: [
+      "/settings/privacy",
       "/settings/general",
       "/settings/appearance",
       "/settings/chat",
@@ -138,7 +176,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
     ],
   },
   {
-    heading: msg("Agents"),
+    heading: msg("AI"),
     paths: [
       "/settings/providers",
       "/settings/threads",
@@ -165,6 +203,20 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
     paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
   },
 ];
+
+export const settingsNavGroups = (developerMode: boolean): ReadonlyArray<SettingsNavGroup> =>
+  developerMode ? DEVELOPER_SETTINGS_NAV_GROUPS : SETTINGS_NAV_GROUPS;
+
+const PLAIN_SETTINGS_PATHS: ReadonlySet<string> = new Set(
+  SETTINGS_NAV_GROUPS.flatMap((group) => group.paths),
+);
+
+/** Leaves out settings on pages that only Developer mode shows, so search cannot land on them. */
+export const settingsForMode = (
+  items: ReadonlyArray<SettingsSearchItem>,
+  developerMode: boolean,
+): ReadonlyArray<SettingsSearchItem> =>
+  developerMode ? items : items.filter((item) => PLAIN_SETTINGS_PATHS.has(item.to));
 
 export function keybindingSearchAnchorId<Command extends KeybindingCommand>(command: Command) {
   return `keybinding-${command}` as const;
@@ -251,7 +303,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/worktrees",
     scope: "project-defaults",
     searchTerms: [
-      "disk storage automatic delete deleted archived threads old inactive merged settled unchanged worktrees retention days project inherit off custom",
+      "disk storage automatic delete deleted archived chats old inactive merged settled unchanged worktrees retention days folder inherit off custom",
     ],
   },
   {
@@ -272,14 +324,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "project-defaults",
-    title: "Project defaults and overrides",
+    title: "Folder defaults and overrides",
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["model workspace environments projects inheritance checkout"],
+    searchTerms: ["model workspace computers folders inheritance checkout"],
   },
   {
     id: "project-overview",
-    title: "Project overview",
+    title: "Folder overview",
     to: "/settings/projects",
     searchTerms: ["name icon emoji image checkout remove delete"],
   },
@@ -288,14 +340,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Default model",
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["new thread project provider reasoning effort"],
+    searchTerms: ["new chat folder provider reasoning effort"],
   },
   {
     id: "fallback-model",
     title: "Fallback model",
     to: "/settings/threads",
     scope: "environment-defaults",
-    searchTerms: ["fallback agent provider out of usage new threads"],
+    searchTerms: ["fallback agent provider out of usage new chats"],
     environmentOnly: true,
   },
   {
@@ -304,7 +356,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: [
-      "new thread default runtime mode supervised approvals auto accept edits full access",
+      "new chat default runtime mode supervised approvals auto accept edits full access",
     ],
   },
   {
@@ -349,10 +401,10 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "thread-details-items",
-    title: "Thread details",
+    title: "Chat details",
     to: "/settings/appearance",
     searchTerms: [
-      "customize show hide panel card environment editor scripts branch pull request git changes servers automations lineage usage limits 5 hour weekly quota tokens context window",
+      "customize show hide panel card computer editor scripts branch pull request git changes servers automations lineage usage limits 5 hour weekly quota tokens context window",
     ],
   },
   {
@@ -374,7 +426,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "environment-identification",
-    title: "Environment identification",
+    title: "Computer identification",
     to: "/settings/appearance",
     searchTerms: ["dev nightly latest channel artwork pill label hide none"],
     targetId: "appearance-interface",
@@ -384,6 +436,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Interface font",
     to: "/settings/appearance",
     searchTerms: ["typography family size system sans"],
+  },
+  {
+    id: "reading-font",
+    title: "Reading font",
+    to: "/settings/appearance",
+    searchTerms: ["typography family serif answers documents titles headings prose"],
   },
   {
     id: "prompt-font",
@@ -429,15 +487,15 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "project-grouping",
-    title: msg("Project grouping"),
+    title: msg("Folder grouping"),
     to: "/settings/general",
-    searchTerms: ["combine matching repositories environments sidebar"],
+    searchTerms: ["combine matching repositories computers sidebar"],
   },
   {
     id: "project-order",
-    title: msg("Project order"),
+    title: msg("Folder order"),
     to: "/settings/general",
-    searchTerms: ["sort projects sidebar manual created recent"],
+    searchTerms: ["sort folders sidebar manual created recent"],
   },
   {
     id: "snooze-options",
@@ -463,13 +521,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "working-shelf",
     title: msg("Working section"),
     to: "/settings/general",
-    searchTerms: ["hide fold running monitoring threads inbox sidebar shelf"],
+    searchTerms: ["hide fold running monitoring chats inbox sidebar shelf"],
   },
   {
     id: "boring-sidebar",
-    title: "Boring sidebar (group by project)",
+    title: "Boring sidebar (group by folder)",
     to: "/settings/labs",
-    searchTerms: ["beta folders project tree classic sidebar"],
+    searchTerms: ["beta folders folder tree classic sidebar"],
   },
   {
     id: "boring-sidebar-multiline",
@@ -500,7 +558,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Screen reader window title",
     to: "/settings/chat",
     searchTerms: [
-      "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar thread status order working approval",
+      "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar chat status order working approval",
     ],
   },
   {
@@ -512,10 +570,63 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "linked-environments-beta",
-    title: "Linked environments",
+    title: "Linked computers",
     to: "/settings/labs",
     scope: "environment",
     searchTerms: ["beta link another machine vps peer agents work there delegate"],
+  },
+  {
+    id: "privacy-images",
+    title: "Images and documents",
+    to: "/settings/privacy",
+    scope: "environment",
+    searchTerms: [
+      "image screenshot photo redact black box censor OCR reading tool scan PDF attachment withhold",
+    ],
+  },
+  {
+    id: "privacy-redactions",
+    title: "What was sent in place of files",
+    to: "/settings/privacy",
+    scope: "environment",
+    searchTerms: ["download redacted image masked text attachment recent files"],
+  },
+  {
+    id: "usage-data",
+    title: "Usage data",
+    to: "/settings/privacy",
+    scope: "environment",
+    searchTerms: ["telemetry analytics tracking opt out statistics installation identifier"],
+  },
+  {
+    id: "account-answers",
+    title: "Your answers",
+    to: "/settings/privacy",
+    searchTerms: ["onboarding questions field workplace correct change remove profile"],
+  },
+  {
+    id: "account-export",
+    title: "Download my data",
+    to: "/settings/privacy",
+    searchTerms: ["export copy access account data file portability"],
+  },
+  {
+    id: "account-delete",
+    title: "Delete my account",
+    to: "/settings/privacy",
+    searchTerms: ["erase remove close account deletion"],
+  },
+  {
+    id: "terms-of-use",
+    title: "Terms of Use",
+    to: "/settings/privacy",
+    searchTerms: ["terms agreement legal version accepted"],
+  },
+  {
+    id: "privacy-policy-version",
+    title: "Privacy Policy",
+    to: "/settings/privacy",
+    searchTerms: ["privacy policy legal version"],
   },
   {
     id: "prompt-suggestions-beta",
@@ -544,7 +655,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Transcribe with",
     to: "/settings/voice",
     searchTerms: [
-      "send microphone audio dictation destination speech voice stt transcription environment machine consent privacy cloud OpenAI Grok OpenRouter",
+      "send microphone audio dictation destination speech voice stt transcription computer machine consent privacy cloud OpenAI Grok OpenRouter",
     ],
   },
   {
@@ -573,12 +684,10 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "speech-project-dictionary",
-    title: "Project dictionary",
+    title: "Folder dictionary",
     to: "/settings/voice",
     scope: "project-defaults",
-    searchTerms: [
-      "speech voice transcription vocabulary shared dictionary team environment glossary",
-    ],
+    searchTerms: ["speech voice transcription vocabulary shared dictionary team computer glossary"],
   },
   {
     id: "speech-post-processing-model",
@@ -645,7 +754,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "auto-settle-inactive-threads",
-    title: "Auto-settle inactive threads",
+    title: "Auto-settle inactive chats",
     to: "/settings/threads",
     searchTerms: ["sidebar inactivity days no activity automatically"],
     requiresThreadAutoSettlement: true,
@@ -653,14 +762,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "compact-idle-threads",
-    title: "Compact idle threads",
+    title: "Compact idle chats",
     to: "/settings/providers",
     scope: "environment-defaults",
     searchTerms: ["claude context compaction idle cache tokens usage summary resume"],
   },
   {
     id: "auto-settle-merged-threads",
-    title: "Auto-settle merged threads",
+    title: "Auto-settle merged chats",
     to: "/settings/threads",
     searchTerms: ["pull request merge closed automatically sidebar"],
     requiresThreadAutoSettlement: true,
@@ -668,7 +777,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "keep-threads-with-pull-requests",
-    title: "Keep threads with a PR",
+    title: "Keep chats with a PR",
     to: "/settings/threads",
     targetId: "auto-settle-inactive-threads",
     searchTerms: ["pull request inactivity auto-settle merge close sidebar"],
@@ -680,13 +789,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Days of inactivity before auto-settle",
     to: "/settings/threads",
     targetId: "auto-settle-inactive-threads",
-    searchTerms: ["thread timeout activity sidebar"],
+    searchTerms: ["chat timeout activity sidebar"],
     requiresThreadAutoSettlement: true,
     scope: "project-defaults",
   },
   {
     id: "thread-notifications",
-    title: "Thread notifications",
+    title: "Chat notifications",
     to: "/settings/general",
     searchTerms: ["notification sound alert completion input approval desktop"],
   },
@@ -776,7 +885,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "continue-threads-after-server-update",
-    title: "Continue threads after restarts",
+    title: "Continue chats after restarts",
     to: "/settings/maintenance",
     scope: "project-defaults",
     searchTerms: [
@@ -801,7 +910,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "new-threads",
-    title: "New threads",
+    title: "New chats",
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: ["default workspace mode draft local worktree"],
@@ -822,7 +931,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "add-project-starts-in",
-    title: "Add project starts in",
+    title: "Add folder starts in",
     to: "/settings/threads",
     scope: "environment-defaults",
     searchTerms: ["base directory folder browser path home"],
@@ -838,19 +947,25 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "unpin-confirmation",
     title: msg("Unpin confirmation"),
     to: "/settings/general",
-    searchTerms: ["ask before thread pinned section"],
+    searchTerms: ["ask before chat pinned section"],
   },
   {
     id: "archive-confirmation",
     title: msg("Archive confirmation"),
     to: "/settings/general",
-    searchTerms: ["ask before thread second click inline action"],
+    searchTerms: ["ask before chat second click inline action"],
+  },
+  {
+    id: "developer-mode",
+    title: msg("Developer mode"),
+    to: "/settings/general",
+    searchTerms: ["terminal git pull requests programming code coding tools advanced"],
   },
   {
     id: "delete-confirmation",
     title: msg("Delete confirmation"),
     to: "/settings/general",
-    searchTerms: ["ask before thread chat history"],
+    searchTerms: ["ask before chat chat history"],
   },
   {
     id: "quit-confirmation",
@@ -864,14 +979,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Text generation model",
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["generated thread titles source control content default provider"],
+    searchTerms: ["generated chat titles source control content default provider"],
   },
   {
     id: "thread-title-instructions",
-    title: "Thread title instructions",
+    title: "Chat title instructions",
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["generated thread titles prompt custom style naming rename regenerate"],
+    searchTerms: ["generated chat titles prompt custom style naming rename regenerate"],
   },
   {
     id: "app-version",
@@ -904,7 +1019,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Welcome page",
     to: "/settings/about",
     primaryEnvironmentOnly: true,
-    searchTerms: ["onboarding setup first run getting started agents import projects"],
+    searchTerms: ["onboarding setup first run getting started agents import folders"],
   },
   {
     id: "privacy-policy",
@@ -986,20 +1101,11 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
-    id: "usage-providers",
-    title: "Usage providers",
-    to: "/settings/providers",
-    searchTerms: [
-      "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
-    ],
-    providerSettingsOnly: true,
-  },
-  {
     id: "text-generators",
     title: "Text generators",
     to: "/settings/providers",
     searchTerms: [
-      "model api api key openai openrouter anthropic ollama lm studio custom endpoint base url thread titles commit messages",
+      "model api api key openai openrouter anthropic ollama lm studio custom endpoint base url chat titles commit messages",
     ],
     providerSettingsOnly: true,
     textGeneratorsOnly: true,
@@ -1021,7 +1127,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Agent browser access",
     to: "/settings/browser",
     scope: "project-defaults",
-    searchTerms: ["allow disable enable open drive preview tools sessions project override"],
+    searchTerms: ["allow disable enable open drive preview tools sessions folder override"],
   },
   {
     id: "device-sources",
@@ -1113,7 +1219,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "pull-request-links-open-in-app",
-    title: "Open pull requests in T3 Code",
+    title: "Open pull requests in DoeDesk",
     to: "/settings/diffs",
     searchTerms: [
       `pr commit links ${SOURCE_CONTROL_HOST_LABELS} browser external click default pull request view panel`,
@@ -1154,7 +1260,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/source-control",
     scope: "environment-defaults",
     searchTerms: [
-      `version control git ${SOURCE_CONTROL_HOST_TERMS} hosting integrations credentials scan server environment`,
+      `version control git ${SOURCE_CONTROL_HOST_TERMS} hosting integrations credentials scan server computer`,
     ],
   },
   {
@@ -1237,14 +1343,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "environment-icon",
-    title: "Environment icon",
+    title: "Computer icon",
     to: "/settings/access",
     targetId: "connections-environment",
     searchTerms: ["machine glyph sidebar mac mini studio laptop desktop server cloud vm"],
   },
   {
     id: "local-environment",
-    title: "Local environment",
+    title: "Local computer",
     to: "/settings/connections",
     searchTerms: ["turn off on disable enable local server agents remote only restart"],
     desktopOnly: true,
@@ -1271,7 +1377,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "WSL backend",
     to: "/settings/access",
     searchTerms: [
-      "windows subsystem linux distro second server projects stop windows backend restart wsl only",
+      "windows subsystem linux distro second server folders stop windows backend restart wsl only",
     ],
     desktopOnly: true,
     windowsOnly: true,
@@ -1327,14 +1433,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "linked-environments",
     peerLinksOnly: true,
-    title: "Linked environments",
+    title: "Linked computers",
     to: "/settings/connections",
     targetId: "linked-environments",
     searchTerms: ["link peer another machine vps agents work there handoff pairing code"],
   },
   {
     id: "remote-environments",
-    title: "Environments",
+    title: "Computers",
     to: "/settings/connections",
     searchTerms: ["add pair backend host code ssh config agent tunnel saved t3 connect"],
   },
@@ -1343,7 +1449,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Load balancing",
     to: "/settings/connections",
     searchTerms: [
-      "automatic machine environment resources cpu memory capacity preference weight shared projects",
+      "automatic machine computer resources cpu memory capacity preference weight shared folders",
     ],
   },
   {
@@ -1351,7 +1457,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Pull request sharing",
     to: "/settings/connections",
     searchTerms: [
-      `pull request routing trusted environments shared credentials permissions read actions source control ${SOURCE_CONTROL_HOST_LABELS}`,
+      `pull request routing trusted computers shared credentials permissions read actions source control ${SOURCE_CONTROL_HOST_LABELS}`,
     ],
   },
   {
@@ -1371,9 +1477,9 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "archive",
-    title: "Archived threads",
+    title: "Archived chats",
     to: "/settings/archived",
-    searchTerms: ["restore reopen deleted history projects"],
+    searchTerms: ["restore reopen deleted history folders"],
   },
 ] as const satisfies ReadonlyArray<SettingsSearchItem>;
 
@@ -1382,6 +1488,7 @@ export type SettingsSearchItemId = (typeof SETTINGS_SEARCH_ITEMS)[number]["id"];
 const SEARCH_ITEMS_BY_ID = new Map(SETTINGS_SEARCH_ITEMS.map((item) => [item.id, item] as const));
 
 const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScope | null>> = {
+  "/settings/privacy": "environment",
   "/settings/diagnostics": "environment",
   "/settings/projects": "project",
   "/settings/general": null,

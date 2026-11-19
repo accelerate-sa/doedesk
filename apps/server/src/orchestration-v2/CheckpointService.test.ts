@@ -59,6 +59,7 @@ it.effect(
               IdAllocator.layer,
               Layer.mock(CheckpointStore.CheckpointStore)({
                 isGitRepository: () => Effect.succeed(true),
+                ensureRepository: () => Effect.succeed(true),
                 hasCheckpointRef: () => Effect.succeed(false),
                 captureCheckpoint: () => Effect.fail(captureError),
               }),
@@ -128,6 +129,7 @@ it.effect(
             IdAllocator.layer,
             Layer.mock(CheckpointStore.CheckpointStore)({
               isGitRepository: () => Effect.succeed(true),
+              ensureRepository: () => Effect.succeed(true),
               hasCheckpointRef: ({ checkpointRef }) =>
                 Ref.get(refs).pipe(Effect.map((current) => current.has(checkpointRef))),
               captureCheckpoint: ({ checkpointRef }) =>

@@ -43,7 +43,7 @@ export function WorkspaceFilePreviewError(props: {
     <View className="flex-1 items-center justify-center bg-sheet px-6">
       <EmptyState
         title="Preview unavailable"
-        detail="This file may be missing, unsupported, or unavailable on this environment."
+        detail="This file may be missing, unsupported, or unavailable on this computer."
         actionLabel="Try again"
         onAction={props.onRetry}
       />

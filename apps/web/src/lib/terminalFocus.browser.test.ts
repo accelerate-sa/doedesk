@@ -116,7 +116,7 @@ function mountThread(threadId: string, environmentId = "env") {
 
 describe("thread focus restoration", () => {
   it.each(["composer", "drawer", "panel", "remounted composer"] as const)(
-    "restores %s focus when returning to a thread with both terminals open",
+    "restores %s focus when returning to a chat with both terminals open",
     (control) => {
       using thread = mountThread(`return-${control}`);
       using drawer = thread.mountTerminal("drawer");

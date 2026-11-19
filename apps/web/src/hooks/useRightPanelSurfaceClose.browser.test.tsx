@@ -104,7 +104,7 @@ function setup() {
 }
 
 it.each([false, true])(
-  "keeps a pending close on its original environment and thread, fallback=%s",
+  "keeps a pending close on its original computer and chat, fallback=%s",
   async (failClose) => {
     const { original, other, Harness, resolve } = setup();
     fixture.failClose = failClose;

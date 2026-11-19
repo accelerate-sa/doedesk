@@ -370,7 +370,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   const compactsBeforeSend = compactTokens !== null && !keepFullHistory;
 
   const submitLabel = showResume
-    ? "Resume thread"
+    ? "Resume chat"
     : isEditingQueuedMessage
       ? "Update queued message"
       : compactsBeforeSend
@@ -381,7 +381,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             ? "Steer message"
             : "Submit message";
   const submitStatus = isEnvironmentUnavailable
-    ? "Environment disconnected"
+    ? "Computer disconnected"
     : (sendDisabledReason ??
       (isPreparingWorktree
         ? "Preparing worktree"

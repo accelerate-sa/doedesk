@@ -1,6 +1,7 @@
 import { StackActions, useNavigation } from "@react-navigation/native";
 import { Platform } from "react-native";
 import { resolveThreadReferenceCopyTarget } from "@t3tools/client-runtime/thread-reference";
+import { useDeveloperMode } from "../../doedesk/product";
 import {
   createContext,
   use,
@@ -104,6 +105,7 @@ export function HardwareKeyboardCommandProvider({
     getHardwareKeyboardCommandRegistrationVersion,
     getHardwareKeyboardCommandRegistrationVersion,
   );
+  const developerMode = useDeveloperMode();
   const enabledCommands = useMemo(() => {
     const commands = new Set<HardwareKeyboardCommand>(getRegisteredHardwareKeyboardCommands());
     commands.add("newTask");
@@ -116,13 +118,13 @@ export function HardwareKeyboardCommandProvider({
     if (pathname !== "/" || navigation.canGoBack()) commands.add("back");
     if (activeThreadRef !== null) {
       commands.add("files");
-      commands.add("terminal");
+      if (developerMode) commands.add("terminal");
       commands.add("review");
       if (pathname.split("/")[4] !== "terminal") commands.add("copyThreadReference");
     }
     return [...commands];
     // oxlint-disable-next-line react/memo-dependencies -- registrationVersion invalidates the snapshot of the external keyboard-command registry.
-  }, [activeThreadRef, pathname, registrationVersion, navigation]);
+  }, [activeThreadRef, developerMode, pathname, registrationVersion, navigation]);
 
   const onCommand = useCallback(
     (command: HardwareKeyboardCommand) => {

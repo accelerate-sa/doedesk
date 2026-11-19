@@ -159,7 +159,7 @@ it("clears attachment drafts for requests the thread resolved, wherever they wer
 
 // Stop cancels an open question; a provider timeout expires it. Neither sends the answer.
 it.each(["cancelled", "expired"] as const)(
-  "returns typed answers and their thread chips to the thread draft when a question is %s",
+  "returns typed answers and their chat chips to the chat draft when a question is %s",
   (status) => {
     const store = useComposerDraftStore.getState();
     const request = RuntimeRequestId.make("stopped");

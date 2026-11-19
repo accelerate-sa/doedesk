@@ -240,7 +240,7 @@ it.each(["Save", "Disable"])("keeps other provider edits through a %s refetch", 
 });
 
 it.each([true, false])(
-  "enables project actions after projects arrive (sessions: %s)",
+  "enables folder actions after folders arrive (sessions: %s)",
   async (canList) => {
     setup();
     await using screen = await renderSection({ canList, projects: [] });
@@ -272,7 +272,7 @@ it.each([true, false])(
 );
 
 it.each([true, false])(
-  "preserves a valid selection and clears a removed project's data (sessions: %s)",
+  "preserves a valid selection and clears a removed folder's data (sessions: %s)",
   async (canList) => {
     setup();
     const second = { id: ProjectId.make("second"), title: "Second", workspaceRoot: "/second" };
@@ -290,7 +290,7 @@ it.each([true, false])(
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "Project for ACP sessions" : "Project for ACP providers",
+          name: canList ? "Folder for ACP sessions" : "Folder for ACP providers",
         }),
       )
       .toHaveFocus();
@@ -309,7 +309,7 @@ it.each([true, false])(
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "Project for ACP sessions" : "Project for ACP providers",
+          name: canList ? "Folder for ACP sessions" : "Folder for ACP providers",
         }),
       )
       .toHaveTextContent("Second");
@@ -349,7 +349,7 @@ it.each([true, false])(
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "Project for ACP sessions" : "Project for ACP providers",
+          name: canList ? "Folder for ACP sessions" : "Folder for ACP providers",
         }),
       )
       .toHaveTextContent("Antigravity");
@@ -384,7 +384,7 @@ it("ignores a late listing after project replacement", async () => {
   await expect.element(screen.getByRole("button", { name: "List sessions" })).toBeEnabled();
 });
 
-it.each(["Save", "Disable"])("does not refetch the old project after a late %s", async (action) => {
+it.each(["Save", "Disable"])("does not refetch the old folder after a late %s", async (action) => {
   setup();
   const command = action === "Save" ? commands.setProvider : commands.disableProvider;
   let finish!: () => void;
@@ -407,7 +407,7 @@ it.each(["Save", "Disable"])("does not refetch the old project after a late %s",
 });
 
 it.each(["Delete", "Disable"])(
-  "does not act on a replaced project after confirming %s",
+  "does not act on a replaced folder after confirming %s",
   async (action) => {
     setup();
     let finish!: (confirmed: boolean) => void;

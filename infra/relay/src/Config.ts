@@ -1,4 +1,5 @@
 import * as Config from "effect/Config";
+import type { AccountTokenSettings } from "./auth/AccountTokens.ts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -60,9 +61,8 @@ export class RelayConfiguration extends Context.Service<
     readonly relayIssuer: string;
     readonly apns: ApnsCredentials | null;
     readonly fcmServiceAccount?: Redacted.Redacted<string>;
-    readonly clerkSecretKey: Redacted.Redacted<string>;
-    readonly clerkPublishableKey: string;
-    readonly clerkJwtAudience: string;
+    /** Whose signed-in accounts this relay accepts, and under which audience. */
+    readonly accountTokens: AccountTokenSettings;
     readonly apnsDeliveryJobSigningSecret: Redacted.Redacted<string>;
     readonly cloudMintPrivateKey: Redacted.Redacted<string>;
     readonly cloudMintPublicKey: string;

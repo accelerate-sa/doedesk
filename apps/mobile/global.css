@@ -21,6 +21,8 @@
   --font-sans: "DMSans-Regular";
   --font-medium: "DMSans-Medium";
   --font-bold: "DMSans-Bold";
+  /* The brand serif, for the wordmark, large titles and empty states. */
+  --font-display: "DoeDeskSerif-Regular";
 
   /* Keep this scale aligned with src/lib/typography.ts for native style props. */
   --text-3xs: 11px;

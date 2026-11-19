@@ -186,8 +186,8 @@ export function useComposerStash(input: {
     if (filesToVerify.some((file) => file.environmentId !== environmentId)) {
       toastManager.add({
         type: "error",
-        title: "Stashed files belong to another environment",
-        description: "Restore this prompt in the environment that received its files.",
+        title: "Stashed files belong to another computer",
+        description: "Restore this prompt in the computer that received its files.",
       });
       return;
     }

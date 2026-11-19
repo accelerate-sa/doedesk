@@ -68,8 +68,7 @@ export function useStartTriage() {
       if (!isAtomCommandInterrupted(scratch)) {
         pipe(
           squashAtomCommandFailure(scratch),
-          (failure) =>
-            errorMessage(failure, "This machine cannot start threads without a project."),
+          (failure) => errorMessage(failure, "This machine cannot start chats without a folder."),
           fail,
         );
       }

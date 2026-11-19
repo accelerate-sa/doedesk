@@ -70,6 +70,9 @@ export function parsePairingUrl(url: string): { host: string; code: string } {
   }
 }
 
+// The app's own link schemes, plus the one T3 Code servers still print.
+const PAIRING_LINK_SCHEMES = new Set(["doedesk:", "doedesk-preview:", "doedesk-dev:", "t3code:"]);
+
 export function extractPairingUrlFromQrPayload(payload: string): string {
   const trimmed = payload.trim();
   if (!trimmed) {
@@ -78,7 +81,7 @@ export function extractPairingUrlFromQrPayload(payload: string): string {
 
   try {
     const url = new URL(trimmed);
-    if (url.protocol === "t3code:") {
+    if (PAIRING_LINK_SCHEMES.has(url.protocol)) {
       const pairingUrl = url.searchParams.get(MOBILE_PAIRING_URL_PARAM)?.trim() ?? "";
       if (pairingUrl.length > 0) {
         return pairingUrl;

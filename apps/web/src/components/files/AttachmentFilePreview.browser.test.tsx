@@ -1162,7 +1162,7 @@ describe("attachment HTML preview recovery", () => {
     refresh.mockResolvedValue(null);
     await toggleMode(screen, "Show HTML source");
     expect(attachmentFetches()).toEqual([]);
-    expect(alert(screen)?.textContent).toContain("Reconnect to the environment and try again.");
+    expect(alert(screen)?.textContent).toContain("Reconnect to the computer and try again.");
 
     await toggleMode(screen, "Show rendered page");
     await toggleMode(screen, "Show HTML source");

@@ -530,14 +530,14 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   };
   const header = (
     <WorkspaceListHeader
-      accessibilityLabel="T3 Code, Threads"
+      accessibilityLabel="DoeDesk, Threads"
       onOpenEnvironments={props.onOpenEnvironmentSettings}
       onOpenSettings={props.onOpenSettings}
       search={{
         value: props.searchQuery,
         onChangeText: props.onSearchQueryChange,
         placeholder: "Search",
-        accessibilityLabel: "Search threads",
+        accessibilityLabel: "Search chats",
       }}
       filter={{
         customized: options.selectedEnvironmentId !== null || selectedProjectKey !== null,
@@ -571,16 +571,16 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
         }
       >
         {catalogState.isLoadingConnections
-          ? "Loading threads…"
+          ? "Loading chats…"
           : showAddEnvironment
-            ? "No environments connected"
+            ? "No computers connected"
             : props.searchQuery.trim().length > 0
               ? threadSearch.isPending
-                ? "Searching thread messages…"
-                : "No matching threads"
+                ? "Searching chat messages…"
+                : "No matching chats"
               : selectedProjectScope !== null
-                ? `No threads in ${selectedProjectScope.title}`
-                : "No threads yet"}
+                ? `No chats in ${selectedProjectScope.title}`
+                : "No chats yet"}
       </Text>
       {showAddEnvironment ? (
         <View className={Platform.OS === "android" ? "self-center" : "px-2"}>
@@ -588,7 +588,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
             tone="primary"
             size="compact"
             icon="plus"
-            label="Add environment"
+            label="Add computer"
             onPress={props.onOpenEnvironmentSettings}
           />
         </View>

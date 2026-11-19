@@ -886,8 +886,8 @@ describe("composerDraftStore project draft thread mapping", () => {
       store.setPrompt(localDraftId, "local draft");
       store.setPrompt(remoteDraftId, "remote draft");
       store.addImage(localDraftId, makeImage({ id: "img-local", previewUrl: "blob:local-draft" }));
-      store.setPrompt(localThreadRef, "local thread draft");
-      store.setPrompt(remoteThreadRef, "remote thread draft");
+      store.setPrompt(localThreadRef, "local chat draft");
+      store.setPrompt(remoteThreadRef, "remote chat draft");
       useComposerDraftStore.setState({
         rewindingThreadKeys: new Set([
           threadKeyFor(threadId, TEST_ENVIRONMENT_ID),
@@ -904,9 +904,9 @@ describe("composerDraftStore project draft thread mapping", () => {
       expect(next.getDraftThreadByProjectRef(projectRef)).toBeNull();
       expect(next.getDraftThreadByProjectRef(remoteProjectRef)).not.toBeNull();
       expect(next.getComposerDraft(localDraftId)).toBeNull();
-      expect(next.getComposerDraft(remoteDraftId)?.prompt).toBe("remote thread draft");
+      expect(next.getComposerDraft(remoteDraftId)?.prompt).toBe("remote chat draft");
       expect(next.getComposerDraft(localThreadRef)).toBeNull();
-      expect(next.getComposerDraft(remoteThreadRef)?.prompt).toBe("remote thread draft");
+      expect(next.getComposerDraft(remoteThreadRef)?.prompt).toBe("remote chat draft");
       expect(revokeSpy).toHaveBeenCalledWith("blob:local-draft");
     } finally {
       URL.revokeObjectURL = originalRevokeObjectUrl;

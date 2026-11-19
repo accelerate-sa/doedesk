@@ -250,8 +250,8 @@ export function PullRequestActionsMenu({
             <span>{handoff === "ask" ? "Opening..." : "Ask a question"}</span>
             <span className="text-xs text-muted-foreground">
               {attachesToComposer
-                ? `Adds the ${terminology.singular} to this thread's composer.`
-                : `Opens a thread that knows which ${terminology.singular} you mean.`}
+                ? `Adds the ${terminology.singular} to this chat's composer.`
+                : `Opens a chat that knows which ${terminology.singular} you mean.`}
             </span>
           </span>
         </MenuItem>

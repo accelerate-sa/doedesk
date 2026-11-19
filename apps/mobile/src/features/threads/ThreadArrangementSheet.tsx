@@ -396,9 +396,9 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
             <SafeAreaView style={{ flex: 1 }}>
               <SheetHeader
                 presentation="inline"
-                title="Arrange threads"
+                title="Arrange chats"
                 onClose={props.onClose}
-                accessibilityLabel="Close arrange threads"
+                accessibilityLabel="Close arrange chats"
               />
               <Text className="px-5 pb-3 text-sm text-foreground-muted">
                 Drag to reorder, pin, or settle. Changes save when you drop.
@@ -541,7 +541,7 @@ function ThreadArrangementSheet(props: { onClose: () => void }) {
                               {olderSettledShelf.loading
                                 ? "Loading"
                                 : olderSettledShelf.failed
-                                  ? "Could not load older threads. Retry"
+                                  ? "Could not load older chats. Retry"
                                   : `Show more (${settledCount - visibleSettled.length} settled hidden)`}
                             </Text>
                           </Pressable>

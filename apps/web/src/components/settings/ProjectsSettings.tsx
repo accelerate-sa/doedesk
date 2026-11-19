@@ -22,7 +22,7 @@ export function ProjectsSettings() {
               onClick={() => selectScope(selectEnvironmentAxis(value, ALL_ENVIRONMENTS_VALUE))}
             >
               <LayersIcon />
-              Show all environments
+              Show all computers
             </Button>
           ) : null}
         </div>
@@ -47,7 +47,7 @@ export function ProjectsSettings() {
         unavailable
       ) : (
         <SettingsScopeNotice target="project">
-          Choose a project to manage its name, icon, checkouts and actions.
+          Choose a folder to manage its name, icon, checkouts and actions.
         </SettingsScopeNotice>
       )}
     </div>

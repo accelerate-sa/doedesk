@@ -89,7 +89,7 @@ export async function startFanoutThread(input: {
   try {
     if (uncertainThreadId) {
       throw new Error(
-        "The previous request may have started. Open its thread to check before sending again.",
+        "The previous request may have started. Open its chat to check before sending again.",
       );
     }
     requestMayHaveStarted = true;
@@ -121,7 +121,7 @@ export async function startFanoutThread(input: {
                   onClick: () => {
                     void readLocalApi()
                       ?.dialogs.confirm(
-                        "The previous request may already be running. Check its thread first. Allow another send that could create a duplicate thread?",
+                        "The previous request may already be running. Check its chat first. Allow another send that could create a duplicate chat?",
                       )
                       .then(
                         (confirmed) => {
@@ -139,7 +139,7 @@ export async function startFanoutThread(input: {
                 },
               },
               actionProps: {
-                children: "Open thread",
+                children: "Open chat",
                 onClick: () => input.openThread(retainedThreadId),
               },
             }
@@ -189,7 +189,7 @@ export async function rewindToMessage(input: {
       throw new Error("Wait for attachments to finish preparing before rewinding.");
     }
     const connection = readPreparedConnection(environmentId);
-    if (!connection) throw new Error("The environment is not connected.");
+    if (!connection) throw new Error("The computer is not connected.");
     const files = await prepareRevertedMessageAttachments({
       message,
       environmentId,
@@ -254,7 +254,7 @@ export async function rewindToMessage(input: {
     store.addFiles(draftTarget, restoredFiles, { allowDuplicates: true });
     return { error: null, prompt: nextPrompt };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Failed to revert thread state." };
+    return { error: error instanceof Error ? error.message : "Failed to revert chat state." };
   }
 }
 

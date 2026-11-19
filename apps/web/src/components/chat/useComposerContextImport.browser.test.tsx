@@ -194,7 +194,7 @@ it.each([
 });
 
 it.each(["same", "other-environment"] as const)(
-  "preserves thread identity across repeated pastes: %s",
+  "preserves chat identity across repeated pastes: %s",
   async (variant) => {
     const otherEnvironment = variant === "other-environment";
     const target = DraftId.make(`thread-collision-${variant}`);

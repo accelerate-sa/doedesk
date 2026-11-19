@@ -99,7 +99,7 @@ function makeBridge(
       }
       return {
         environmentId: EnvironmentId.make("environment-ssh"),
-        label: "SSH environment",
+        label: "SSH computer",
         platform: {
           os: "linux",
           arch: "x64",

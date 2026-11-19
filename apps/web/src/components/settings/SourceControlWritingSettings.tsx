@@ -50,7 +50,7 @@ const MODE_OPTIONS: Record<SourceControlWritingStyleMode, { label: string; descr
     repo_conventions: {
       label: "Repository conventions",
       description:
-        "Commit messages and pull request titles and descriptions match each project's history.",
+        "Commit messages and pull request titles and descriptions match each folder's history.",
     },
     conventional_commits: {
       label: "Conventional Commits",
@@ -258,8 +258,8 @@ export function SourceControlWritingSettingsSection() {
                   value={allInstructions ?? ""}
                   onChange={(event) => setAllInstructions(event.target.value)}
                   rows={4}
-                  aria-label="Custom commit and pull request instructions for all selected environments"
-                  placeholder="Write the instructions each selected environment should use."
+                  aria-label="Custom commit and pull request instructions for all selected computers"
+                  placeholder="Write the instructions each selected computer should use."
                 />
                 <Button
                   size="sm"
@@ -338,7 +338,7 @@ export function SourceControlWritingSettingsSection() {
             control={
               !hasServerTargets ? (
                 <span className="text-sm text-muted-foreground">
-                  Connect an environment to choose its review guide model.
+                  Connect a computer to choose its review guide model.
                 </span>
               ) : (
                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -522,11 +522,11 @@ export function SourceControlWritingSettingsSection() {
           serverScoped
           settingKeys={["sourceControlWriterModelSelection"]}
           {...searchableSetting("source-control-writer-model")}
-          description="Model for commit messages, pull request text, and branch or bookmark names. When disabled, use the text generation model configured for this environment."
+          description="Model for commit messages, pull request text, and branch or bookmark names. When disabled, use the text generation model configured for this computer."
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
-                Connect an environment to choose its source control writer model.
+                Connect a computer to choose its source control writer model.
               </span>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-2">

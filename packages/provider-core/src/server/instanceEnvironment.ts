@@ -4,12 +4,43 @@ import * as Effect from "effect/Effect";
 
 import { expandHomeVariable } from "./pathExpansion.ts";
 
+/** Variables to add to one provider's processes, or `undefined` to add none. */
+export type ProviderEnvironmentOverlay = (
+  provider: string | undefined,
+) => Readonly<Record<string, string>> | undefined;
+
+let environmentOverlay: ProviderEnvironmentOverlay | undefined;
+
+/**
+ * Sets what is added to a provider process after its own configuration. The privacy gateway
+ * uses it to route a masked provider's agents through itself; it wins over instance
+ * configuration so that a provider setting cannot route around masking.
+ */
+export const setProviderEnvironmentOverlay = (
+  overlay: ProviderEnvironmentOverlay | undefined,
+): void => {
+  environmentOverlay = overlay;
+};
+
+const withOverlay = (
+  environment: NodeJS.ProcessEnv,
+  provider: string | undefined,
+): NodeJS.ProcessEnv => {
+  const overlay = environmentOverlay?.(provider);
+  return overlay === undefined ? environment : { ...environment, ...overlay };
+};
+
+/**
+ * `provider` is the driver kind the process belongs to. Without it the process is treated as
+ * one of a masked provider whenever masking is on.
+ */
 export const mergeProviderInstanceEnvironment = Effect.fn(function* (
   environment: ProviderInstanceEnvironment | undefined,
   baseEnv: NodeJS.ProcessEnv = process.env,
+  provider?: string,
 ) {
   if (!environment || environment.length === 0) {
-    return baseEnv;
+    return withOverlay(baseEnv, provider);
   }
 
   const home = yield* HostProcess.HomeDirectory;
@@ -29,5 +60,5 @@ export const mergeProviderInstanceEnvironment = Effect.fn(function* (
     }
     next[name] = expandHomeVariable(name, variable.value, home);
   }
-  return next;
+  return withOverlay(next, provider);
 });

@@ -234,7 +234,11 @@ export const makeFxAdapterV2Driver = (
       return yield* makeFxAdapterV2({
         instanceId: input.instanceId,
         settings: { ...input.config, enabled: input.enabled },
-        environment: yield* mergeProviderInstanceEnvironment(input.environment, hostEnvironment),
+        environment: yield* mergeProviderInstanceEnvironment(
+          input.environment,
+          hostEnvironment,
+          FX_DRIVER_KIND,
+        ),
         selfInvocation,
         defaultModel,
         nativeLogging: (threadId) =>

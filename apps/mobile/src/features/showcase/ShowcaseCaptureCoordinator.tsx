@@ -231,7 +231,7 @@ export function installShowcaseCapture(
         );
         const outcome =
           activity === null
-            ? "fixture threads not loaded"
+            ? "fixture chats not loaded"
             : await stageShowcaseAgentActivity(activity, now);
         if (outcome === true) return true;
         if (outcome !== lastOutcome) {

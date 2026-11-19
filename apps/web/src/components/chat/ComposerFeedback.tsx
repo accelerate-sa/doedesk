@@ -27,11 +27,11 @@ export function feedbackBannerItem(
           size="xs"
           variant="ghost"
           onClick={() => {
-            void writeTextToClipboard(submission.feedbackId, "Codex feedback thread ID").catch(
+            void writeTextToClipboard(submission.feedbackId, "Codex feedback chat ID").catch(
               (error: unknown) => {
                 toastManager.add({
                   type: "error",
-                  title: "Could not copy thread ID",
+                  title: "Could not copy chat ID",
                   description: error instanceof Error ? error.message : "An error occurred.",
                 });
               },

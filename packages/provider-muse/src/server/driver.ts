@@ -91,6 +91,7 @@ export const MuseDriver: ProviderDriver<
     const processEnvironment = yield* mergeProviderInstanceEnvironment(
       environment,
       makeMuseEnvironment(hostEnvironment),
+      DRIVER_KIND,
     );
     const effectiveConfig = {
       ...config,

@@ -169,7 +169,7 @@ vi.mock("../../state/threads", () => ({
         state.requests.push({ action, ...request });
         await state.heldActions.get(action);
         if (!state.scopes.get(request.environmentId)?.has(AuthOrchestrationOperateScope)) {
-          return AsyncResult.failure(Cause.fail(new Error("Thread operation denied")));
+          return AsyncResult.failure(Cause.fail(new Error("Chat operation denied")));
         }
         if (action === state.failedAction)
           return AsyncResult.failure(Cause.fail(new Error("Server rejected action")));
@@ -604,7 +604,7 @@ describe("thread action undo", () => {
     state.failedAction = "unsettle";
     await readThreadUndoNotice()!.undo();
     expect(state.requests.map(({ action }) => action)).toEqual(["settle", "unsettle"]);
-    expect(state.alerts.at(-1)?.title).toBe("Could not un-settle thread");
+    expect(state.alerts.at(-1)?.title).toBe("Could not un-settle chat");
   });
 
   it("rechecks the destination permission before undoing", async () => {
@@ -654,7 +654,7 @@ describe("thread archive guard", () => {
     expect(await useThreadListActions().archiveThread(thread)).toBe(false);
     expect(state.requests).toEqual([]);
     expect(state.archivedRefreshes).toEqual([]);
-    expect(state.alerts.at(-1)?.title).toBe("Could not archive thread");
+    expect(state.alerts.at(-1)?.title).toBe("Could not archive chat");
 
     // A list can hold a row from before the run started.
     state.shells = [thread];
