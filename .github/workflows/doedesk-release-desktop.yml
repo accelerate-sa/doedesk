@@ -1,7 +1,7 @@
 name: Release desktop build
 
 # One Windows or Linux package, called once per target from doedesk-release.yml.
-# Adapted from T3 Code's release-desktop.yml. The JS bundle (server, web client,
+# Adapted from T3 Code's release-desktop.yml, without its CLI archive. The JS bundle (server, web client,
 # Electron main) comes from the `js-bundle` artifact; this job adds the brand
 # fonts, builds the native helpers, and packages the app. Windows builds on
 # Linux, and a second job runs its native checks on a Windows runner.
@@ -27,12 +27,6 @@ on:
       rust_target:
         required: true
         type: string
-      # Builds the self-contained CLI archive. The Windows app embeds the Linux x64
-      # one as its WSL runtime; it is not published.
-      cli_archive:
-        required: false
-        default: false
-        type: boolean
       # Opens the packaged AppImage against a seeded database before uploading it.
       launch_check:
         required: false
@@ -80,12 +74,23 @@ jobs:
           git sparse-checkout set --no-cone '/*' '!/.repos/'
           git -c checkout.workers=0 checkout --detach FETCH_HEAD
 
+      # The release checks come from this workflow's commit, so tags made before
+      # the script existed (v0.1.10) are checked the same way.
+      - name: Use this workflow's release checks
+        shell: bash
+        env:
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$WORKFLOW_SHA"
+          git show "$WORKFLOW_SHA:scripts/doedesk-check-release.ts" > scripts/doedesk-check-release.ts
+
       - name: Setup dependencies
         uses: ./.github/actions/setup-ci-deps
         with:
           install-args: --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
 
-      # The CLI archive and the staged app install without a lockfile; they share
+      # The staged app installs without a lockfile; it reuses
       # this registry metadata and store. A new week starts cold.
       - name: Resolve staged install cache
         id: stage_pnpm
@@ -165,59 +170,7 @@ jobs:
         run: cargo ${{ inputs.platform == 'win' && 'xwin build' || 'build' }} --locked --release --manifest-path native/resource-monitor/Cargo.toml --target "${{ inputs.rust_target }}"
 
       - uses: ./.github/actions/setup-apt-mirrors
-        if: inputs.platform == 'linux' || inputs.platform == 'win'
-
-      # The CLI archive is built before the brand fonts are added below, so no
-      # artifact of this run holds the font files on their own.
-      - name: Apply web client branding
-        if: inputs.cli_archive
-        run: node scripts/apply-web-brand-assets.ts production apps/server/dist/client
-
-      - name: Build CLI single-executable
-        if: inputs.cli_archive
-        run: node apps/server/scripts/cli.ts build-exe --verbose
-
-      - name: Stage resource monitor for the CLI archive
-        if: inputs.cli_archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          target_dir="$RUNNER_TEMP/cli-resource-monitor/${{ inputs.platform }}-${{ inputs.arch }}"
-          mkdir -p "$target_dir"
-          cp "native/resource-monitor/target/${{ inputs.rust_target }}/release/t3-resource-monitor" "$target_dir/"
-
-      # The Linux archive ships libatomic.so.1 and points t3's RUNPATH at it.
-      - name: Install patchelf
-        if: inputs.cli_archive
-        run: command -v patchelf || { sudo apt-get update && sudo apt-get install -y patchelf; }
-
-      - name: Build CLI archive
-        if: inputs.cli_archive
-        env:
-          pnpm_config_cache_dir: ${{ steps.stage_pnpm.outputs.dir }}/cache
-          pnpm_config_store_dir: ${{ steps.stage_pnpm.outputs.dir }}/store
-          pnpm_config_prefer_offline: "true"
-        run: |
-          node scripts/build-cli-archive.ts \
-            --platform "${{ inputs.platform }}" \
-            --arch "${{ inputs.arch }}" \
-            --version "${{ inputs.version }}" \
-            --resource-monitor-dir "$RUNNER_TEMP/cli-resource-monitor" \
-            --output-dir release-cli
-
-      - name: Smoke-test CLI archive
-        if: inputs.cli_archive
-        run: node scripts/smoke-cli-archive.ts --archive release-cli/* --expect-version "${{ inputs.version }}"
-
-      - name: Upload CLI archive
-        if: inputs.cli_archive
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: cli-${{ inputs.platform }}-${{ inputs.arch }}
-          path: release-cli/*
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 1
+        if: inputs.platform == 'linux'
 
       - name: Install Linux desktop build libraries
         if: inputs.platform == 'linux'
@@ -225,14 +178,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libsecret-1-dev pkg-config libgtk-3-0t64 libnss3 libasound2t64 libgbm1 xvfb
           command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1 || sudo apt-get install -y imagemagick
-
-      # The Windows app embeds the same-arch Linux CLI archive as its WSL runtime.
-      - name: Download Linux CLI archive for WSL
-        if: inputs.platform == 'win'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: cli-linux-${{ inputs.arch }}
-          path: wsl-runtime
 
       # Thmanyah Serif's licence forbids redistributing the files, so they come
       # from secrets (split in parts: a secret holds at most 48 KB), stay in the
@@ -291,7 +236,9 @@ jobs:
             --verbose
           )
           if [[ "${{ inputs.platform }}" == "win" ]]; then
-            args+=(--wsl-runtime "$GITHUB_WORKSPACE"/wsl-runtime/t3-*-linux-${{ inputs.arch }}.tar.gz)
+            # No --wsl-runtime: T3 Code embeds its Linux CLI archive for the WSL backend, but
+            # DoeDesk's server loads sharp, which a Node single executable cannot. The Windows
+            # app runs agents on Windows itself.
             # WINDOWS CODE SIGNING: DoeDesk has no Windows certificate yet, so the
             # installer is unsigned and SmartScreen warns on first run. To sign,
             # add the certificate's secrets, export what scripts/lib/windows-jsign.ts

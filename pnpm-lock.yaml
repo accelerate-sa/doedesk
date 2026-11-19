@@ -404,9 +404,6 @@ importers:
 
   .:
     devDependencies:
-      '@coderabbitai/config':
-        specifier: 1.2.0
-        version: 1.2.0
       '@effect/tsgo':
         specifier: 0.67.1
         version: 0.67.1
@@ -3607,9 +3604,6 @@ packages:
 
   '@cloudflare/workers-types@5.20261026.1':
     resolution: {integrity: sha512-E+KMLXOMip7uzfkFYoSjAF0n0+VFkK2KFU0Md/PM3JkPpC9Km0/YAoDttkmxAoZLGbK1wQRAFg2IJtyZkTBCHg==}
-
-  '@coderabbitai/config@1.2.0':
-    resolution: {integrity: sha512-o9CzGIJcXj8JZtJ167xFZ0CQgxXzaWHiO7aP5m4STKTFXHU3l6/RMxjJRmz87ufncu2KMBLY1hOraAnCeXDBHQ==}
 
   '@connectrpc/connect-web@1.7.0':
     resolution: {integrity: sha512-qyP0YOnUPRWwCc/VfsoydMJvkb7EyUPr2q9sHgBuJzbADjiqck1gKH5V5ZPzPhTLBvmz5UvG+wiZ5sMRQHU1MQ==}
@@ -14115,10 +14109,6 @@ snapshots:
   '@cloudflare/workers-types@4.20260604.1': {}
 
   '@cloudflare/workers-types@5.20261026.1': {}
-
-  '@coderabbitai/config@1.2.0':
-    dependencies:
-      zod: 4.6.7
 
   '@connectrpc/connect-web@1.7.0(@bufbuild/protobuf@1.10.0)(@connectrpc/connect@1.7.0(@bufbuild/protobuf@1.10.0))':
     dependencies:

@@ -54,6 +54,31 @@ const state = vi.hoisted(() => ({
   closeTerminal: vi.fn(),
 }));
 
+// DoeDesk: the import flow is a Developer mode tool, and Start waits for a privacy choice. These
+// tests cover the import, so Developer mode is on and privacy is already decided (masking off).
+vi.mock(import("~/doedesk/product"), () => ({
+  useDeveloperMode: () => true,
+  isDeveloperMode: () => true,
+}));
+
+vi.mock(import("~/privacy/privacyClient"), async (original) => ({
+  ...(await original()),
+  usePrivacyStatus: () => ({
+    kind: "ready" as const,
+    status: {
+      mode: "off" as const,
+      active: false,
+      accountLabel: null,
+      endpoint: null,
+      vaultSize: 0,
+      problem: null,
+      profileAnswered: true,
+    },
+  }),
+  useUsageData: () => null,
+  useConsentLocale: () => ["en", () => {}, false] as const,
+}));
+
 vi.mock(import("@t3tools/client-runtime/state/session"), async (original) => {
   const actual = await original();
   return {
@@ -441,7 +466,7 @@ it("finishes setup without landing when the imported project never reaches the c
   // The retry skips the project it already imported, but still counts its thread.
   await vi.waitFor(() =>
     expect(toastAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "success", title: "Imported 1 thread" }),
+      expect.objectContaining({ type: "success", title: "Imported 1 chat" }),
     ),
   );
 });
@@ -452,7 +477,7 @@ it("waits for a ready agent to start, and Start without an agent still finishes 
   await using _screen = await mountWelcome();
   expect(button("Import 2 folders and start").disabled).toBe(true);
 
-  await click("Start without an agent");
+  await click("Start without an AI");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
   expect(state.createProject).toHaveBeenCalledTimes(2);
 });

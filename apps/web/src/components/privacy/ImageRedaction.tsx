@@ -21,13 +21,10 @@ export function ImageHandlingSection({ status }: { readonly status: PrivacyStatu
   const handling = imageHandlingOf(status);
   const chosen = IMAGE_HANDLING_CHOICES.find((choice) => choice.value === handling);
   const masking = status.mode !== "off";
-  const change = async (preference: Parameters<typeof setPrivacyPreference>[0]) => {
+  // Promise chains rather than try/finally, which React Compiler cannot optimize.
+  const change = (preference: Parameters<typeof setPrivacyPreference>[0]) => {
     setBusy(true);
-    try {
-      await setPrivacyPreference(preference);
-    } finally {
-      setBusy(false);
-    }
+    return setPrivacyPreference(preference).finally(() => setBusy(false));
   };
   return (
     <SettingsSection {...searchableSetting("privacy-images")} title="Images and documents">
@@ -93,20 +90,18 @@ export function RedactionsSection() {
   const records = usePrivacyRedactions();
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const download = async (id: string, part: "image" | "text") => {
+  const download = (id: string, part: "image" | "text") => {
     setBusy(`${id}:${part}`);
     setProblem(null);
-    try {
-      const file = await fetchRedactionFile(id, part);
-      if (file === null) {
-        setProblem("That file is no longer kept.");
-        refreshPrivacyRedactions();
-      } else save(file.fileName, file.blob);
-    } catch {
-      setProblem("The file could not be read.");
-    } finally {
-      setBusy(null);
-    }
+    return fetchRedactionFile(id, part)
+      .then((file) => {
+        if (file === null) {
+          setProblem("That file is no longer kept.");
+          refreshPrivacyRedactions();
+        } else save(file.fileName, file.blob);
+      })
+      .catch(() => setProblem("The file could not be read."))
+      .finally(() => setBusy(null));
   };
   return (
     <SettingsSection

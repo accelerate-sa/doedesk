@@ -89,6 +89,10 @@ The Windows installer is **not code-signed**: there is no certificate yet, and S
 on first run ("More info", "Run anyway"). The place to add signing is marked `WINDOWS CODE
 SIGNING` in `doedesk-release-desktop.yml`.
 
+The Windows app has no WSL backend: T3 Code embeds its Linux CLI archive for it, and that archive
+cannot be built for DoeDesk (a Node single executable cannot load `sharp`, which the privacy
+gateway uses). For the same reason the releases carry no `t3` CLI archives.
+
 Secrets: `DOEDESK_BRAND_FONTS_01` to `_10` hold the six Thmanyah files as one base64 `tar.xz`,
 split because a secret holds at most 48 KB (the workflow reads up to `_12`). The jobs unpack them
 in the runner's temp folder; the JS bundle artifact is uploaded without them. To replace them,

@@ -57,7 +57,7 @@ describe("CommandPalette open intents", () => {
     );
     const pathname = screen.router?.state.location.pathname;
     openCommandPalette({ query: "Drag this chat" });
-    const row = page.getByRole("option", { name: /Drag this thread/ });
+    const row = page.getByRole("option", { name: /Drag this chat/ });
     await expect.element(row).toBeVisible();
     const bounds = row.element().getBoundingClientRect();
     const pointer = (type: string, x: number, y: number) =>
@@ -120,7 +120,7 @@ describe("CommandPalette open intents", () => {
       .toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     await expect
-      .element(page.getByRole("option", { name: /^New thread in\.\.\./ }))
+      .element(page.getByRole("option", { name: /^New chat in\.\.\./ }))
       .toHaveAttribute("data-highlighted");
     await userEvent.keyboard("{Enter}");
 

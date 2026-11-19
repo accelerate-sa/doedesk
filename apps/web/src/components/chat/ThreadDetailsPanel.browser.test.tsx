@@ -81,6 +81,7 @@ vi.mock(import("~/state/vcs"), async (importOriginal) => {
   };
 });
 
+import { developerMode } from "../../../test/developerMode";
 import { render } from "../../../test/render";
 import { useRightPanelStore } from "../../rightPanelStore";
 import { PopoverCreateHandle } from "../ui/popover";
@@ -116,12 +117,16 @@ function setup(input: {
   state.folder = input.folder;
   state.pullRequests = input.pullRequests ?? [];
   useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
+  const developer = developerMode();
   const anchor = document.createElement("div");
   document.body.append(anchor);
   return {
     anchor: { current: anchor },
     handle: PopoverCreateHandle(),
-    [Symbol.dispose]: () => anchor.remove(),
+    [Symbol.dispose]: () => {
+      anchor.remove();
+      developer[Symbol.dispose]();
+    },
   };
 }
 

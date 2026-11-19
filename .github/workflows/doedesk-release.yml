@@ -175,7 +175,6 @@ jobs:
       target: AppImage
       arch: x64
       rust_target: x86_64-unknown-linux-gnu
-      cli_archive: true
       launch_check: true
 
   # node-pty compiles from source on Linux, so arm64 builds on arm64 hardware.
@@ -195,10 +194,9 @@ jobs:
       rust_target: aarch64-unknown-linux-gnu
 
   # Packaging is faster on Linux; the native checks run on a Windows runner.
-  # Waits for Linux x64, whose CLI archive it embeds as the WSL runtime.
   desktop_win_x64:
     name: Desktop Windows x64
-    needs: [prepare, bundle, desktop_linux_x64]
+    needs: [prepare, bundle]
     uses: ./.github/workflows/doedesk-release-desktop.yml
     secrets: inherit
     with:

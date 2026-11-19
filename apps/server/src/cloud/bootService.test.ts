@@ -382,7 +382,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
                 ...(insideService
                   ? {
                       T3_BOOT_SERVICE_UNIT:
-                        platform === "win32" ? "t3code-task.xml" : "doedesk.service",
+                        platform === "win32" ? "doedesk-task.xml" : "doedesk.service",
                     }
                   : {}),
                 ...(underSudo ? { SUDO_USER: "julius" } : {}),
@@ -1447,7 +1447,7 @@ process.disconnect();
       const task = yield* fs.readFileString(plan.unitPath);
 
       expect(plan.unitPath).toBe(
-        path.join(path.dirname(plan.baseDir), "AppData", "Local", "t3code", "t3code-task.xml"),
+        path.join(path.dirname(plan.baseDir), "AppData", "Local", "doedesk", "doedesk-task.xml"),
       );
       expect(BootService.bootServiceProgramOf(task)).toBe(runtime.entryPath);
       expect(BootService.bootServiceBaseDirOf(task)).toBe(plan.baseDir);
