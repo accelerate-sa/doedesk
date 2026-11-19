@@ -29,11 +29,12 @@ describe("generate mobile Uniwind themes", () => {
         ),
         name,
       ).toEqual({
-        "--color-clerk-page": isDark ? "#0a0a0a" : "#fcfcfc",
-        "--color-clerk-foreground": isDark ? "#f5f5f5" : "#27272a",
-        "--color-clerk-foreground-muted": isDark ? "#818181" : "#71717b",
-        "--color-clerk-border": isDark ? "#191919" : "#e4e4e7",
-        "--color-clerk-danger": isDark ? "#ff6467" : "#c10007",
+        // DoeDesk's paper and ink.
+        "--color-clerk-page": isDark ? "#121311" : "#f5f3ee",
+        "--color-clerk-foreground": isDark ? "#eceae3" : "#171815",
+        "--color-clerk-foreground-muted": isDark ? "#a2a599" : "#5c5e56",
+        "--color-clerk-border": isDark ? "#2b2e29" : "#ddd9cf",
+        "--color-clerk-danger": isDark ? "#ff8b80" : "#a11c12",
       });
     }
   });

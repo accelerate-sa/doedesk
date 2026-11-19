@@ -64,6 +64,8 @@ const audio = vi.hoisted(() => ({
   navigate: vi.fn(),
   query: vi.fn(),
 }));
+// lib/readingFonts reads the app config for the brand Arabic fonts; these tests use the fallback.
+vi.mock("expo-constants", () => ({ default: { expoConfig: null } }));
 vi.mock("expo-audio", () => ({
   AudioModule: { setAudioSessionOwner: audio.setSessionOwner },
   useAudioPlayer: () => audio.player,
