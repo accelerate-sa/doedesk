@@ -1,9 +1,17 @@
 # Welcome page
 
-T3 Code shows a Welcome page when you open a new installation. Existing
-workspaces skip it. It shows what T3 Code found on the computer you are using,
-on one page: your agents, projects from your Claude Code, Codex, and Pi history,
-and the phone app. Only an agent is needed to start chatting.
+DoeDesk shows setup when you open a new installation. Existing workspaces skip
+it. Setup asks one thing per step, in English or Arabic: the language, how names
+and numbers are masked, your DoeDesk account, two optional questions about your
+work, usage data where it applies, and the AI to use. In Developer mode it also
+offers folders from your Claude Code, Codex, and Pi history, and the phone app.
+Steps that do not apply are left out.
+
+Setup remembers where you are. If you quit, it reopens at the same step with
+your answers kept. **Back** returns to an earlier step to change the masking or
+usage-data choice or to check the AI again. An account you created or Terms you
+accepted cannot be undone from setup, so that step shows them as done; to use
+another account, sign out in **Settings → Privacy**.
 
 To see the page again, go to **Settings → About → Welcome page** and select
 **Open**. Direct links, such as Settings, open normally before setup is done.
@@ -41,15 +49,31 @@ is found, it reads **Set up an agent** and opens by itself:
   **Settings → Providers**.
 - **Browse** opens the ACP Registry for more agents.
 
-On the desktop app, when the folder of the `t3` command is not on your `PATH`,
-**Add to PATH** adds one line to your shell's startup file.
+In Developer mode on the desktop app, when the folder of the `t3` command is not
+on your `PATH`, **Add to PATH** adds one line to your shell's startup file.
+
+### Finding AI programs
+
+Under **Programs found on this computer**, DoeDesk lists each AI program it found,
+with its path and version. It looks without asking in your terminal's `PATH`, the
+usual install folders (Homebrew, `~/.local/bin`, npm, nvm, fnm, Volta, Bun, asdf,
+mise, pnpm), and inside the ChatGPT, Codex and Claude apps. Select **Use** to run a
+different copy; DoeDesk saves it as the AI's program path in **Settings → Providers**.
+
+If your tools live on another drive, select **Look on other drives**, tick the
+drives to search, and select **Search**. Nothing else is searched. Network drives
+and disk images are listed only after **Show network drives and disk images**.
+DoeDesk reads file and folder names only, skips caches, version control folders,
+package folders and virtual machines, and stops after two minutes or **Stop**.
+What it finds stays on this computer. To name a program yourself, select
+**Point to a program** and enter its full path.
 
 The setup terminal uses the home directory and environment configured for the
 provider instance. Sensitive values remain redacted in Settings and
 terminal metadata while the terminal process can use them.
 
-**Start** waits for one ready agent. Select **Start without an agent** to finish
-without one. Checked projects are still imported.
+**Continue** waits for one ready AI. Select **Skip for now** (or **Start without
+an AI** on the last step) to go on without one. Checked folders are still imported.
 
 ## Phone
 

@@ -1,7 +1,7 @@
 import type { PrivacyLegal, PrivacyLocale, UsageDataStatus } from "@t3tools/contracts";
 import { useGT } from "gt-react";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useContext, useId, useState } from "react";
 
 import {
   CONSENT_WORDS,
@@ -10,6 +10,7 @@ import {
   USAGE_DATA_SETTINGS_WORDING_ID,
 } from "~/doedesk/consentWords";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
+import { SetupLocaleContext } from "~/onboarding/setupLocale";
 import { setUsageData, useConsentLocale, usePrivacyStatus } from "~/privacy/privacyClient";
 import { managedTelemetryOffMessage, usePrimaryManagedPolicy } from "~/state/managedPolicy";
 import {
@@ -62,7 +63,10 @@ const useLegal = (): PrivacyLegal | null => {
  */
 export function UsageDataChoice({ status }: { readonly status: UsageDataStatus }) {
   const controlId = useId();
-  const [locale, setLocale, languageOffered] = useConsentLocale();
+  const [locale, setLocale, consentSwitchOffered] = useConsentLocale();
+  // Setup chose its language on its first step, and the consent words follow that choice.
+  const inSetup = useContext(SetupLocaleContext) !== null;
+  const languageOffered = consentSwitchOffered && !inSetup;
   const legal = useLegal();
   const [busy, setBusy] = useState(false);
   const words = CONSENT_WORDS[locale];

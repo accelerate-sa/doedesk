@@ -3,7 +3,9 @@
  * or a deletion. The service's own messages are English and written for apps; these are for the
  * person. The copy rule: each sentence says who does what to what.
  */
-import { msg } from "gt-react";
+import { msg, useMessages } from "gt-react";
+
+import { useSetupArabic } from "~/onboarding/setupLocale";
 
 export const UNREACHABLE = msg("DoeDesk on this computer did not answer. Try again.");
 export const NOT_WORKED = msg("That did not work. Try again.");
@@ -39,3 +41,48 @@ export const CLOUD_MESSAGES: Readonly<Record<string, string>> = {
     "DoeDesk Cloud will not check requests for this account until it has accepted the Terms of Use.",
   ),
 };
+
+const ARABIC: ReadonlyMap<string, string> = new Map([
+  [UNREACHABLE, "لم يستجب DoeDesk على هذا الجهاز. أعد المحاولة."],
+  [NOT_WORKED, "لم تنجح العملية. أعد المحاولة."],
+  [
+    SIGN_UP_UNAVAILABLE,
+    "لا يمكن إنشاء حسابات جديدة في DoeDesk Cloud من بلدك حتى الآن. وإن كان لديك حساب فسجّل الدخول كالمعتاد.",
+  ],
+  [
+    LEGAL_UNKNOWN,
+    "لم يستجب DoeDesk Cloud، فلا يستطيع DoeDesk عرض شروط الاستخدام وسياسة الخصوصية السارية. تحقّق من اتصالك.",
+  ],
+  [
+    CLOUD_MESSAGES.invalid_acceptance!,
+    "لم يستطع DoeDesk Cloud قراءة ما أرسله DoeDesk عن شروط الاستخدام. هذا خلل في DoeDesk، فحدّثه ثم أعد المحاولة.",
+  ],
+  [
+    CLOUD_MESSAGES.terms_outdated!,
+    "تغيّرت شروط الاستخدام والنموذج مفتوح، والروابط تفتح الآن النسخة الجديدة. اقرأها ووافق عليها، ثم أرسل مجددًا.",
+  ],
+  [
+    CLOUD_MESSAGES.too_many_requests!,
+    "تلقّى DoeDesk Cloud طلبات كثيرة من هنا. انتظر بضع دقائق ثم أعد المحاولة.",
+  ],
+  [
+    CLOUD_MESSAGES.recent_sign_in_required!,
+    "لا يحذف DoeDesk Cloud الحساب إلا في العشر الدقائق التي تلي تسجيل الدخول. سجّل الدخول مجددًا لحذفه.",
+  ],
+  [CLOUD_MESSAGES.different_account!, "هذا الرقم أو البريد لحساب آخر، ولم يحذف DoeDesk شيئًا."],
+  [
+    CLOUD_MESSAGES.unauthenticated!,
+    "لم يعد DoeDesk Cloud يقبل تسجيل الدخول هذا. سجّل الدخول مجددًا.",
+  ],
+  [
+    CLOUD_MESSAGES.terms_update_required!,
+    "لن يفحص DoeDesk Cloud طلبات هذا الحساب حتى يقبل شروط الاستخدام.",
+  ],
+]);
+
+/** Reads one of these messages in the app's language, or in Arabic inside setup shown in Arabic. */
+export function usePrivacyMessage(): (message: string) => string {
+  const m = useMessages();
+  const arabic = useSetupArabic();
+  return (message) => (arabic ? (ARABIC.get(message) ?? m(message)) : m(message));
+}

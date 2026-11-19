@@ -4,27 +4,29 @@ import type { PrivacyProfileField, PrivacyProfileWorkplace } from "@t3tools/cont
 export const PROFILE_FIELDS: ReadonlyArray<{
   readonly value: PrivacyProfileField;
   readonly label: string;
+  readonly labelAr: string;
 }> = [
-  { value: "legal", label: "Legal" },
-  { value: "finance", label: "Finance" },
-  { value: "government", label: "Government services" },
-  { value: "healthcare", label: "Healthcare" },
-  { value: "hr", label: "Human resources" },
-  { value: "real_estate", label: "Real estate" },
-  { value: "consulting", label: "Consulting" },
-  { value: "engineering", label: "Engineering and IT" },
-  { value: "research", label: "Research and education" },
-  { value: "other", label: "Other" },
+  { value: "legal", label: "Legal", labelAr: "القانون" },
+  { value: "finance", label: "Finance", labelAr: "المالية" },
+  { value: "government", label: "Government services", labelAr: "الخدمات الحكومية" },
+  { value: "healthcare", label: "Healthcare", labelAr: "الرعاية الصحية" },
+  { value: "hr", label: "Human resources", labelAr: "الموارد البشرية" },
+  { value: "real_estate", label: "Real estate", labelAr: "العقار" },
+  { value: "consulting", label: "Consulting", labelAr: "الاستشارات" },
+  { value: "engineering", label: "Engineering and IT", labelAr: "الهندسة وتقنية المعلومات" },
+  { value: "research", label: "Research and education", labelAr: "البحث والتعليم" },
+  { value: "other", label: "Other", labelAr: "غير ذلك" },
 ];
 
 export const PROFILE_WORKPLACES: ReadonlyArray<{
   readonly value: PrivacyProfileWorkplace;
   readonly label: string;
+  readonly labelAr: string;
 }> = [
-  { value: "self", label: "On my own" },
-  { value: "small_company", label: "Company under 50 people" },
-  { value: "large_company", label: "Company of 50 or more" },
-  { value: "government", label: "Government entity" },
+  { value: "self", label: "On my own", labelAr: "أعمل لحسابي" },
+  { value: "small_company", label: "Company under 50 people", labelAr: "شركة يقل موظفوها عن 50" },
+  { value: "large_company", label: "Company of 50 or more", labelAr: "شركة موظفوها 50 أو أكثر" },
+  { value: "government", label: "Government entity", labelAr: "جهة حكومية" },
 ];
 
 const labelOf = (
