@@ -1,6 +1,7 @@
 import { RegistryContext } from "@effect/atom-react";
 import {
   AuthOrchestrationOperateScope,
+  DEFAULT_CLIENT_SETTINGS,
   AuthOrchestrationReadScope,
   AuthRelayReadScope,
   AuthRelayWriteScope,
@@ -36,6 +37,7 @@ const state = vi.hoisted(() => ({
   createProject: vi.fn(),
   importThreads: vi.fn(),
   refreshProviders: vi.fn(),
+  scanProviderPrograms: vi.fn(),
   completeOnboarding: vi.fn(),
   onDone: vi.fn(),
   scan: vi.fn(),
@@ -137,6 +139,7 @@ vi.mock(import("../../state/server"), async (original) => {
       providersValueAtom: (() => state.providers) as never,
       configValueAtom: (() => state.config) as never,
       refreshProviders: "refreshProviders" as never,
+      scanProviderPrograms: "scanProviderPrograms" as never,
     },
   };
 });
@@ -209,12 +212,15 @@ vi.mock(import("../../state/use-atom-command"), async (original) => ({
       | "createProject"
       | "importThreads"
       | "refreshProviders"
+      | "scanProviderPrograms"
       | "openTerminal"
       | "writeTerminal"
       | "closeTerminal",
   ) => state[command]) as never,
 }));
 
+import { __setClientSettingsForTests, updateClientSettings } from "../../hooks/useSettings";
+import type { OnboardingStep } from "../../onboarding/onboardingSteps.logic";
 import { welcomeImportSelectionKey } from "../../onboarding/welcomeState";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { toastManager } from "../ui/toast";
@@ -327,6 +333,10 @@ function pageText() {
   return document.body.textContent ?? "";
 }
 
+function heading() {
+  return document.querySelector("h1")?.textContent ?? "";
+}
+
 function button(label: string) {
   const found = [...document.querySelectorAll("button")].find(
     (element) => element.textContent?.trim() === label,
@@ -340,6 +350,38 @@ async function click(label: string) {
   expect(target.disabled).toBe(false);
   await act(async () => target.click());
 }
+
+// The steps these tests can show, in order: no account step (masking is off), and no phone
+// step unless a test turns T3 Connect on.
+const STEP_TITLES = [
+  "Welcome to DoeDesk",
+  "Protect names and numbers",
+  "Connect an AI",
+  "Folders",
+  "Your phone",
+] as const;
+
+// Takes setup from the step on screen to `title` with Continue, as the person would.
+async function continueTo(title: (typeof STEP_TITLES)[number]) {
+  await vi.waitFor(() => expect(STEP_TITLES).toContain(heading()));
+  const from = STEP_TITLES.indexOf(heading() as (typeof STEP_TITLES)[number]);
+  for (const passed of STEP_TITLES.slice(from, STEP_TITLES.indexOf(title))) {
+    await vi.waitFor(() => expect(heading()).toBe(passed));
+    await click("Continue");
+  }
+  await vi.waitFor(() => expect(heading()).toBe(title));
+}
+
+// Setup reopens at its stored step, as after a quit or a visit to Settings.
+function resumeAt(step: OnboardingStep) {
+  __setClientSettingsForTests({
+    ...DEFAULT_CLIENT_SETTINGS,
+    onboardingProgress: { step, seen: [], locale: "en", masking: null },
+  });
+}
+
+// Like the real completion, which clears the stored step once setup is saved.
+const clearProgress = () => void updateClientSettings({ onboardingProgress: null });
 
 async function mountWelcome() {
   return render(
@@ -376,7 +418,8 @@ function setup() {
     .mockReset()
     .mockResolvedValue(AsyncResult.success({ importedCount: 1, skippedCount: 0 }));
   state.refreshProviders.mockReset().mockResolvedValue(AsyncResult.success(undefined));
-  state.completeOnboarding.mockReset().mockResolvedValue(undefined);
+  state.scanProviderPrograms.mockReset().mockResolvedValue(AsyncResult.success({ finds: [] }));
+  state.completeOnboarding.mockReset().mockImplementation(async () => clearProgress());
   state.onDone.mockReset();
   state.scan.mockReset();
   state.refreshScan.mockReset();
@@ -393,6 +436,8 @@ function setup() {
     command.mockReset().mockResolvedValue(AsyncResult.success(undefined));
   }
   localStorage.removeItem(welcomeImportSelectionKey(primaryId));
+  // Most tests are about the folders step; the others resume or walk to their own step.
+  resumeAt("folders");
   return now;
 }
 
@@ -471,15 +516,30 @@ it("finishes setup without landing when the imported project never reaches the c
   );
 });
 
-it("waits for a ready agent to start, and Start without an agent still finishes setup", async () => {
+it("waits for a ready agent to continue, and going on without one still imports or finishes", async () => {
   using _now = setup();
+  resumeAt("welcome");
   appAtomRegistry.set(state.providers as Atom.Writable<ReadonlyArray<ServerProvider>>, []);
-  await using _screen = await mountWelcome();
-  expect(button("Import 2 folders and start").disabled).toBe(true);
+  {
+    await using _screen = await mountWelcome();
+    await continueTo("Connect an AI");
+    expect(button("Continue").disabled).toBe(true);
+    // Skipping the AI still imports the folders checked on the next step.
+    await click("Skip for now");
+    await vi.waitFor(() => expect(heading()).toBe("Folders"));
+    await click("Import 2 folders and start");
+    await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
+    expect(state.createProject).toHaveBeenCalledTimes(2);
+  }
 
+  // With no folders to offer, the AI step is the last one and its skip finishes setup.
+  state.onDone.mockReset();
+  appAtomRegistry.set(candidatesAtom(), []);
+  await using _screen = await mountWelcome();
+  await continueTo("Connect an AI");
+  expect(button("Start").disabled).toBe(true);
   await click("Start without an AI");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
-  expect(state.createProject).toHaveBeenCalledTimes(2);
 });
 
 it("blocks leaving the page until the imported projects have landed", async () => {
@@ -514,7 +574,7 @@ it("blocks leaving the page until the imported projects have landed", async () =
   expect(screen.router?.state.location.pathname).toBe("/");
 
   const saved = deferred<void>();
-  state.completeOnboarding.mockImplementationOnce(() => saved.promise);
+  state.completeOnboarding.mockImplementationOnce(() => saved.promise.then(clearProgress));
   await act(async () => {
     landing.resolve();
     await landing.promise;
@@ -571,7 +631,9 @@ it("keeps the project choice across a visit to Settings until setup finishes", a
     await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
     expect(state.createProject).not.toHaveBeenCalled();
   }
+  // Opened again from Settings after setup finished: it starts over, with the default picks.
   await using _third = await mountWelcome();
+  await continueTo("Folders");
   expect(button("Import 2 folders and start").disabled).toBe(false);
 });
 
@@ -580,7 +642,7 @@ it("stays busy while setup saves after an import with nothing to open", async ()
   appAtomRegistry.set(candidatesAtom(), [candidate("/projects/first")]);
   state.importThreads.mockResolvedValue(AsyncResult.success({ importedCount: 0, skippedCount: 1 }));
   const saved = deferred<void>();
-  state.completeOnboarding.mockImplementationOnce(() => saved.promise);
+  state.completeOnboarding.mockImplementationOnce(() => saved.promise.then(clearProgress));
   await using _screen = await mountWelcome();
 
   await click("Import 1 folder and start");
@@ -668,8 +730,9 @@ it("keeps saved picks when Start comes before the project list loads", async () 
   expect(localStorage.getItem(welcomeImportSelectionKey(primaryId))).toBe(saved);
 });
 
-it("offers Update for a signed-in agent whose version is broken, and keeps Start off", async () => {
+it("offers Update for a signed-in agent whose version is broken, and keeps Continue off", async () => {
   using _now = setup();
+  resumeAt("agents");
   appAtomRegistry.set(state.providers as Atom.Writable<ReadonlyArray<ServerProvider>>, [
     {
       ...readyClaude,
@@ -687,11 +750,12 @@ it("offers Update for a signed-in agent whose version is broken, and keeps Start
     (element) => element.textContent?.trim() === "Update",
   );
   expect(update?.getAttribute("href")).toContain("/settings/providers");
-  expect(button("Import 2 folders and start").disabled).toBe(true);
+  expect(button("Continue").disabled).toBe(true);
 });
 
 it("checks an agent again once its install command finishes in the setup terminal", async () => {
   using _now = setup();
+  resumeAt("agents");
   appAtomRegistry.set(
     sessionAtom(primaryId),
     AsyncResult.success(session([AuthOrchestrationOperateScope, AuthTerminalOperateScope])),
@@ -737,6 +801,7 @@ it("keeps an import opt-out on the page when storage cannot save it", async () =
 
 it("opens the list of agents to add once the checks find none, even after a wrong first status", async () => {
   using _now = setup();
+  resumeAt("agents");
   const pi = {
     ...readyClaude,
     instanceId: ProviderInstanceId.make("pi"),
@@ -754,7 +819,7 @@ it("opens the list of agents to add once the checks find none, even after a wron
   );
   const fold = () =>
     [...document.querySelectorAll("button")].find((element) =>
-      element.textContent?.startsWith("Set up an agent"),
+      element.textContent?.startsWith("Set up an AI"),
     );
   await vi.waitFor(() => expect(fold()?.getAttribute("aria-expanded")).toBe("true"));
 
@@ -780,6 +845,7 @@ it("starts without importing when this connection cannot import projects", async
 
 it("says the phone is set up only once this computer is shared with the signed-in account", async () => {
   using _now = setup();
+  resumeAt("phone");
   state.cloud = true;
   state.auth = { isLoaded: true, isSignedIn: true, userId: "user_1" };
   appAtomRegistry.set(

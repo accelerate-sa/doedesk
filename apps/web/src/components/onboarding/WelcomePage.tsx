@@ -353,24 +353,22 @@ export function WelcomePage({
   // Each step's own answer is recorded on the way out, then the next step that applies opens.
   const advance = async (options: { readonly skip?: boolean } = {}) => {
     setAdvancing(true);
-    try {
-      if (view.step === "profile" && privacyStatus !== null) {
-        const answers = profileAnswersRef.current;
-        if (answers !== null || !privacyStatus.profileAnswered) {
-          const saved = await savePrivacyProfile(
-            answers ?? { field: null, fieldOther: null, workplace: null },
-          ).catch(() => null);
-          // The answers are optional: a failed save asks again next time rather than blocking.
-          if (saved !== null) setPrivacyStatus(saved);
-          profileAnswersRef.current = null;
-        }
+    // Both saves catch their own failures, so nothing here can skip the reset below.
+    if (view.step === "profile" && privacyStatus !== null) {
+      const answers = profileAnswersRef.current;
+      if (answers !== null || !privacyStatus.profileAnswered) {
+        const saved = await savePrivacyProfile(
+          answers ?? { field: null, fieldOther: null, workplace: null },
+        ).catch(() => null);
+        // The answers are optional: a failed save asks again next time rather than blocking.
+        if (saved !== null) setPrivacyStatus(saved);
+        profileAnswersRef.current = null;
       }
-      if (view.step === "usageData") {
-        await settleUsageDataFirstRun(usageData, locale).catch(() => undefined);
-      }
-    } finally {
-      setAdvancing(false);
     }
+    if (view.step === "usageData") {
+      await settleUsageDataFirstRun(usageData, locale).catch(() => undefined);
+    }
+    setAdvancing(false);
     if (view.isLast) {
       start();
       return;
