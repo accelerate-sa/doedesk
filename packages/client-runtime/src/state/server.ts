@@ -50,6 +50,7 @@ import {
   requestGuarded,
   requestInSession,
   runStream,
+  runStreamGuarded,
   runStreamInSession,
   subscribe,
   subscribeDynamicWithSession,
@@ -1462,6 +1463,25 @@ export function createServerEnvironmentAtoms<R, E>(
     removeProviderInstallation: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:provider:install-remove",
       tag: WS_METHODS.providerInstallRemove,
+    }),
+    scanProviderPrograms: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:provider:discovery-scan",
+      tag: WS_METHODS.providerDiscoveryScan,
+    }),
+    listProviderVolumes: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:provider:discovery-volumes",
+      tag: WS_METHODS.providerDiscoveryListVolumes,
+    }),
+    inspectProviderProgram: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:provider:discovery-inspect",
+      tag: WS_METHODS.providerDiscoveryInspect,
+    }),
+    providerVolumeSearch: createEnvironmentSubscriptionAtomFamily(runtime, {
+      label: "environment-data:provider:discovery-search",
+      // A search runs only while asked for; a reconnect must not start it again unasked.
+      subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.providerDiscoverySearchVolumes>) =>
+        runStreamGuarded(WS_METHODS.providerDiscoverySearchVolumes, input),
+      idleTtlMs: 0,
     }),
     traceDiagnostics: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:server:trace-diagnostics",

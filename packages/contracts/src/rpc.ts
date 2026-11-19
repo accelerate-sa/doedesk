@@ -52,6 +52,15 @@ import {
   ProviderSetupError,
   ProviderSetupInput,
 } from "./providerSetup.ts";
+import {
+  ProviderDiscoveryError,
+  ProviderDiscoveryScanResult,
+  ProviderInspectInput,
+  ProviderInspectResult,
+  ProviderVolumeList,
+  ProviderVolumeSearchInput,
+  ProviderVolumeSearchProgress,
+} from "./providerDiscovery.ts";
 
 import {
   AcpRegistryAcceptUrlAuthInput,
@@ -458,6 +467,10 @@ export const WS_METHODS = {
   providerInstallCancel: "provider.install.cancel",
   providerInstallSubscribe: "provider.install.subscribe",
   providerInstallRemove: "provider.install.remove",
+  providerDiscoveryScan: "provider.discovery.scan",
+  providerDiscoveryListVolumes: "provider.discovery.listVolumes",
+  providerDiscoverySearchVolumes: "provider.discovery.searchVolumes",
+  providerDiscoveryInspect: "provider.discovery.inspect",
 
   vcsPull: "vcs.pull",
   vcsRefreshStatus: "vcs.refreshStatus",
@@ -791,6 +804,36 @@ const WsProviderInstallRemoveRpc = Rpc.make(WS_METHODS.providerInstallRemove, {
   payload: ProviderSetupInput,
   success: ProviderInstallState,
   error: ProviderSetupRpcError,
+});
+
+const ProviderDiscoveryRpcError = Schema.Union([
+  ProviderDiscoveryError,
+  EnvironmentAuthorizationError,
+]);
+
+const WsProviderDiscoveryScanRpc = Rpc.make(WS_METHODS.providerDiscoveryScan, {
+  payload: Schema.Struct({}),
+  success: ProviderDiscoveryScanResult,
+  error: ProviderDiscoveryRpcError,
+});
+
+const WsProviderDiscoveryListVolumesRpc = Rpc.make(WS_METHODS.providerDiscoveryListVolumes, {
+  payload: Schema.Struct({}),
+  success: ProviderVolumeList,
+  error: ProviderDiscoveryRpcError,
+});
+
+const WsProviderDiscoverySearchVolumesRpc = Rpc.make(WS_METHODS.providerDiscoverySearchVolumes, {
+  payload: ProviderVolumeSearchInput,
+  success: ProviderVolumeSearchProgress,
+  error: ProviderDiscoveryRpcError,
+  stream: true,
+});
+
+const WsProviderDiscoveryInspectRpc = Rpc.make(WS_METHODS.providerDiscoveryInspect, {
+  payload: ProviderInspectInput,
+  success: ProviderInspectResult,
+  error: ProviderDiscoveryRpcError,
 });
 
 const WsServerGetNpmReleaseRpc = Rpc.make(WS_METHODS.serverGetNpmRelease, {
@@ -2131,6 +2174,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsProviderInstallCancelRpc,
   WsProviderInstallSubscribeRpc,
   WsProviderInstallRemoveRpc,
+  WsProviderDiscoveryScanRpc,
+  WsProviderDiscoveryListVolumesRpc,
+  WsProviderDiscoverySearchVolumesRpc,
+  WsProviderDiscoveryInspectRpc,
   WsServerUpdateServerRpc,
   WsServerGetNpmReleaseRpc,
   WsServerUpdateServerWithProgressRpc,
