@@ -4,7 +4,7 @@
 //
 //   payload --resources <dir> --update-repository <owner/repo> [--fonts <dir>]
 //     The packaged app's resources folder: app-update.yml points the updater at
-//     the repository, and app.asar carries every brand font byte for byte.
+//     the repository, and the app's .asar archives carry every brand font byte for byte.
 //   manifests --dir <dir>
 //     Each latest*.yml in the folder names files that are in it, with their
 //     sha512 and size.
@@ -41,31 +41,41 @@ async function checkPayload(
     problems.push(`app-update.yml does not name repo ${repo}:\n${updateConfig}`);
   }
 
-  const asar = NodePath.join(resources, "app.asar");
-  const fontEntries = listPackage(asar, { isPack: false }).filter((entry) =>
-    /[\\/]client[\\/]brand-fonts[\\/][^\\/]+\.otf$/.test(entry),
-  );
+  // The web client is in app.asar on Linux and macOS, and in server.asar on Windows.
+  const fontEntries = NodeFS.readdirSync(resources)
+    .filter((name) => name.endsWith(".asar"))
+    .flatMap((name) => {
+      const archive = NodePath.join(resources, name);
+      return listPackage(archive, { isPack: false })
+        .filter((entry) => /[\\/]client[\\/]brand-fonts[\\/][^\\/]+\.otf$/.test(entry))
+        .map((entry) => ({ archive, entry }));
+    });
   if (fontEntries.length === 0) {
-    problems.push(`${asar} has no brand-fonts/*.otf in the web client.`);
+    problems.push(`No .asar in ${resources} has brand-fonts/*.otf in the web client.`);
     return;
   }
   if (fontsDir === undefined) {
-    console.log(`app.asar carries ${fontEntries.length} brand fonts.`);
+    console.log(`The app carries ${fontEntries.length} brand fonts.`);
     return;
   }
   const expected = NodeFS.readdirSync(fontsDir).filter((name) => name.endsWith(".otf"));
+  const before = problems.length;
   for (const name of expected) {
-    const entry = fontEntries.find((candidate) => NodePath.basename(candidate) === name);
-    if (entry === undefined) {
-      problems.push(`app.asar is missing brand font ${name}.`);
+    const found = fontEntries.find(({ entry }) => NodePath.basename(entry) === name);
+    if (found === undefined) {
+      problems.push(`The app is missing brand font ${name}.`);
       continue;
     }
-    const packaged = extractFile(asar, entry.replace(/^[\\/]/, ""));
+    const packaged = extractFile(found.archive, found.entry.replace(/^[\\/]/, ""));
     if (!packaged.equals(NodeFS.readFileSync(NodePath.join(fontsDir, name)))) {
-      problems.push(`app.asar's ${name} differs from the original file.`);
+      problems.push(
+        `${NodePath.basename(found.archive)}'s ${name} differs from the original file.`,
+      );
     }
   }
-  console.log(`app.asar carries the ${expected.length} original brand fonts.`);
+  if (problems.length === before) {
+    console.log(`The app carries the ${expected.length} original brand fonts.`);
+  }
 }
 
 interface ManifestFile {
