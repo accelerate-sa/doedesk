@@ -7,3 +7,19 @@ case "$url" in
     exit 1
     ;;
 esac
+
+# GitHub runs a branch's or tag's own workflow files when it is pushed, and T3 Code's
+# deploy and publish T3 Code. DoeDesk keeps only .github/workflows/doedesk-*.yml, so
+# refuse any pushed commit that carries another workflow (after merging a T3 Code
+# release, delete the workflows it brought).
+zero=0000000000000000000000000000000000000000
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  others=$(git ls-tree --name-only "$local_sha" .github/workflows/ 2>/dev/null | grep -v '^\.github/workflows/doedesk-' || true)
+  if [ -n "$others" ]; then
+    echo "Refused: $remote_ref would bring T3 Code's workflows to GitHub:" >&2
+    echo "$others" >&2
+    echo "Delete them (git rm) first. See docs/operations/doedesk-release.md." >&2
+    exit 1
+  fi
+done

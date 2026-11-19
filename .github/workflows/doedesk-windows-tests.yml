@@ -1,9 +1,9 @@
 # On-demand Windows test lane. Manual only: nothing in the suite passes on
-# Windows yet, so this exists to give contributors (and agents) a cloud Windows
-# box to iterate against. Once the suite is green here, fold it into ci.yml.
+# Windows yet (as in T3 Code), so this gives a cloud Windows box to iterate
+# against. Once the suite is green here, fold it into doedesk-ci.yml.
 #
-#   gh workflow run windows-tests.yml --ref <branch> -f package=packages/shared
-#   gh workflow run windows-tests.yml --ref <branch> -f package=apps/server \
+#   gh workflow run doedesk-windows-tests.yml --ref <branch> -f package=packages/shared
+#   gh workflow run doedesk-windows-tests.yml --ref <branch> -f package=apps/server \
 #     -f files="src/process/externalLauncher.test.ts src/cli/theme.test.ts"
 #   gh run watch && gh run view --log-failed
 name: Windows Tests
@@ -68,9 +68,12 @@ jobs:
       # so file-scoped runs call `vp test run` inside the package instead.
       - name: Test
         shell: pwsh
+        env:
+          PACKAGE: ${{ inputs.package }}
+          FILES: ${{ inputs.files }}
         run: |
-          $package = '${{ inputs.package }}'
-          $files = '${{ inputs.files }}'
+          $package = $env:PACKAGE
+          $files = $env:FILES
           if ($package -eq '') {
             vp run --parallel --concurrency-limit 4 --filter '!t3' --filter '!@t3tools/monorepo' test
           } elseif ($files -eq '') {

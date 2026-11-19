@@ -1,0 +1,263 @@
+name: Release
+
+# Builds DoeDesk for Windows x64 and Linux (x64 and arm64) from a release tag
+# and attaches the files to that tag's GitHub release. The Mac app is built,
+# signed and notarized on the owner's Mac; its files on the release are never
+# replaced or removed here. A release this workflow has to create is a draft:
+# publishing it is the owner's call. See docs/operations/doedesk-release.md.
+#
+#   gh workflow run doedesk-release.yml --ref doedesk -f version=0.1.10
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, for example 0.1.10. Builds the commit of tag v<version>."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve release
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - id: resolve
+        name: Resolve version and commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then raw="$DISPATCH_VERSION"; else raw="$GITHUB_REF_NAME"; fi
+          version="${raw#v}"
+          # DoeDesk carries the version of the T3 Code release it is built on.
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Not a release version: $raw"
+            exit 1
+          fi
+          tag="v$version"
+          # The peeled entry (^{}) is the commit an annotated tag points at.
+          sha=$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "refs/tags/$tag" "refs/tags/$tag^{}" | tail -n 1 | cut -f1)
+          if [[ -z "$sha" ]]; then
+            echo "::error::No tag $tag on $GITHUB_REPOSITORY."
+            exit 1
+          fi
+          # Tags T3 Code made also exist on this fork. Build only commits on doedesk.
+          status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...doedesk" --jq .status)
+          if [[ "$status" != identical && "$status" != ahead ]]; then
+            echo "::error::$tag ($sha) is not on the doedesk branch (compare status: $status)."
+            exit 1
+          fi
+          echo "Building $tag at $sha."
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+
+  # Server, web client and Electron main, shared by every package job. The
+  # brand fonts are in the build but left out of the artifact (see
+  # doedesk-release-desktop.yml, "Add brand fonts").
+  bundle:
+    name: Build JS bundle
+    needs: [prepare]
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          install-args: --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
+
+      - name: Unpack brand fonts
+        env:
+          PART_01: ${{ secrets.DOEDESK_BRAND_FONTS_01 }}
+          PART_02: ${{ secrets.DOEDESK_BRAND_FONTS_02 }}
+          PART_03: ${{ secrets.DOEDESK_BRAND_FONTS_03 }}
+          PART_04: ${{ secrets.DOEDESK_BRAND_FONTS_04 }}
+          PART_05: ${{ secrets.DOEDESK_BRAND_FONTS_05 }}
+          PART_06: ${{ secrets.DOEDESK_BRAND_FONTS_06 }}
+          PART_07: ${{ secrets.DOEDESK_BRAND_FONTS_07 }}
+          PART_08: ${{ secrets.DOEDESK_BRAND_FONTS_08 }}
+          PART_09: ${{ secrets.DOEDESK_BRAND_FONTS_09 }}
+          PART_10: ${{ secrets.DOEDESK_BRAND_FONTS_10 }}
+          PART_11: ${{ secrets.DOEDESK_BRAND_FONTS_11 }}
+          PART_12: ${{ secrets.DOEDESK_BRAND_FONTS_12 }}
+        run: |
+          set -euo pipefail
+          fonts="$RUNNER_TEMP/doedesk-brand-fonts"
+          mkdir -p "$fonts"
+          for i in 01 02 03 04 05 06 07 08 09 10 11 12; do
+            part="PART_$i"
+            printf '%s' "${!part}"
+          done | base64 -d | xz -d | tar -x -C "$fonts"
+          echo "DOEDESK_BRAND_FONTS_DIR=$fonts" >> "$GITHUB_ENV"
+
+      - name: Align package versions to release version
+        run: node scripts/update-release-package-versions.ts "${{ needs.prepare.outputs.version }}"
+
+      - name: Build JS bundle
+        run: vp run build:desktop:bundle
+
+      - name: Check brand fonts in the web client
+        run: |
+          set -euo pipefail
+          for font in "$DOEDESK_BRAND_FONTS_DIR"/*.otf; do
+            cmp "$font" "apps/server/dist/client/brand-fonts/$(basename "$font")"
+          done
+          grep -q 'data-brand-fonts' apps/server/dist/client/index.html
+
+      - name: Upload JS bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: js-bundle
+          path: |
+            apps/server/dist
+            apps/desktop/dist-electron
+            !apps/server/dist/client/brand-fonts
+          if-no-files-found: error
+          retention-days: 1
+
+  desktop_linux_x64:
+    name: Desktop Linux x64
+    needs: [prepare, bundle]
+    uses: ./.github/workflows/doedesk-release-desktop.yml
+    secrets: inherit
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.sha }}
+      label: Linux x64
+      runner: blacksmith-16vcpu-ubuntu-2404
+      platform: linux
+      target: AppImage
+      arch: x64
+      rust_target: x86_64-unknown-linux-gnu
+      cli_archive: true
+      launch_check: true
+
+  # node-pty compiles from source on Linux, so arm64 builds on arm64 hardware.
+  desktop_linux_arm64:
+    name: Desktop Linux arm64
+    needs: [prepare, bundle]
+    uses: ./.github/workflows/doedesk-release-desktop.yml
+    secrets: inherit
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.sha }}
+      label: Linux arm64
+      runner: blacksmith-16vcpu-ubuntu-2404-arm
+      platform: linux
+      target: AppImage
+      arch: arm64
+      rust_target: aarch64-unknown-linux-gnu
+
+  # Packaging is faster on Linux; the native checks run on a Windows runner.
+  # Waits for Linux x64, whose CLI archive it embeds as the WSL runtime.
+  desktop_win_x64:
+    name: Desktop Windows x64
+    needs: [prepare, bundle, desktop_linux_x64]
+    uses: ./.github/workflows/doedesk-release-desktop.yml
+    secrets: inherit
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.sha }}
+      label: Windows x64
+      runner: blacksmith-16vcpu-ubuntu-2404
+      verify_runner: blacksmith-4vcpu-windows-2025
+      platform: win
+      target: nsis
+      arch: x64
+      rust_target: x86_64-pc-windows-msvc
+
+  publish:
+    name: Attach to GitHub release
+    needs: [prepare, desktop_linux_x64, desktop_linux_arm64, desktop_win_x64]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      # Only the checker script; nothing from the tag runs here.
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: scripts/doedesk-check-release.ts
+          sparse-checkout-cone-mode: false
+
+      - name: Download packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          path: packages
+
+      # Only Windows and Linux kinds, by name; a Mac file never matches.
+      - name: Collect files
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir upload
+          for file in packages/*/*; do
+            name=$(basename "$file")
+            case "$name" in
+              *.AppImage | *.deb | *.exe | *.exe.blockmap | latest.yml | latest-linux.yml | latest-linux-arm64.yml)
+                cp "$file" "upload/$name" ;;
+              *) echo "Not uploaded: $name" ;;
+            esac
+          done
+          # Fixed names for doedesk.com/download. The AppImages already have them.
+          cp "upload/DoeDesk-$VERSION-x64.exe" upload/DoeDesk-x64.exe
+          cp "upload/DoeDesk-$VERSION-amd64.deb" upload/DoeDesk-amd64.deb
+          cp "upload/DoeDesk-$VERSION-arm64.deb" upload/DoeDesk-arm64.deb
+          for name in DoeDesk-x86_64.AppImage DoeDesk-arm64.AppImage latest.yml latest-linux.yml latest-linux-arm64.yml; do
+            test -f "upload/$name" || { echo "::error::Missing $name"; exit 1; }
+          done
+          node scripts/doedesk-check-release.ts manifests --dir upload
+          ls -l upload
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag --draft --latest=false \
+              --title "DoeDesk $VERSION" --notes "Based on T3 Code v$VERSION."
+            echo "Created $TAG as a draft. The owner adds the Mac files and publishes it."
+          fi
+          existing=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          for name in $(ls upload); do
+            case "$name" in
+              *.dmg | *.zip | *-mac.yml | *.dmg.blockmap | *.zip.blockmap)
+                echo "::error::Refusing to touch Mac asset $name"; exit 1 ;;
+            esac
+            if grep -qxF "$name" <<< "$existing"; then echo "Replacing $name"; fi
+          done
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber upload/*
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | "\(.name)\t\(.size)"'
