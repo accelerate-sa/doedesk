@@ -1,20 +1,30 @@
 import { useAuth } from "@clerk/react";
-import { PrivacySetup } from "../privacy/PrivacySetup";
 import {
-  isPrivacyDecided,
-  refreshPrivacyStatus,
+  savePrivacyProfile,
   setPrivacyStatus,
   useConsentLocale,
   usePrivacyStatus,
   useUsageData,
 } from "~/privacy/privacyClient";
-import { ProfileQuestions } from "../privacy/ProfileQuestions";
-import { settleUsageDataFirstRun, UsageDataChoice, usageDataChoiceDue } from "../privacy/UsageData";
+import { settleUsageDataFirstRun, usageDataChoiceDue } from "../privacy/UsageData";
+import { termsAcceptanceDue } from "../privacy/TermsAcceptanceSheet";
 import { useDeveloperMode } from "~/doedesk/product";
+import {
+  goBack,
+  goForward,
+  onboardingView,
+  readOnboardingState,
+  type OnboardingFacts,
+  type OnboardingState,
+  type OnboardingStep,
+  type SetupLocale,
+} from "~/onboarding/onboardingSteps.logic";
+import { SetupLocaleContext, useSetupText } from "~/onboarding/setupLocale";
 import { useAtomValue } from "@effect/atom-react";
 import type {
   AgentSessionProjectCandidate,
   EnvironmentId,
+  PrivacyProfileRequest,
   ProjectId,
   ProviderInstanceId,
   ScopedProjectRef,
@@ -55,7 +65,11 @@ import { TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "../../appearanceFonts";
 import { MOBILE_APP_URL } from "../../branding";
 import { isElectron } from "../../env";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
-import { usePersistEnvironmentProviderInstanceMutation } from "../../hooks/useSettings";
+import {
+  updateClientSettings,
+  useClientSettings,
+  usePersistEnvironmentProviderInstanceMutation,
+} from "../../hooks/useSettings";
 import { useCloudLinkState } from "../../cloud/cloudLinkState";
 import { hasCloudPublicConfig } from "../../cloud/publicConfig";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
@@ -127,13 +141,39 @@ import { toastManager } from "../ui/toast";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { cn } from "../../lib/utils";
 import { formatRelativeTime } from "../../timestampFormat";
+import { ProviderPrograms } from "./ProviderPrograms";
+import {
+  AccountStep,
+  LanguageStep,
+  MaskingStep,
+  ProfileStep,
+  UsageDataStep,
+} from "./SetupPrivacySteps";
 
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
 const SCAN_LIMIT_MESSAGE = "Scan limit reached. Some folders or conversations may be missing.";
 
+/** Stored progress for first-run setup, read and written through the client settings. */
+function useOnboardingState() {
+  const stored = useClientSettings((settings) => settings.onboardingProgress);
+  const state = readOnboardingState(stored);
+  const save = (next: OnboardingState) =>
+    void updateClientSettings({
+      onboardingProgress: {
+        step: next.step,
+        seen: [...next.seen],
+        locale: next.locale,
+        masking: next.masking,
+      },
+    }).catch(() => undefined);
+  return [state, save] as const;
+}
+
 /**
- * First-run page for one computer: its agents, the projects found in agent history, and the
- * phone app. Every part is optional except one ready agent to start chatting.
+ * First-run setup for one computer, one decision per step: the language, how names and numbers
+ * are found, the account, two optional questions, usage data, the AI, and in Developer mode the
+ * folders to import and the phone. Progress is kept in the client settings, so a quit reopens the
+ * same step with the answers given so far.
  */
 export function WelcomePage({
   environmentId,
@@ -144,10 +184,11 @@ export function WelcomePage({
 }) {
   const developerMode = useDeveloperMode();
   const { environments } = useEnvironments();
-  const label =
-    environments.find((environment) => environment.environmentId === environmentId)?.label ??
-    "this computer";
-  const agentReady = useWelcomeAgents(environmentId).readyCount > 0;
+  const environmentLabel = environments.find(
+    (environment) => environment.environmentId === environmentId,
+  )?.label;
+  const agents = useWelcomeAgents(environmentId);
+  const agentReady = agents.readyCount > 0;
   // The phone and `t3` on PATH belong to the primary computer, so only it offers them.
   const isPrimary = usePrimaryEnvironmentId() === environmentId;
   // The same access Settings → Sharing & access checks.
@@ -264,17 +305,42 @@ export function WelcomePage({
   const selected = developerMode && projectImport.canWrite ? projectImport.selected : [];
   const privacy = usePrivacyStatus();
   const privacyStatus = privacy.kind === "ready" ? privacy.status : null;
-  const privacyReady = privacyStatus !== null && isPrivacyDecided(privacyStatus);
   const usageData = useUsageData();
-  const [consentLocale] = useConsentLocale();
-  // Shown from the moment the choice is due, and kept on the page after the person answers it.
+  const [consentLocale, setConsentLocale] = useConsentLocale();
+  // Kept as a step from the moment the choice is due, even after the person answers it.
   const [usageDataOffered, setUsageDataOffered] = useState(false);
   if (!usageDataOffered && usageDataChoiceDue(usageData)) setUsageDataOffered(true);
   const newCount = selected.filter(projectImport.isNew).length;
+
+  const [state, saveState] = useOnboardingState();
+  // Arabic when the system's language is, until the person picks on the first step.
+  const locale: SetupLocale = state.locale ?? consentLocale;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the consent texts read a shared language atom that is not stored; a resumed setup puts its stored language back into it
+  useEffect(() => {
+    if (state.locale !== null && state.locale !== consentLocale) setConsentLocale(state.locale);
+  }, [state.locale, consentLocale, setConsentLocale]);
+
+  const scan = scans[0];
+  const facts: OnboardingFacts = {
+    privacyMode: privacyStatus?.mode ?? null,
+    termsOutstanding: privacyStatus !== null && termsAcceptanceDue(privacyStatus),
+    profileAnswered: privacyStatus?.profileAnswered ?? false,
+    usageDataDue: usageDataOffered,
+    developerMode,
+    foldersAvailable:
+      scan !== undefined &&
+      (scan.isPending || scan.error !== null || projectImport.candidates.length > 0),
+    phoneAvailable: showPhone,
+    agentReady,
+  };
+  const view = onboardingView(state, facts);
+  const profileAnswersRef = useRef<PrivacyProfileRequest | null>(null);
+  const [advancing, setAdvancing] = useState(false);
+
   const start = () => {
-    // Leaving the page with the choice untouched is an answer too: see settleUsageDataFirstRun.
-    void settleUsageDataFirstRun(usageData, consentLocale).catch(() => undefined);
-    keepChoicesRef.current = scans.some((scan) => scan.data === null);
+    // Leaving with the choice untouched is an answer too: see settleUsageDataFirstRun.
+    void settleUsageDataFirstRun(usageData, locale).catch(() => undefined);
+    keepChoicesRef.current = scans.some((entry) => entry.data === null);
     if (selected.length === 0) {
       projectImport.finishAfterImport();
       return;
@@ -284,85 +350,113 @@ export function WelcomePage({
     void projectImport.runImport(selected);
   };
 
+  // Each step's own answer is recorded on the way out, then the next step that applies opens.
+  const advance = async (options: { readonly skip?: boolean } = {}) => {
+    setAdvancing(true);
+    try {
+      if (view.step === "profile" && privacyStatus !== null) {
+        const answers = profileAnswersRef.current;
+        if (answers !== null || !privacyStatus.profileAnswered) {
+          const saved = await savePrivacyProfile(
+            answers ?? { field: null, fieldOther: null, workplace: null },
+          ).catch(() => null);
+          // The answers are optional: a failed save asks again next time rather than blocking.
+          if (saved !== null) setPrivacyStatus(saved);
+          profileAnswersRef.current = null;
+        }
+      }
+      if (view.step === "usageData") {
+        await settleUsageDataFirstRun(usageData, locale).catch(() => undefined);
+      }
+    } finally {
+      setAdvancing(false);
+    }
+    if (view.isLast) {
+      start();
+      return;
+    }
+    const base = view.step === "welcome" ? { ...state, locale } : state;
+    saveState(goForward(base, facts, options));
+  };
+
+  const chooseLocale = (next: SetupLocale) => {
+    setConsentLocale(next);
+    saveState({ ...state, locale: next });
+  };
+
   return (
-    <SidebarInset
-      {...workspaceAreaProps("home", 1, "Welcome")}
-      role="main"
-      className="h-dvh min-h-0 overflow-hidden overscroll-y-none"
-    >
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-        {/* The desktop window only moves where CSS opts in, so keep a titlebar strip. */}
-        {isElectron ? <WorkspacePageHeader electron /> : null}
-        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-both">
-          <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 pt-12 pb-8 sm:pt-20">
-            <h1 className="font-display text-4xl tracking-tight text-foreground">
-              Welcome to DoeDesk
-            </h1>
-            <p className="mt-2 font-reading text-lg text-muted-foreground">
-              An AI assistant for confidential work.
-            </p>
-            <div className="mt-10 border-t border-border/60">
-              <WelcomeSection title="Privacy">
-                <p className="pt-2.5 text-sm leading-relaxed text-muted-foreground">
-                  Names, phone numbers and IDs are replaced with stand-ins before the AI sees them,
-                  and put back on your screen.
-                </p>
-                {privacyStatus !== null ? (
-                  <PrivacySetup status={privacyStatus} onStatus={setPrivacyStatus} />
-                ) : privacy.kind === "loading" ? (
-                  <p className="py-2 text-sm text-muted-foreground">Checking…</p>
+    <SetupLocaleContext value={locale}>
+      <SidebarInset
+        {...workspaceAreaProps("home", 1, "Welcome")}
+        role="main"
+        className="h-dvh min-h-0 overflow-hidden overscroll-y-none"
+      >
+        <div
+          dir={locale === "ar" ? "rtl" : "ltr"}
+          lang={locale}
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 flex-col bg-background",
+            locale === "ar" && "font-reading",
+          )}
+        >
+          {/* The desktop window only moves where CSS opts in, so keep a titlebar strip. */}
+          {isElectron ? <WorkspacePageHeader electron /> : null}
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-both">
+            <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-6 pt-10 pb-8 sm:pt-16">
+              <StepProgress position={view.position} count={view.count} />
+              <StepHeading step={view.step} label={environmentLabel} />
+              <div className="mt-6 min-w-0">
+                {view.step === "welcome" ? (
+                  <LanguageStep locale={locale} onLocale={chooseLocale} />
+                ) : view.step === "masking" ? (
+                  <MaskingStep
+                    status={privacy.kind === "loading" ? null : privacyStatus}
+                    choice={state.masking}
+                    onChoice={(masking) => saveState({ ...state, masking })}
+                  />
+                ) : view.step === "account" ? (
+                  <AccountStep status={privacyStatus} />
+                ) : view.step === "profile" && privacyStatus !== null ? (
+                  <ProfileStep
+                    status={privacyStatus}
+                    onAnswersChange={(answers) => {
+                      profileAnswersRef.current = answers;
+                    }}
+                  />
+                ) : view.step === "usageData" ? (
+                  <UsageDataStep status={usageData} />
+                ) : view.step === "agents" ? (
+                  <>
+                    <AgentsSection
+                      environmentId={environmentId}
+                      label={environmentLabel}
+                      isPrimary={isPrimary}
+                      onImportSourceEnabled={() => scan?.refresh()}
+                    />
+                    <ProviderPrograms
+                      environmentId={environmentId}
+                      providers={agents.allowed}
+                      settings={agents.serverConfig?.settings}
+                    />
+                  </>
+                ) : view.step === "folders" ? (
+                  <ProjectsSection
+                    scan={scan}
+                    projectImport={projectImport}
+                    isImporting={isImporting}
+                  />
                 ) : (
-                  <div className="flex items-center gap-3 py-2">
-                    <p className="text-sm text-destructive">Could not reach DoeDesk on {label}.</p>
-                    <Button variant="outline" size="sm" onClick={refreshPrivacyStatus}>
-                      Retry
-                    </Button>
-                  </div>
+                  <PhoneSection environmentId={environmentId} />
                 )}
-              </WelcomeSection>
-              {privacyStatus !== null && privacyReady && !privacyStatus.profileAnswered ? (
-                <WelcomeSection title="About you">
-                  <ProfileQuestions onStatus={setPrivacyStatus} />
-                </WelcomeSection>
-              ) : null}
-              <AgentsSection
-                environmentId={environmentId}
-                label={label}
-                isPrimary={isPrimary}
-                onImportSourceEnabled={() => scans[0]?.refresh()}
-              />
-              {developerMode ? (
-                <ProjectsSection
-                  scan={scans[0]}
-                  projectImport={projectImport}
-                  isImporting={isImporting}
-                />
-              ) : null}
-              {developerMode && showPhone ? <PhoneSection environmentId={environmentId} /> : null}
-              {usageDataOffered && usageData !== null ? (
-                <WelcomeSection title="Usage data">
-                  <div className="py-2.5">
-                    <UsageDataChoice status={usageData} />
-                  </div>
-                </WelcomeSection>
-              ) : null}
-            </div>
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              {agentReady || !privacyReady ? (
-                <span />
-              ) : (
-                <Button variant="ghost-muted" disabled={isImporting} onClick={start}>
-                  Start without an AI
-                </Button>
-              )}
-              <div className="flex items-center gap-3">
-                {!privacyReady ? (
-                  <span className="text-xs text-muted-foreground">Sign in to start.</span>
-                ) : agentReady ? null : (
-                  <span className="text-xs text-muted-foreground">Connect one AI to start.</span>
-                )}
-                <Button disabled={!privacyReady || !agentReady || isImporting} onClick={start}>
-                  {isImporting
+              </div>
+              <StepFooter
+                isFirst={view.isFirst}
+                isLast={view.isLast}
+                canContinue={view.canContinue && !advancing && !isImporting}
+                canSkip={view.canSkip && !view.canContinue && !isImporting}
+                hint={stepHint(view.step, view.canContinue, facts)}
+                startLabel={
+                  isImporting
                     ? selected.length > 0
                       ? "Importing…"
                       : "Starting…"
@@ -370,15 +464,199 @@ export function WelcomePage({
                       ? `Import ${newCount} ${newCount === 1 ? "folder" : "folders"} and start`
                       : selected.length > 0
                         ? "Import chats and start"
-                        : "Start"}
-                </Button>
-              </div>
+                        : null
+                }
+                onBack={() => saveState(goBack(state, facts))}
+                onContinue={() => void advance()}
+                onSkip={() => void advance({ skip: true })}
+              />
+              <TelemetryNotice environmentId={environmentId} />
             </div>
-            <TelemetryNotice environmentId={environmentId} />
           </div>
         </div>
+      </SidebarInset>
+    </SetupLocaleContext>
+  );
+}
+
+function stepHint(
+  step: OnboardingStep,
+  canContinue: boolean,
+  facts: OnboardingFacts,
+): readonly [english: string, arabic: string] | null {
+  if (canContinue) return null;
+  switch (step) {
+    case "masking":
+      return facts.privacyMode === null
+        ? null
+        : ["Choose one to continue.", "اختر طريقة للمتابعة."];
+    case "account":
+      return facts.termsOutstanding
+        ? ["Accept the Terms of Use to continue.", "وافق على شروط الاستخدام للمتابعة."]
+        : ["Sign in to continue.", "سجّل الدخول للمتابعة."];
+    case "agents":
+      return [
+        "Connect one AI to continue, or skip this for now.",
+        "اربط ذكاءً اصطناعيًا واحدًا للمتابعة، أو تخطَّ هذه الخطوة الآن.",
+      ];
+    default:
+      return null;
+  }
+}
+
+/** "Step 2 of 6", with one bar per step. Bars fill from the reading start in either language. */
+function StepProgress({ position, count }: { readonly position: number; readonly count: number }) {
+  const t = useSetupText();
+  return (
+    <div className="grid gap-2">
+      <p className="text-xs text-muted-foreground tabular-nums">
+        {t(`Step ${position} of ${count}`, `الخطوة ${position} من ${count}`)}
+      </p>
+      <div
+        role="progressbar"
+        aria-valuemin={1}
+        aria-valuemax={count}
+        aria-valuenow={position}
+        aria-label={t("Setup progress", "تقدّم الإعداد")}
+        className="flex gap-1"
+      >
+        {Array.from({ length: count }, (_, index) => (
+          <span
+            key={index}
+            className={cn("h-1 flex-1 rounded-full", index < position ? "bg-primary" : "bg-border")}
+          />
+        ))}
       </div>
-    </SidebarInset>
+    </div>
+  );
+}
+
+const STEP_TITLES: Readonly<
+  Record<
+    OnboardingStep,
+    readonly [title: readonly [string, string], lead: readonly [string, string] | null]
+  >
+> = {
+  welcome: [
+    ["Welcome to DoeDesk", "أهلًا بك في DoeDesk"],
+    ["An AI assistant for confidential work.", "مساعدك بالذكاء الاصطناعي في الأعمال السرّية."],
+  ],
+  masking: [
+    ["Protect names and numbers", "حماية الأسماء والأرقام"],
+    [
+      "Names, phone numbers and IDs are replaced with stand-ins before the AI sees them, and put back on your screen.",
+      "يضع DoeDesk رموزًا بديلة مكان الأسماء وأرقام الجوال والهوية قبل أن تصل إلى الذكاء الاصطناعي، ثم يعيدها كما كانت على شاشتك.",
+    ],
+  ],
+  account: [
+    ["Your DoeDesk account", "حسابك في DoeDesk"],
+    [
+      "Sign in, or create an account, with your phone or email.",
+      "سجّل الدخول أو أنشئ حسابًا بجوالك أو بريدك.",
+    ],
+  ],
+  profile: [["About your work", "عن عملك"], null],
+  usageData: [["Usage data", "بيانات الاستخدام"], null],
+  agents: [
+    ["Connect an AI", "اربط ذكاءً اصطناعيًا"],
+    [
+      "DoeDesk runs the AI programs on this computer with your own sign-in.",
+      "يشغّل DoeDesk برامج الذكاء الاصطناعي الموجودة على هذا الجهاز بحسابك أنت.",
+    ],
+  ],
+  folders: [
+    ["Folders", "المجلدات"],
+    [
+      "Bring in folders and chats from your AI history.",
+      "استورد المجلدات والمحادثات من سجلّ الذكاء الاصطناعي.",
+    ],
+  ],
+  phone: [
+    ["Your phone", "جوالك"],
+    ["Use DoeDesk on your phone as well.", "استخدم DoeDesk على جوالك أيضًا."],
+  ],
+};
+
+function StepHeading({
+  step,
+  label,
+}: {
+  readonly step: OnboardingStep;
+  readonly label: string | undefined;
+}) {
+  const t = useSetupText();
+  const [title, lead] = STEP_TITLES[step];
+  return (
+    <header className="mt-8">
+      {/* Focus moves here on each step, so a screen reader announces the new one. */}
+      <h1
+        key={step}
+        ref={(node) => node?.focus({ preventScroll: true })}
+        tabIndex={-1}
+        className="font-display text-3xl tracking-tight text-foreground outline-none sm:text-4xl"
+      >
+        {t(...title)}
+      </h1>
+      {lead !== null ? (
+        <p className="mt-2 font-reading text-lg text-muted-foreground">{t(...lead)}</p>
+      ) : null}
+      {step === "agents" && label !== undefined ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          <bdi>{label}</bdi>
+        </p>
+      ) : null}
+    </header>
+  );
+}
+
+function StepFooter({
+  isFirst,
+  isLast,
+  canContinue,
+  canSkip,
+  hint,
+  startLabel,
+  onBack,
+  onContinue,
+  onSkip,
+}: {
+  readonly isFirst: boolean;
+  readonly isLast: boolean;
+  readonly canContinue: boolean;
+  readonly canSkip: boolean;
+  readonly hint: readonly [string, string] | null;
+  /** The last step's button while folders are picked or the import runs. */
+  readonly startLabel: string | null;
+  readonly onBack: () => void;
+  readonly onContinue: () => void;
+  readonly onSkip: () => void;
+}) {
+  const t = useSetupText();
+  return (
+    <footer className="mt-10 grid gap-3 border-t border-border/60 pt-5">
+      {hint !== null ? <p className="text-xs text-muted-foreground">{t(...hint)}</p> : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {isFirst ? (
+          <span />
+        ) : (
+          <Button variant="ghost" onClick={onBack}>
+            {t("Back", "رجوع")}
+          </Button>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {canSkip ? (
+            <Button variant="ghost-muted" onClick={onSkip}>
+              {isLast
+                ? t("Start without an AI", "ابدأ دون ذكاء اصطناعي")
+                : t("Skip for now", "تخطَّ الآن")}
+            </Button>
+          ) : null}
+          <Button disabled={!canContinue} onClick={onContinue}>
+            {isLast ? (startLabel ?? t("Start", "ابدأ")) : t("Continue", "متابعة")}
+          </Button>
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -402,7 +680,7 @@ function TelemetryNotice({ environmentId }: { readonly environmentId: Environmen
   );
 }
 
-// Each part of the page is one band: its label on the left, its rows on the right.
+// A part of a step. The step's heading names it, so the part carries its name only for screen readers.
 function WelcomeSection({
   title,
   children,
@@ -411,9 +689,8 @@ function WelcomeSection({
   readonly children: ReactNode;
 }) {
   return (
-    <section className="grid gap-x-10 border-b border-border/60 py-4 sm:grid-cols-[6rem_minmax(0,1fr)]">
-      <h2 className="text-sm leading-10 text-muted-foreground">{title}</h2>
-      <div className="min-w-0">{children}</div>
+    <section aria-label={title} className="min-w-0">
+      {children}
     </section>
   );
 }
@@ -447,18 +724,15 @@ function useWelcomeAgents(environmentId: EnvironmentId) {
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
   const managedPolicy = serverConfig?.managedPolicy;
+  const isAllowed = (provider: ServerProvider) =>
+    isManagedDriverAllowed(managedPolicy, provider.driver) &&
+    // Cursor's traffic cannot be masked, so DoeDesk blocks it; offering it would only fail.
+    (developerMode || provider.driver !== "cursor");
   return {
     providers,
     serverConfig,
-    ...groupWelcomeAgents(
-      providers,
-      serverConfig?.settings,
-      agentName,
-      (provider) =>
-        isManagedDriverAllowed(managedPolicy, provider.driver) &&
-        // Cursor's traffic cannot be masked, so DoeDesk blocks it; offering it would only fail.
-        (developerMode || provider.driver !== "cursor"),
-    ),
+    allowed: (providers ?? []).filter(isAllowed),
+    ...groupWelcomeAgents(providers, serverConfig?.settings, agentName, isAllowed),
   };
 }
 
@@ -476,11 +750,13 @@ function AgentsSection({
   onImportSourceEnabled,
 }: {
   readonly environmentId: EnvironmentId;
-  readonly label: string;
+  readonly label: string | undefined;
   readonly isPrimary: boolean;
   // The project scan only reads agents that are on, so turning one on can find more history.
   readonly onImportSourceEnabled: () => void;
 }) {
+  const t = useSetupText();
+  const developerMode = useDeveloperMode();
   const { providers, serverConfig, checking, found, available } = useWelcomeAgents(environmentId);
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     reportFailure: false,
@@ -618,27 +894,27 @@ function AgentsSection({
         <Button
           size="xs"
           variant="outline"
-          aria-label={`Turn on: ${name}`}
+          aria-label={`${t("Turn on", "تشغيل")}: ${name}`}
           disabled={!canManageProviders || serverConfig === null}
           onClick={() => void turnOn(provider)}
         >
-          Turn on
+          {t("Turn on", "تشغيل")}
         </Button>
       );
     }
     // Settings updates a broken CLI the way it was installed, including a custom binary path.
-    if (isBrokenVersion(provider)) return settingsAction("Update");
+    if (isBrokenVersion(provider)) return settingsAction(t("Update", "تحديث"));
     if (serverConfig !== null && codexNeedsSetup(provider, serverConfig.settings)) {
       const open = codexSetupId === provider.instanceId;
       return (
         <Button
           size="xs"
           variant="outline"
-          aria-label={`Set up: ${name}`}
+          aria-label={`${t("Set up", "إعداد")}: ${name}`}
           aria-expanded={open}
           onClick={() => setCodexSetupId(open ? null : provider.instanceId)}
         >
-          Set up
+          {t("Set up", "إعداد")}
         </Button>
       );
     }
@@ -657,7 +933,11 @@ function AgentsSection({
       );
     }
     return settingsAction(
-      state === "signIn" ? "Sign in" : state === "attention" ? "Details" : "Set up",
+      state === "signIn"
+        ? t("Sign in", "تسجيل الدخول")
+        : state === "attention"
+          ? t("Details", "التفاصيل")
+          : t("Set up", "إعداد"),
     );
   };
 
@@ -667,7 +947,7 @@ function AgentsSection({
       (provider) =>
         needsInstallOrSignIn(provider) || codexNeedsSetup(provider, serverConfig?.settings),
     )
-      ? "This connection cannot control terminals."
+      ? t("This connection cannot control terminals.", "لا يتيح هذا الاتصال التحكم في الطرفيات.")
       : null,
     !canManageProviders &&
     (acpAllowed ||
@@ -675,12 +955,12 @@ function AgentsSection({
         (provider) =>
           stateOf(provider) === "disabled" || codexNeedsSetup(provider, serverConfig?.settings),
       ))
-      ? "This connection cannot manage agents."
+      ? t("This connection cannot manage agents.", "لا يتيح هذا الاتصال إدارة الذكاء الاصطناعي.")
       : null,
   ].filter((note) => note !== null);
 
   return (
-    <WelcomeSection title="AI">
+    <WelcomeSection title={t("AI", "الذكاء الاصطناعي")}>
       {found.map((provider) => (
         <AgentRow
           key={provider.instanceId}
@@ -690,15 +970,17 @@ function AgentsSection({
         />
       ))}
       {checking && found.length === 0 ? (
-        <p className="text-sm leading-10 text-muted-foreground">Checking {label}…</p>
+        <p className="text-sm leading-10 text-muted-foreground">
+          {t("Checking", "جارٍ فحص")} <bdi>{label ?? t("this computer", "هذا الجهاز")}</bdi>…
+        </p>
       ) : null}
       {notes.map((note) => (
-        <p key={note} className="pl-8 text-xs text-muted-foreground">
+        <p key={note} className="ps-8 text-xs text-muted-foreground">
           {note}
         </p>
       ))}
       <Collapsible open={showMore} onOpenChange={setMoreOpen}>
-        <CollapsibleTrigger className="group flex min-h-10 w-full items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+        <CollapsibleTrigger className="group flex min-h-10 w-full items-center gap-3 rounded-md text-start outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
           <RowIcon>
             <PlusIcon className="size-4" />
           </RowIcon>
@@ -708,10 +990,12 @@ function AgentsSection({
               found.length > 0 ? "text-muted-foreground" : "text-foreground",
             )}
           >
-            {found.length > 0 ? "Add more" : "Set up an agent"}
+            {found.length > 0
+              ? t("Add more", "أضف المزيد")
+              : t("Set up an AI", "أعدّ ذكاءً اصطناعيًا")}
           </span>
           {showMore ? null : <AgentLogoStack providers={available} acp={acpAllowed} />}
-          <ChevronDownIcon className="ml-auto size-4 text-muted-foreground group-data-panel-open:rotate-180" />
+          <ChevronDownIcon className="ms-auto size-4 text-muted-foreground group-data-panel-open:rotate-180" />
         </CollapsibleTrigger>
         <CollapsiblePanel>
           <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
@@ -731,7 +1015,7 @@ function AgentsSection({
                 <ACPRegistryIcon className="size-4" />
               </RowIcon>
               <span className="min-w-0 flex-1 text-sm text-muted-foreground">
-                More agents in the ACP Registry
+                {t("More agents in the ACP Registry", "مساعدون آخرون في سجل ACP")}
               </span>
               <Button
                 size="xs"
@@ -739,7 +1023,7 @@ function AgentsSection({
                 disabled={!canManageProviders}
                 onClick={() => setAddingProvider(true)}
               >
-                Browse
+                {t("Browse", "تصفّح")}
               </Button>
             </div>
           ) : null}
@@ -757,7 +1041,7 @@ function AgentsSection({
           />
         </div>
       ) : null}
-      {isPrimary ? <CliPathSetup /> : null}
+      {isPrimary && developerMode ? <CliPathSetup /> : null}
       {terminalSession !== null ? (
         <AgentInstallTerminal
           key={`${terminalSession.environmentId}:${terminalSession.providerInstanceId}:${terminalSession.driver}`}
@@ -778,7 +1062,7 @@ function AgentsSection({
         <AddProviderInstanceDialog
           open
           environmentId={environmentId}
-          environmentLabel={label}
+          environmentLabel={label ?? t("this computer", "هذا الجهاز")}
           showMoreProviders
           onOpenChange={setAddingProvider}
           onCreated={(_instanceId, driver) => {
@@ -948,7 +1232,7 @@ function ProjectsSection({
             </div>
           </div>
           <ScrollArea scrollFade className="mt-1 h-auto max-h-80">
-            <div className="space-y-0.5 pr-3">
+            <div className="space-y-0.5 pe-3">
               <ImportCandidateList
                 candidates={candidates}
                 selectedKeys={selectedKeys}
@@ -959,21 +1243,21 @@ function ProjectsSection({
         </fieldset>
       ) : null}
       {scan.data?.truncated ? (
-        <p className="pl-8 text-xs text-muted-foreground" role="status">
+        <p className="ps-8 text-xs text-muted-foreground" role="status">
           {SCAN_LIMIT_MESSAGE}
         </p>
       ) : null}
       {scan.error !== null ? (
         <div
           role="alert"
-          className="flex items-center justify-between gap-3 pl-8 text-sm text-muted-foreground"
+          className="flex items-center justify-between gap-3 ps-8 text-sm text-muted-foreground"
         >
           <span>Could not check folders again. {scan.error}</span>
           {retry}
         </div>
       ) : null}
       {visibleImportError ? (
-        <p className="pt-1 pl-8 text-sm text-destructive">{visibleImportError}</p>
+        <p className="pt-1 ps-8 text-sm text-destructive">{visibleImportError}</p>
       ) : null}
     </WelcomeSection>
   );
@@ -997,7 +1281,7 @@ function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId
           </CollapsibleTrigger>
         </div>
         <CollapsiblePanel>
-          <div className="flex items-center gap-8 pt-2 pb-3 pl-8">
+          <div className="flex items-center gap-8 pt-2 pb-3 ps-8">
             <ol className="min-w-0 flex-1 space-y-5">
               <PhoneStep step={1}>
                 <p className="text-sm text-foreground">Scan with your phone to get the app.</p>
@@ -1191,7 +1475,8 @@ function TerminalAction({
   readonly disabled: boolean;
   readonly onClick: () => void;
 }) {
-  const label = signIn ? "Sign in" : "Install";
+  const t = useSetupText();
+  const label = signIn ? t("Sign in", "تسجيل الدخول") : t("Install", "تثبيت");
   return (
     <Button
       size="xs"
@@ -1218,6 +1503,7 @@ function AgentRow({
   // A row in the "Add more" grid: the button carries the state, so no detail line.
   readonly compact?: boolean;
 }) {
+  const t = useSetupText();
   const name = agentName(provider);
   // Claude Code and Codex tiles show Install or Set up; other agents that are on say why not.
   const brokenMessage = isBrokenVersion(provider)
@@ -1227,7 +1513,7 @@ function AgentRow({
     state === "install"
       ? isInstallableDriver(provider.driver)
         ? null
-        : "Not installed"
+        : t("Not installed", "غير مثبّت")
       : compact || state === "ready" || state === "checking"
         ? null
         : state === "attention"
@@ -1259,10 +1545,10 @@ function AgentRow({
         {state === "ready" ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
             <CheckIcon className="size-3.5" />
-            Ready
+            {t("Ready", "جاهز")}
           </span>
         ) : state === "checking" ? (
-          <span className="text-xs text-muted-foreground">Checking…</span>
+          <span className="text-xs text-muted-foreground">{t("Checking…", "جارٍ الفحص…")}</span>
         ) : (
           action
         )}
@@ -1762,10 +2048,10 @@ function ImportCandidateList({
                 )
               }
             />
-            <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
+            <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-start">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
               <span className="truncate text-sm text-muted-foreground">Other folders</span>
-              <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
+              <span className="ms-auto shrink-0 text-xs text-muted-foreground tabular-nums">
                 {other.length} {other.length === 1 ? "folder" : "folders"}
               </span>
             </CollapsibleTrigger>
@@ -1820,7 +2106,7 @@ function ImportRepositoryGroup({
           indeterminate={selectedCount > 0 && selectedCount < keys.length}
           onCheckedChange={(checked) => onToggle(keys, checked === true)}
         />
-        <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
+        <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-start">
           <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
           <span className="truncate text-sm font-medium">{group.label}</span>
           <ImportRowMeta
@@ -1881,7 +2167,7 @@ function ImportCandidateRow({
     <label
       className={cn(
         "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/40 has-disabled:cursor-default",
-        nested && "pl-8",
+        nested && "ps-8",
       )}
     >
       <Checkbox checked={checked} onCheckedChange={(value) => onCheckedChange(value === true)} />
@@ -1931,7 +2217,7 @@ function ImportRowMeta({
   const relative = lastActiveAt === null ? null : formatRelativeTime(lastActiveAt);
   const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
   return (
-    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
+    <span className="ms-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
       {AgentSessionSource.literals.map((source) => (
         <span key={source} className="flex size-4 items-center justify-center">
           {sources?.includes(source) ? (
@@ -1945,8 +2231,8 @@ function ImportRowMeta({
           ) : null}
         </span>
       ))}
-      <span className="text-right">{threadCount}</span>
-      <span className="text-right whitespace-nowrap">{age}</span>
+      <span className="text-end">{threadCount}</span>
+      <span className="text-end whitespace-nowrap">{age}</span>
     </span>
   );
 }

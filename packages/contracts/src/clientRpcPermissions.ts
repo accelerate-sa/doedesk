@@ -18,6 +18,11 @@ import { WS_METHODS } from "./rpc.ts";
 /** Incremental client enforcement; the server still authorizes every request. */
 export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.providerAuthRemoveMethod]: AuthProvidersManageScope,
+  // Discovery reads which programs and drives a computer has, and runs the programs it finds.
+  // The drive search is a subscription stream, which has no client guard; the server checks it.
+  [WS_METHODS.providerDiscoveryScan]: AuthProvidersManageScope,
+  [WS_METHODS.providerDiscoveryListVolumes]: AuthProvidersManageScope,
+  [WS_METHODS.providerDiscoveryInspect]: AuthProvidersManageScope,
   [WS_METHODS.previewClose]: AuthPreviewOperateScope,
   // Stopping a server signals its processes, as closing a terminal does.
   [WS_METHODS.previewStopLocalServer]: AuthTerminalOperateScope,

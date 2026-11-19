@@ -402,6 +402,22 @@ export const VoiceTranscriptionDestination = Schema.Union([
 ]);
 export type VoiceTranscriptionDestination = typeof VoiceTranscriptionDestination.Type;
 
+/**
+ * Where first-run setup stands while it is unfinished, so a quit reopens the same step with the
+ * answers given so far. Cleared once setup finishes. Open strings, like `language`, so a step
+ * added or removed later never makes the whole settings file unreadable; the client checks them.
+ */
+export const OnboardingProgress = Schema.Struct({
+  step: Schema.String,
+  /** Steps shown so far. They stay in the list, so going back finds them and the count holds. */
+  seen: Schema.Array(Schema.String),
+  /** The language setup is shown in: "en" or "ar". */
+  locale: Schema.NullOr(Schema.String),
+  /** How personal details are found, as chosen before it takes effect. */
+  masking: Schema.NullOr(Schema.String),
+});
+export type OnboardingProgress = typeof OnboardingProgress.Type;
+
 export const ClientSettingsSchema = Schema.Struct({
   notificationMode: NotificationMode.pipe(
     Schema.withDecodingDefault(Effect.succeed("off" as const)),
@@ -504,6 +520,9 @@ export const ClientSettingsSchema = Schema.Struct({
   fontSmoothing: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   // Older installs also decode to null; onboarding must additionally require an empty workspace.
   onboardingCompletedAt: Schema.NullOr(Schema.String).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  onboardingProgress: Schema.NullOr(OnboardingProgress).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   persistComposerContextStrip: Schema.Boolean.pipe(
@@ -2075,6 +2094,7 @@ export const ClientSettingsPatch = Schema.Struct({
   environmentIdentificationMode: Schema.optionalKey(EnvironmentIdentificationMode),
   glassOpacity: Schema.optionalKey(GlassOpacity),
   onboardingCompletedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  onboardingProgress: Schema.optionalKey(Schema.NullOr(OnboardingProgress)),
   fontSizeInterface: Schema.optionalKey(InterfaceFontSize),
   fontSizePrompt: Schema.optionalKey(PromptFontSize),
   fontSizeCode: Schema.optionalKey(CodeFontSize),

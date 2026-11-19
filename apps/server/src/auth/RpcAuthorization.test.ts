@@ -52,6 +52,17 @@ describe("RPC authorization scopes", () => {
     );
   });
 
+  it("keeps provider discovery, which lists drives and runs the programs it finds, behind providers scope", () => {
+    for (const method of [
+      WS_METHODS.providerDiscoveryScan,
+      WS_METHODS.providerDiscoveryListVolumes,
+      WS_METHODS.providerDiscoverySearchVolumes,
+      WS_METHODS.providerDiscoveryInspect,
+    ]) {
+      expect(requiredScopeForRpcMethod(method)).toBe(AuthProvidersManageScope);
+    }
+  });
+
   it("separates passive terminal observation from operations that can change a shell", () => {
     for (const method of [WS_METHODS.terminalObserve, WS_METHODS.subscribeTerminalMetadata]) {
       expect(requiredScopeForRpcMethod(method)).toBe(AuthTerminalReadScope);

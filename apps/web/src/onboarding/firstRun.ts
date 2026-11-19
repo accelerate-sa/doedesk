@@ -3,5 +3,9 @@ import { ensureClientSettingsHydrated, persistClientSettingsUpdate } from "../ho
 export async function completeOnboarding(): Promise<void> {
   await ensureClientSettingsHydrated();
   const onboardingCompletedAt = new Date().toISOString();
-  await persistClientSettingsUpdate((current) => ({ ...current, onboardingCompletedAt }));
+  await persistClientSettingsUpdate((current) => ({
+    ...current,
+    onboardingCompletedAt,
+    onboardingProgress: null,
+  }));
 }
