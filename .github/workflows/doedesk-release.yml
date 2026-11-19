@@ -7,6 +7,7 @@ name: Release
 # publishing it is the owner's call. See docs/operations/doedesk-release.md.
 #
 #   gh workflow run doedesk-release.yml --ref doedesk -f version=0.1.10
+#   (add -f upload=false to build and check without touching the release)
 
 on:
   push:
@@ -18,6 +19,11 @@ on:
         description: "Version to build, for example 0.1.10. Builds the commit of tag v<version>."
         required: true
         type: string
+      upload:
+        description: "Attach the files to the release. Off: build and check only."
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -240,6 +246,7 @@ jobs:
           ls -l upload
 
       - name: Upload to the release
+        if: github.event_name == 'push' || inputs.upload
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}
