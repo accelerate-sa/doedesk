@@ -15,11 +15,11 @@ import { type ImageRedactor, makeImageRedactor } from "./redaction/redactImage.t
 import { type RedactionFile, type RedactionRecord, RedactionStore } from "./redaction/store.ts";
 
 /**
- * Images go as masked text until the redacted-image path is measured on a larger set of images
- * it was not tuned on (docs/operations/image-redaction.md). People can choose redacted images
- * in Settings.
+ * Images go redacted: the image with a labelled box over each detected value (owner's decision,
+ * 19 November 2026). An image that cannot be redacted safely, or a service that returns no word
+ * positions, falls back to masked text. People can choose masked text or withholding in Settings.
  */
-const DEFAULT_IMAGE_HANDLING: "redacted" | "text" | "withheld" = "text";
+const DEFAULT_IMAGE_HANDLING: "redacted" | "text" | "withheld" = "redacted";
 
 export type PrivacyMode = "unconfigured" | "cloud" | "selfHosted" | "off";
 
