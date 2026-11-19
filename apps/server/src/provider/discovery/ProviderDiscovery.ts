@@ -201,15 +201,20 @@ const make = Effect.fn("ProviderDiscovery.make")(function* () {
     let path = input.path.replace(/\/+$/, "");
     let app: string | undefined;
     let kind = yield* fs.kindOf(path);
-    if (kind === "directory" && path.endsWith(".app")) {
-      // An app chosen by hand stands for the provider's program inside it.
-      app = path.slice(path.lastIndexOf("/") + 1);
+    if (kind === "directory") {
+      // A folder chosen by hand stands for the provider's program inside it: an app, or a
+      // folder of programs such as a `bin` folder.
       const spec = specFor(input.driver);
-      const inner = [
-        ...(spec?.appBundles.filter((bundle) => bundle.app === app).map((bundle) => bundle.inner) ??
-          []),
-        ...(spec?.executables.map((name) => `Contents/MacOS/${name}`) ?? []),
-      ];
+      const isApp = path.endsWith(".app");
+      if (isApp) app = path.slice(path.lastIndexOf("/") + 1);
+      const inner = isApp
+        ? [
+            ...(spec?.appBundles
+              .filter((bundle) => bundle.app === app)
+              .map((bundle) => bundle.inner) ?? []),
+            ...(spec?.executables.map((name) => `Contents/MacOS/${name}`) ?? []),
+          ]
+        : (spec?.executables ?? []);
       for (const candidate of inner) {
         if ((yield* fs.kindOf(`${path}/${candidate}`)) === "executable") {
           path = `${path}/${candidate}`;

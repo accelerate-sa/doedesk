@@ -50,7 +50,6 @@ import {
   requestGuarded,
   requestInSession,
   runStream,
-  runStreamGuarded,
   runStreamInSession,
   subscribe,
   subscribeDynamicWithSession,
@@ -1480,7 +1479,7 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:provider:discovery-search",
       // A search runs only while asked for; a reconnect must not start it again unasked.
       subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.providerDiscoverySearchVolumes>) =>
-        runStreamGuarded(WS_METHODS.providerDiscoverySearchVolumes, input),
+        runStream(WS_METHODS.providerDiscoverySearchVolumes, input),
       idleTtlMs: 0,
     }),
     traceDiagnostics: createEnvironmentRpcQueryAtomFamily(runtime, {
