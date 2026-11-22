@@ -217,6 +217,8 @@ it("opens a linked Linear issue from an inactive thread's sidebar badge", async 
   });
   __setClientSettingsForTests({
     ...DEFAULT_CLIENT_SETTINGS,
+    // Chat details and the right panel's tools show only in Developer mode.
+    developerMode: true,
     onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
   });
   await page.viewport(1400, 900);
@@ -259,7 +261,7 @@ it("opens a linked Linear issue from an inactive thread's sidebar badge", async 
   await act(() => useRightPanelStore.getState().close(scopeThreadRef(ENVIRONMENT_ID, linked.id)));
   await expect
     .element(
-      page.getByRole("region", { name: "Thread details" }).getByRole("link", {
+      page.getByRole("region", { name: "Chat details" }).getByRole("link", {
         name: issueName,
         exact: true,
       }),
@@ -845,6 +847,8 @@ it("a shortcut conditioned on rightPanelOpen sees the thread's open right panel"
   });
   __setClientSettingsForTests({
     ...DEFAULT_CLIENT_SETTINGS,
+    // Chat details and the right panel's tools show only in Developer mode.
+    developerMode: true,
     onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
   });
   const router = getRouter(

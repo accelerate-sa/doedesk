@@ -275,7 +275,7 @@ it("keeps focus on the list when Show more pages reveal the last rows", async ()
   );
   await screen.getByRole("button", { name: /Previous agents/ }).click();
   await screen.getByRole("button", { name: "Show 1 more" }).click();
-  await expect.element(screen.getByRole("list", { name: "Related threads" })).toHaveFocus();
+  await expect.element(screen.getByRole("list", { name: "Related chats" })).toHaveFocus();
 });
 
 it("shows a lineage thread's full title in its tooltip", async () => {

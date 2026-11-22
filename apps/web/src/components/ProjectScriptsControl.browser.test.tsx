@@ -54,7 +54,7 @@ it.each(["edit", "dismiss", "newer import fails first"] as const)(
         expect(name.query()).toHaveProperty("value", "Local check");
         break;
       case "dismiss":
-        await page.getByRole("menuitem", { name: "Add project script" }).click();
+        await page.getByRole("menuitem", { name: "Add folder script" }).click();
         await expect.element(dialog).toBeVisible();
         await userEvent.keyboard("{Escape}");
         await expect.element(dialog).not.toBeInTheDocument();

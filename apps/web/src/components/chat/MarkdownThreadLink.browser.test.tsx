@@ -204,7 +204,7 @@ it.for([
       <MarkdownThreadLink environmentId={environmentId} threadRef={HERE} link={link} label={null} />
     </RegistryContext>,
   );
-  const chip = screen.getByRole("button", { name: "Thread, Thread on fs-17" });
+  const chip = screen.getByRole("button", { name: "Chat, Chat on fs-17" });
   await chip.click();
   const surface = linkedThreadSurface({
     viaEnvironmentId: environmentId,
@@ -236,7 +236,7 @@ it("reads through the link when a disconnected machine's thread is only cached h
       <MarkdownThreadLink environmentId={environmentId} threadRef={HERE} link={link} label={null} />
     </RegistryContext>,
   );
-  await screen.getByRole("button", { name: "Thread, Cached title" }).click();
+  await screen.getByRole("button", { name: "Chat, Cached title" }).click();
   expect(panel().surfaces).toEqual([
     linkedThreadSurface({
       viaEnvironmentId: environmentId,
