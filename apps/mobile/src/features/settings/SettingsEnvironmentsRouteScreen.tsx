@@ -1,3 +1,4 @@
+import { useGT } from "gt-react-native";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useNavigation } from "@react-navigation/native";
 import { useAtomValue } from "@effect/atom-react";
@@ -26,6 +27,7 @@ import {
 const SHOWCASE_ENABLED = process.env.EXPO_PUBLIC_SHOWCASE === "1";
 
 export function SettingsEnvironmentsRouteScreen() {
+  const gt = useGT();
   const {
     connectedEnvironments,
     onReconnectEnvironment,
@@ -91,11 +93,11 @@ export function SettingsEnvironmentsRouteScreen() {
 
   return (
     <SettingsScreen
-      title="Computers"
+      title={gt("Computers")}
       refresh={
         relaySession
           ? {
-              accessibilityLabel: "Refresh cloud computers",
+              accessibilityLabel: gt("Refresh cloud computers"),
               disabled: isRefreshingCloud,
               onPress: () => void refreshCloudEnvironments(),
             }
@@ -103,7 +105,7 @@ export function SettingsEnvironmentsRouteScreen() {
       }
       actions={[
         {
-          accessibilityLabel: "Add computer",
+          accessibilityLabel: gt("Add computer"),
           icon: "plus",
           tintColor: headerIconColor,
           onPress: () => navigation.navigate("SettingsEnvironmentNew"),

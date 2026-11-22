@@ -9,7 +9,7 @@ import {
   usePrivacyRedactions,
 } from "~/privacy/privacyClient";
 import { SettingsRow, SettingsSection } from "../settings/settingsLayout";
-import { searchableSetting } from "../settings/settingsSearch";
+import { useSearchableSetting } from "../settings/settingsSearch";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
@@ -17,6 +17,7 @@ import { describeRedaction, IMAGE_HANDLING_CHOICES, imageHandlingOf } from "./Im
 
 /** How images are sent to the AI, and whether agents may read a file as masked text. */
 export function ImageHandlingSection({ status }: { readonly status: PrivacyStatus }) {
+  const searchableSetting = useSearchableSetting();
   const [busy, setBusy] = useState(false);
   const handling = imageHandlingOf(status);
   const chosen = IMAGE_HANDLING_CHOICES.find((choice) => choice.value === handling);
@@ -87,6 +88,7 @@ const save = (fileName: string, blob: Blob): void => {
 
 /** The redacted image and the masked text of each recent attachment, to download. */
 export function RedactionsSection() {
+  const searchableSetting = useSearchableSetting();
   const records = usePrivacyRedactions();
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);

@@ -59,6 +59,7 @@ import {
   SmartphoneIcon,
   TerminalIcon,
 } from "lucide-react";
+import { msg, T, useGT, useLocale, useMessages, Var } from "gt-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "../../appearanceFonts";
@@ -151,7 +152,7 @@ import {
 } from "./SetupPrivacySteps";
 
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
-const SCAN_LIMIT_MESSAGE = "Scan limit reached. Some folders or conversations may be missing.";
+const SCAN_LIMIT_MESSAGE = msg("Scan limit reached. Some folders or conversations may be missing.");
 
 /** Stored progress for first-run setup, read and written through the client settings. */
 function useOnboardingState() {
@@ -183,6 +184,7 @@ export function WelcomePage({
   readonly onDone: (projectRef?: ScopedProjectRef) => void | Promise<void>;
 }) {
   const developerMode = useDeveloperMode();
+  const gt = useGT();
   const { environments } = useEnvironments();
   const environmentLabel = environments.find(
     (environment) => environment.environmentId === environmentId,
@@ -221,8 +223,8 @@ export function WelcomePage({
       toastManager.add({
         id: "welcome-finishing",
         type: "info",
-        title: "Finishing setup",
-        description: "One moment.",
+        title: gt("Finishing setup"),
+        description: gt("One moment."),
       });
       return true;
     },
@@ -258,14 +260,17 @@ export function WelcomePage({
         if (importWarning) {
           toastManager.add({
             type: "warning",
-            title: "Some history was not imported",
+            title: gt("Some history was not imported"),
             description: importWarning,
             timeout: 0,
           });
         } else if (importedThreadCount > 0) {
           toastManager.add({
             type: "success",
-            title: `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "chat" : "chats"}`,
+            title: gt(
+              "{count, plural, one {Imported {count} chat} other {Imported {count} chats}}",
+              { count: importedThreadCount },
+            ),
           });
         }
         return true;
@@ -274,8 +279,8 @@ export function WelcomePage({
         holdPageRef.current = false;
         const errorToast = {
           type: "error",
-          title: "Could not finish setup",
-          description: "Your settings could not be saved. Try again.",
+          title: gt("Could not finish setup"),
+          description: gt("Your settings could not be saved. Try again."),
         } as const;
         if (completionErrorToastIdRef.current === null) {
           completionErrorToastIdRef.current = toastManager.add(errorToast);
@@ -456,12 +461,15 @@ export function WelcomePage({
                 startLabel={
                   isImporting
                     ? selected.length > 0
-                      ? "Importing…"
-                      : "Starting…"
+                      ? gt("Importing…")
+                      : gt("Starting…")
                     : newCount > 0
-                      ? `Import ${newCount} ${newCount === 1 ? "folder" : "folders"} and start`
+                      ? gt(
+                          "{count, plural, one {Import {count} folder and start} other {Import {count} folders and start}}",
+                          { count: newCount },
+                        )
                       : selected.length > 0
-                        ? "Import chats and start"
+                        ? gt("Import chats and start")
                         : null
                 }
                 onBack={() => saveState(goBack(state, facts))}
@@ -660,20 +668,24 @@ function StepFooter({
 
 // Where an organization's policy turns usage data off, the page says so instead of asking.
 function TelemetryNotice({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const telemetryOff = managedTelemetryOffMessage(useManagedPolicy(environmentId));
+  const messages = useMessages();
+  const telemetryOff = managedTelemetryOffMessage(useManagedPolicy(environmentId), messages);
   if (telemetryOff === undefined) return null;
   return (
     <p className="mt-auto pt-12 text-2xs leading-relaxed text-muted-foreground/70">
-      {telemetryOff} See the{" "}
-      <a
-        className="underline decoration-current/40 underline-offset-2 hover:text-muted-foreground"
-        href={PRIVACY_POLICY_URL}
-        target="_blank"
-        rel="noreferrer noopener"
-      >
-        privacy policy
-      </a>
-      .
+      {telemetryOff}{" "}
+      <T>
+        See the{" "}
+        <a
+          className="underline decoration-current/40 underline-offset-2 hover:text-muted-foreground"
+          href={PRIVACY_POLICY_URL}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          privacy policy
+        </a>
+        .
+      </T>
     </p>
   );
 }
@@ -756,6 +768,7 @@ function AgentsSection({
   const t = useSetupText();
   const developerMode = useDeveloperMode();
   const { providers, serverConfig, checking, found, available } = useWelcomeAgents(environmentId);
+  const gt = useGT();
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     reportFailure: false,
   });
@@ -858,7 +871,7 @@ function AgentsSection({
         const cause = squashAtomCommandFailure(result);
         toastManager.add({
           type: "error",
-          title: `Could not turn on ${agentName(provider)}`,
+          title: gt("Could not turn on {agent}", { agent: agentName(provider) }),
           ...(cause instanceof Error ? { description: cause.message } : {}),
         });
       }
@@ -876,7 +889,7 @@ function AgentsSection({
       <Button
         size="xs"
         variant="outline"
-        aria-label={`${actionLabel}: ${name}`}
+        aria-label={gt("{action}: {agent}", { action: actionLabel, agent: name })}
         render={
           <Link
             to="/settings/providers"
@@ -1107,6 +1120,9 @@ function ProjectsSection({
   readonly projectImport: ReturnType<typeof useProjectImport>;
   readonly isImporting: boolean;
 }) {
+  const gt = useGT();
+  const m = useMessages();
+  const importSourcesLabel = useImportSourcesLabel();
   const [reviewing, setReviewing] = useState(false);
   const {
     canWrite,
@@ -1121,26 +1137,28 @@ function ProjectsSection({
   if (scan === undefined) return null;
   if (scan.isPending && candidates.length === 0) {
     return (
-      <WelcomeSection title="Folders">
+      <WelcomeSection title={gt("Folders")}>
         <p className="text-sm leading-10 text-muted-foreground">
-          Looking for folders in your {IMPORT_SOURCES_LABEL} history…
+          <T>
+            Looking for folders in your <Var>{importSourcesLabel}</Var> history…
+          </T>
         </p>
       </WelcomeSection>
     );
   }
   const retry = (
     <Button variant="ghost" size="sm" onClick={scan.refresh}>
-      Retry
+      <T>Retry</T>
     </Button>
   );
   if (scan.error !== null && candidates.length === 0) {
     return (
-      <WelcomeSection title="Folders">
+      <WelcomeSection title={gt("Folders")}>
         <div
           role="alert"
           className="flex min-h-10 items-center justify-between gap-3 text-sm text-muted-foreground"
         >
-          <span>Could not check folders. {scan.error}</span>
+          <span>{gt("Could not check folders. {error}", { error: scan.error })}</span>
           {retry}
         </div>
       </WelcomeSection>
@@ -1148,9 +1166,9 @@ function ProjectsSection({
   }
   if (candidates.length === 0) {
     return scan.data?.truncated ? (
-      <WelcomeSection title="Folders">
+      <WelcomeSection title={gt("Folders")}>
         <p className="text-xs leading-10 text-muted-foreground" role="status">
-          {SCAN_LIMIT_MESSAGE}
+          {m(SCAN_LIMIT_MESSAGE)}
         </p>
       </WelcomeSection>
     ) : null;
@@ -1167,7 +1185,7 @@ function ProjectsSection({
     selected.length < candidates.length &&
     !(selected.length === defaultKeys.length && defaultKeys.every((key) => selectedKeys.has(key)));
   return (
-    <WelcomeSection title="Folders">
+    <WelcomeSection title={gt("Folders")}>
       <div className="flex min-h-10 items-center gap-3 py-1">
         <label className="flex min-w-0 flex-1 items-center gap-3">
           <RowIcon>
@@ -1183,11 +1201,16 @@ function ProjectsSection({
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-foreground">
               {canWrite && selected.length > 0
-                ? `Import ${selected.length} ${selected.length === 1 ? "folder" : "folders"} and their chats`
-                : "Import folders and their chats"}
+                ? gt(
+                    "{count, plural, one {Import {count} folder and their chats} other {Import {count} folders and their chats}}",
+                    { count: selected.length },
+                  )
+                : gt("Import folders and their chats")}
             </span>
             <span className="block text-xs text-muted-foreground">
-              From your {IMPORT_SOURCES_LABEL} history
+              <T>
+                From your <Var>{importSourcesLabel}</Var> history
+              </T>
             </span>
           </span>
         </label>
@@ -1198,7 +1221,11 @@ function ProjectsSection({
             aria-expanded={reviewing}
             onClick={() => setReviewing((open) => !open)}
           >
-            {reviewing ? "Hide" : `Review all ${candidates.length}`}
+            {reviewing
+              ? gt("Hide")
+              : gt("{count, plural, one {Review all {count}} other {Review all {count}}}", {
+                  count: candidates.length,
+                })}
             <ChevronDownIcon className={cn("size-3.5", reviewing && "rotate-180")} />
           </Button>
         ) : null}
@@ -1208,7 +1235,13 @@ function ProjectsSection({
         <fieldset className="-mx-1.5 mt-1 min-w-0" disabled={isImporting}>
           <div className="flex items-center justify-between gap-3 px-2 text-xs text-muted-foreground">
             <span role="status">
-              {selected.length} of {candidates.length} selected
+              {gt(
+                "{selected, plural, one {{selected} of {total} selected} other {{selected} of {total} selected}}",
+                {
+                  selected: selected.length,
+                  total: candidates.length,
+                },
+              )}
             </span>
             <div className="flex items-center gap-1">
               <Button
@@ -1217,7 +1250,7 @@ function ProjectsSection({
                 disabled={selected.length === candidates.length}
                 onClick={() => setSelectedKeys(new Set(allKeys))}
               >
-                Select all
+                <T>Select all</T>
               </Button>
               <Button
                 variant="ghost"
@@ -1225,7 +1258,7 @@ function ProjectsSection({
                 disabled={selected.length === 0}
                 onClick={() => setSelectedKeys(new Set())}
               >
-                Select none
+                <T>Select none</T>
               </Button>
             </div>
           </div>
@@ -1242,7 +1275,7 @@ function ProjectsSection({
       ) : null}
       {scan.data?.truncated ? (
         <p className="ps-8 text-xs text-muted-foreground" role="status">
-          {SCAN_LIMIT_MESSAGE}
+          {m(SCAN_LIMIT_MESSAGE)}
         </p>
       ) : null}
       {scan.error !== null ? (
@@ -1250,31 +1283,32 @@ function ProjectsSection({
           role="alert"
           className="flex items-center justify-between gap-3 ps-8 text-sm text-muted-foreground"
         >
-          <span>Could not check folders again. {scan.error}</span>
+          <span>{gt("Could not check folders again. {error}", { error: scan.error })}</span>
           {retry}
         </div>
       ) : null}
       {visibleImportError ? (
-        <p className="pt-1 ps-8 text-sm text-destructive">{visibleImportError}</p>
+        <p className="pt-1 ps-8 text-sm text-destructive">{m(visibleImportError)}</p>
       ) : null}
     </WelcomeSection>
   );
 }
 
 function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const gt = useGT();
   const [open, setOpen] = useState(false);
   return (
-    <WelcomeSection title="Phone">
+    <WelcomeSection title={gt("Phone")}>
       <Collapsible open={open} onOpenChange={setOpen}>
         <div className="flex min-h-10 items-center gap-3 py-1">
           <RowIcon>
             <SmartphoneIcon className="size-4" />
           </RowIcon>
           <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
-            Use DoeDesk on your phone
+            <T>Use DoeDesk on your phone</T>
           </span>
           <CollapsibleTrigger render={<Button variant="ghost-muted" size="xs" />}>
-            {open ? "Hide" : "Set up"}
+            {open ? gt("Hide") : gt("Set up")}
             <ChevronDownIcon className={cn("size-3.5", open && "rotate-180")} />
           </CollapsibleTrigger>
         </div>
@@ -1282,7 +1316,9 @@ function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId
           <div className="flex items-center gap-8 pt-2 pb-3 ps-8">
             <ol className="min-w-0 flex-1 space-y-5">
               <PhoneStep step={1}>
-                <p className="text-sm text-foreground">Scan with your phone to get the app.</p>
+                <p className="text-sm text-foreground">
+                  <T>Scan with your phone to get the app.</T>
+                </p>
               </PhoneStep>
               <PhoneStep step={2}>
                 <PhoneConnectLink environmentId={environmentId} />
@@ -1295,7 +1331,7 @@ function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId
                 size={124}
                 level="M"
                 marginSize={2}
-                title="DoeDesk app for iPhone and Android"
+                title={gt("DoeDesk app for iPhone and Android")}
               />
             </div>
           </div>
@@ -1316,6 +1352,7 @@ function PhoneStep({ step, children }: { readonly step: number; readonly childre
 
 function PhoneConnectLink({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const { isLoaded, isSignedIn, userId } = useAuth({ treatPendingAsSignedOut: false });
+  const gt = useGT();
   const loadFailed = useClerkLoadFailed();
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
   const linkState = useCloudLinkState(environmentId);
@@ -1342,13 +1379,19 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
     </Button>
   );
   if (isSignedIn && link === null && linkState.isPending) {
-    return <p className="text-sm text-muted-foreground">Checking T3 Connect…</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        <T>Checking T3 Connect…</T>
+      </p>
+    );
   }
   if (isSignedIn && linkState.error !== null) {
     return (
       <>
-        <p className="text-sm text-foreground">Could not check T3 Connect.</p>
-        {settingsLink("Check T3 Connect")}
+        <p className="text-sm text-foreground">
+          <T>Could not check T3 Connect.</T>
+        </p>
+        {settingsLink(gt("Check T3 Connect"))}
       </>
     );
   }
@@ -1356,14 +1399,14 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
     return (
       <p className="flex gap-1.5 text-sm text-foreground">
         <CheckIcon className="mt-0.5 size-4 shrink-0 text-success-foreground" />
-        Your phone can reach this computer. Sign in to the app with the same account.
+        <T>Your phone can reach this computer. Sign in to the app with the same account.</T>
       </p>
     );
   }
   if (isSignedIn && shared && reachability === undefined) {
     return (
       <p className="text-sm text-foreground">
-        T3 Connect is on for this computer. Sign in to the app with the same account.
+        <T>T3 Connect is on for this computer. Sign in to the app with the same account.</T>
       </p>
     );
   }
@@ -1373,25 +1416,25 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
       <>
         <p className="text-sm text-foreground">
           {shared
-            ? "T3 Connect is on, but the app cannot reach this computer."
-            : "Signed in. Share this computer so the app can reach it."}
+            ? gt("T3 Connect is on, but the app cannot reach this computer.")
+            : gt("Signed in. Share this computer so the app can reach it.")}
         </p>
-        {settingsLink(shared ? "Check T3 Connect" : "Set up T3 Connect")}
+        {settingsLink(shared ? gt("Check T3 Connect") : gt("Set up T3 Connect"))}
       </>
     );
   }
   return (
     <>
       <p className="text-sm text-foreground">
-        Sign in to T3 Connect here, then in the app with the same account.
+        <T>Sign in to T3 Connect here, then in the app with the same account.</T>
       </p>
       {loadFailed ? (
         <Button variant="outline" size="xs" onClick={retryClerkLoad}>
-          Retry sign-in
+          <T>Retry sign-in</T>
         </Button>
       ) : (
         <Button variant="outline" size="xs" disabled={!isLoaded} onClick={openAuthPrompt}>
-          Sign in to T3 Connect
+          <T>Sign in to T3 Connect</T>
         </Button>
       )}
     </>
@@ -1411,6 +1454,7 @@ function OnboardingCodexSetup({
   // True asks for the CLI's install or sign-in terminal once Codex has checked the CLI.
   readonly onUseCliChange: (useCli: boolean) => void;
 }) {
+  const gt = useGT();
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const persistProviderInstance = usePersistEnvironmentProviderInstanceMutation(environmentId);
@@ -1439,7 +1483,7 @@ function OnboardingCodexSetup({
           const cause = squashAtomCommandFailure(result);
           toastManager.add({
             type: "error",
-            title: "Could not save Codex setup",
+            title: gt("Could not save Codex setup"),
             ...(cause instanceof Error ? { description: cause.message } : {}),
           });
         }
@@ -1474,12 +1518,13 @@ function TerminalAction({
   readonly onClick: () => void;
 }) {
   const t = useSetupText();
+  const gt = useGT();
   const label = signIn ? t("Sign in", "تسجيل الدخول") : t("Install", "تثبيت");
   return (
     <Button
       size="xs"
       variant="outline"
-      aria-label={`${label}: ${name}`}
+      aria-label={gt("{action}: {agent}", { action: label, agent: name })}
       disabled={disabled}
       onClick={onClick}
     >
@@ -1503,6 +1548,7 @@ function AgentRow({
 }) {
   const t = useSetupText();
   const name = agentName(provider);
+  const messages = useMessages();
   // Claude Code and Codex tiles show Install or Set up; other agents that are on say why not.
   const brokenMessage = isBrokenVersion(provider)
     ? (provider.compatibilityAdvisory?.message ?? null)
@@ -1518,8 +1564,8 @@ function AgentRow({
           ? (provider.unavailableReason ??
             brokenMessage ??
             provider.message ??
-            getProviderSummary(provider).headline)
-          : (brokenMessage ?? getProviderSummary(provider).headline);
+            getProviderSummary(provider, messages).headline)
+          : (brokenMessage ?? getProviderSummary(provider, messages).headline);
   return (
     <div className={cn("flex items-center gap-3", compact ? "min-h-9" : "min-h-10 py-1")}>
       <RowIcon>
@@ -1566,6 +1612,7 @@ function AgentInstallTerminal({
 }) {
   const { command, cwd, driver, environmentId, keybindings, providerInstanceId } = session;
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
+  const gt = useGT();
   const [advancedTypography] = useLocalStorage(
     TYPOGRAPHY_ADVANCED_STORAGE_KEY,
     false,
@@ -1679,18 +1726,21 @@ function AgentInstallTerminal({
       <div className="flex items-center justify-between border-b border-border/60 bg-background/60 px-3 py-1.5">
         <span className="text-2xs font-medium text-muted-foreground">
           {!canOperateTerminal ? (
-            "This connection cannot control terminals."
+            gt("This connection cannot control terminals.")
           ) : setupState === "writeFailed" ? (
-            <>
-              Run <code className="rounded bg-muted px-1 font-mono">{command}</code> in this
-              terminal.
-            </>
+            <T>
+              Run{" "}
+              <code className="rounded bg-muted px-1 font-mono">
+                <Var>{command}</Var>
+              </code>{" "}
+              in this terminal.
+            </T>
           ) : setupState === "ready" ? (
-            "Review the command, then press Enter to run it."
+            gt("Review the command, then press Enter to run it.")
           ) : setupState === "openFailed" ? (
-            "Could not open the setup terminal."
+            gt("Could not open the setup terminal.")
           ) : (
-            "Preparing command..."
+            gt("Preparing command...")
           )}
         </span>
         <div className="flex items-center gap-1">
@@ -1705,11 +1755,11 @@ function AgentInstallTerminal({
                 }
               }}
             >
-              Retry
+              <T>Retry</T>
             </Button>
           ) : null}
           <Button size="xs" variant="ghost-muted" onClick={onClose}>
-            Close
+            <T>Close</T>
           </Button>
         </div>
       </div>
@@ -1719,7 +1769,7 @@ function AgentInstallTerminal({
             threadRef={threadRef}
             threadId={AGENT_ONBOARDING_THREAD_ID}
             terminalId={terminalId}
-            terminalLabel={`Install ${driver}`}
+            terminalLabel={gt("Install {agent}", { agent: driver })}
             cwd={cwd}
             providerInstanceId={providerInstanceId}
             advancedTypography={advancedTypography}
@@ -1734,7 +1784,7 @@ function AgentInstallTerminal({
   );
 }
 
-const IMPORT_PERMISSION_MESSAGE = "This connection cannot import folders or chat history.";
+const IMPORT_PERMISSION_MESSAGE = msg("This connection cannot import folders or chat history.");
 
 // Creates the selected projects, then imports each one's agent history. Owns retry state so a
 // second Start resumes instead of recreating projects.
@@ -1761,6 +1811,7 @@ function useProjectImport({
   ) => Promise<boolean>;
 }) {
   const writableEnvironments = useEnvironmentsWithScope(scans, AuthOrchestrationOperateScope);
+  const gt = useGT();
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
   const importThreads = useAtomCommand(agentSessionImport, { reportFailure: false });
   const importWarningRef = useRef("");
@@ -1972,13 +2023,25 @@ function useProjectImport({
     const importedThreadCount = importedThreadTotal();
     if (importedProjectsCount < selection.length) {
       if (importedThreadCount > 0 && skippedThreadCount > 0) {
-        importWarningRef.current = `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "chat" : "chats"}. ${skippedThreadCount} ${skippedThreadCount === 1 ? "chat" : "chats"} could not be imported.`;
+        importWarningRef.current = `${gt(
+          "{count, plural, one {Imported {count} chat.} other {Imported {count} chats.}}",
+          { count: importedThreadCount },
+        )} ${gt(
+          "{count, plural, one {{count} chat could not be imported.} other {{count} chats could not be imported.}}",
+          { count: skippedThreadCount },
+        )}`;
       } else if (skippedThreadCount > 0) {
-        importWarningRef.current = `${skippedThreadCount} ${skippedThreadCount === 1 ? "chat could" : "chats could"} not be imported.`;
+        importWarningRef.current = gt(
+          "{count, plural, one {{count} chat could not be imported.} other {{count} chats could not be imported.}}",
+          { count: skippedThreadCount },
+        );
       } else if (importedThreadCount > 0) {
-        importWarningRef.current = `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "chat" : "chats"}. Some chat history could not be imported.`;
+        importWarningRef.current = gt(
+          "{count, plural, one {Imported {count} chat. Some chat history could not be imported.} other {Imported {count} chats. Some chat history could not be imported.}}",
+          { count: importedThreadCount },
+        );
       } else {
-        importWarningRef.current = "Could not import chat history.";
+        importWarningRef.current = gt("Could not import chat history.");
       }
     }
     finishAfterImport();
@@ -2022,6 +2085,7 @@ function ImportCandidateList({
     onSelectionChange(next);
   };
   const otherSelected = other.filter((candidate) => selectedKeys.has(candidate.key)).length;
+  const gt = useGT();
 
   return (
     <>
@@ -2048,9 +2112,13 @@ function ImportCandidateList({
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-start">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
-              <span className="truncate text-sm text-muted-foreground">Other folders</span>
+              <span className="truncate text-sm text-muted-foreground">
+                <T>Other folders</T>
+              </span>
               <span className="ms-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-                {other.length} {other.length === 1 ? "folder" : "folders"}
+                {gt("{count, plural, one {{count} folder} other {{count} folders}}", {
+                  count: other.length,
+                })}
               </span>
             </CollapsibleTrigger>
           </div>
@@ -2199,9 +2267,11 @@ const IMPORT_SOURCE_NAMES: Record<AgentSessionSource, string> = {
   codex: "Codex",
   pi: "Pi",
 };
-const IMPORT_SOURCES_LABEL = new Intl.ListFormat("en", { type: "conjunction" }).format(
-  AgentSessionSource.literals.map((source) => IMPORT_SOURCE_NAMES[source]),
-);
+function useImportSourcesLabel() {
+  return new Intl.ListFormat(useLocale(), { type: "conjunction" }).format(
+    AgentSessionSource.literals.map((source) => IMPORT_SOURCE_NAMES[source]),
+  );
+}
 
 function ImportRowMeta({
   sources,
@@ -2212,8 +2282,16 @@ function ImportRowMeta({
   readonly threadCount: number;
   readonly lastActiveAt: string | null;
 }) {
-  const relative = lastActiveAt === null ? null : formatRelativeTime(lastActiveAt);
-  const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
+  const gt = useGT();
+  const messages = useMessages();
+  const relative =
+    lastActiveAt === null ? null : formatRelativeTime(lastActiveAt, undefined, messages);
+  const age =
+    relative === null
+      ? ""
+      : relative.suffix === null
+        ? gt("now", { $context: "relative time" })
+        : relative.value;
   return (
     <span className="ms-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
       {AgentSessionSource.literals.map((source) => (
@@ -2247,19 +2325,20 @@ function CliPathSetup() {
       </RowIcon>
       <p className="min-w-0 flex-1 text-sm text-muted-foreground">
         {setup.added ? (
-          <>
-            Added to {setup.file}. Open a new terminal to use <code className="font-mono">t3</code>.
-          </>
+          <T>
+            Added to <Var>{setup.file}</Var>. Open a new terminal to use{" "}
+            <code className="font-mono">t3</code>.
+          </T>
         ) : (
-          <>
+          <T>
             Use <code className="font-mono">t3</code> from any terminal. Adds one line to{" "}
-            {setup.file}.
-          </>
+            <Var>{setup.file}</Var>.
+          </T>
         )}
       </p>
       {setup.added ? null : (
         <Button size="xs" variant="outline" disabled={busy} onClick={() => run("addToPath")}>
-          Add to PATH
+          <T>Add to PATH</T>
         </Button>
       )}
     </div>

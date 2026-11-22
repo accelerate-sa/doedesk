@@ -1,3 +1,4 @@
+import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
 import {
   ClientSettingsSchema,
   type ClientSettingsPatch,
@@ -25,6 +26,9 @@ import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
 import * as Equal from "effect/Equal";
 import * as Cause from "effect/Cause";
 import { Atom } from "effect/reactivity";
+import { msg } from "gt-react";
+
+import { m } from "../../i18n/messages";
 
 import type { ResolvedSettingsScope } from "./settingsScope";
 
@@ -401,10 +405,16 @@ export function planScopedSettingsPatch(
       : scope.kind === "unavailable"
         ? scope.message
         : unscopableKeys.length > 0
-          ? "This setting is environment-wide and cannot be overridden by a folder."
+          ? m(msg("This setting is environment-wide and cannot be overridden by a folder."))
           : isProjectScope
-            ? "Connect the selected checkouts, or update their computers, to save a folder override."
-            : `Connect ${scope.kind === "environment" ? scope.label : "a computer"} to save this setting.`;
+            ? m(
+                msg(
+                  "Connect the selected checkouts, or update their computers, to save a folder override.",
+                ),
+              )
+            : scope.kind === "environment"
+              ? m(msg("Connect {environment} to save this setting.", { environment: scope.label }))
+              : m(msg("Connect a computer to save this setting."));
   return { clientPatch, hasClientWrite, serverWrites, unavailableReason };
 }
 
@@ -426,7 +436,11 @@ export function planScopedSettingsClear(
     unavailableReason:
       serverWrites.length > 0
         ? null
-        : "Connect the selected checkouts, or update their computers, to reset this override.",
+        : m(
+            msg(
+              "Connect the selected checkouts, or update their computers, to reset this override.",
+            ),
+          ),
   };
 }
 
@@ -482,7 +496,7 @@ export function planProjectOverridesClear(
     hasClientWrite: false,
     serverWrites,
     unavailableReason:
-      serverWrites.length > 0 ? null : "Connect the computers to reset these overrides.",
+      serverWrites.length > 0 ? null : m(msg("Connect the computers to reset these overrides.")),
   };
 }
 
@@ -660,7 +674,7 @@ async function persistScopedSettingsPlan(
       return [
         {
           ...environment,
-          message: "This computer does not support this setting. Update DoeDesk on it.",
+          message: m(msg("This computer does not support this setting. Update DoeDesk on it.")),
         },
       ];
     }
@@ -675,8 +689,8 @@ async function persistScopedSettingsPlan(
         ...environment,
         message:
           error instanceof Error
-            ? error.message
-            : "The save failed. Try reconnecting and saving again.",
+            ? (errorDisplayMessage(error, m) ?? error.message)
+            : m(msg("The save failed. Try reconnecting and saving again.")),
       },
     ];
   });

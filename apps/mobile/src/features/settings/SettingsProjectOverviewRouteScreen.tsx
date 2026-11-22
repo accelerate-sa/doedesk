@@ -1,3 +1,5 @@
+import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
+import { T, useGT } from "gt-react-native";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { AppText as Text, AppTextInput } from "../../components/ui/AppText";
 import { Button } from "../../components/ui/Button";
@@ -38,14 +40,17 @@ import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
 import { ListActionRow as SettingsActionRow } from "../../components/ui/ListActionRow";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
+import { ProjectRepositoriesSection } from "./ProjectRepositoriesSection";
 import { useSettingsEnvironmentMenu } from "./components/SettingsEnvironmentFilterHeader";
 import { useSettingsEnvironmentFilter, type SettingsTarget } from "./settings-environment-filter";
 import { leaveSettingsPage } from "./settings-navigation";
 import { workspaceHasColumns } from "../layout/workspace/workspace-selection-store";
 import { DEFAULT_SETTINGS_PAGE } from "../layout/workspace/workspace-tab-navigation";
 import { readUnloadedThreadCount } from "../../state/olderSettledShelf";
+import { m } from "../../i18n/messages";
 
 export function SettingsProjectOverviewRouteScreen() {
+  const gt = useGT();
   const environmentMenu = useSettingsEnvironmentMenu();
   const insets = useSafeAreaInsets();
   const [isRemoving, setIsRemoving] = useState(false);
@@ -84,7 +89,7 @@ export function SettingsProjectOverviewRouteScreen() {
       .filter((project) => selectedEnvironmentIds.has(project.environmentId)) ?? [];
 
   return (
-    <SettingsScreen title="Folders" menus={[environmentMenu]}>
+    <SettingsScreen title={gt("Folders")} menus={[environmentMenu]}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -94,12 +99,14 @@ export function SettingsProjectOverviewRouteScreen() {
       >
         {selectedProjectKey === null ? (
           <Text className="px-2 text-base text-foreground-muted">
-            Choose a folder with the filter above to manage its name, checkouts and removal.
+            <T>Choose a folder with the filter above to manage its name, checkouts and removal.</T>
           </Text>
         ) : !group || members.length === 0 ? (
           <Text className="px-2 text-base text-foreground-muted">
-            This folder has no checkout on the selected connected computers. Change the filter
-            above.
+            <T>
+              This folder has no checkout on the selected connected computers. Change the filter
+              above.
+            </T>
           </Text>
         ) : (
           <ProjectOverviewContent
@@ -136,6 +143,7 @@ function ProjectOverviewContent(props: {
   readonly projectKey: string | null;
   readonly onProjectRemoved: (projectKey: string | null) => void;
 }) {
+  const gt = useGT();
   const { isRemoving, setIsRemoving, startRemoval, finishRemoval } = props;
   const representative = props.members[0]!;
   const displayName = deriveProjectGroupLabel({
@@ -182,7 +190,7 @@ function ProjectOverviewContent(props: {
     setIsOrganizing(true);
     for (const member of allMembers) {
       if (!readEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope)) {
-        Dialog.alert("Failed to update folder", "This connection can no longer change it.");
+        Dialog.alert(gt("Failed to update folder"), gt("This connection can no longer change it."));
         break;
       }
       const result = await organizeProject({
@@ -193,8 +201,10 @@ function ProjectOverviewContent(props: {
         if (!isAtomCommandInterrupted(result)) {
           const error = squashAtomCommandFailure(result);
           Dialog.alert(
-            `Failed to update "${member.title}"`,
-            error instanceof Error ? error.message : "An error occurred.",
+            gt('Failed to update "{project}"', { project: member.title }),
+            error instanceof Error
+              ? (errorDisplayMessage(error, m) ?? error.message)
+              : gt("An error occurred."),
           );
         }
         break;
@@ -214,8 +224,12 @@ function ProjectOverviewContent(props: {
       (entry) => entry.environmentId === denied.environmentId,
     );
     Dialog.alert(
-      "Failed to remove folder",
-      `This connection cannot change folders in ${environment?.label ?? "this computer"}.`,
+      gt("Failed to remove folder"),
+      environment
+        ? gt("This connection cannot change folders in {environment}.", {
+            environment: environment.label,
+          })
+        : gt("This connection cannot change folders in this computer."),
     );
     return false;
   };
@@ -223,23 +237,26 @@ function ProjectOverviewContent(props: {
   const removeMembers = (members: readonly EnvironmentProject[]) => {
     if (!checkRemovalAccess(members) || !startRemoval()) return;
     const projectKey = props.projectKey;
-    const plan = planProjectRemoval({
-      members: members.map((member) => ({
-        ...member,
-        environmentLabel: props.environments.find(
-          (entry) => entry.environmentId === member.environmentId,
-        )?.label,
-      })),
-      groupMemberCount: props.members.length,
-      hasOtherMembers: props.hasOtherMembers,
-      displayName,
-      threads,
-      unloadedThreadCount: readUnloadedThreadCount(members, threads),
-    });
+    const plan = planProjectRemoval(
+      {
+        members: members.map((member) => ({
+          ...member,
+          environmentLabel: props.environments.find(
+            (entry) => entry.environmentId === member.environmentId,
+          )?.label,
+        })),
+        groupMemberCount: props.members.length,
+        hasOtherMembers: props.hasOtherMembers,
+        displayName,
+        threads,
+        unloadedThreadCount: readUnloadedThreadCount(members, threads),
+      },
+      m,
+    );
     Dialog.confirm({
-      title: plan.targetKind === "checkout" ? "Remove checkout" : "Remove folder",
+      title: plan.targetKind === "checkout" ? gt("Remove checkout") : gt("Remove folder"),
       message: plan.confirmationMessage,
-      confirmText: plan.targetKind === "checkout" ? "Remove checkout" : "Remove folder",
+      confirmText: plan.targetKind === "checkout" ? gt("Remove checkout") : gt("Remove folder"),
       destructive: true,
       onCancel: finishRemoval,
       onConfirm: () => {
@@ -256,8 +273,10 @@ function ProjectOverviewContent(props: {
               if (!isAtomCommandInterrupted(result)) {
                 const error = squashAtomCommandFailure(result);
                 Dialog.alert(
-                  `Failed to remove "${member.title}"`,
-                  error instanceof Error ? error.message : "An error occurred.",
+                  gt('Failed to remove "{project}"', { project: member.title }),
+                  error instanceof Error
+                    ? (errorDisplayMessage(error, m) ?? error.message)
+                    : gt("An error occurred."),
                 );
               }
               return;
@@ -318,17 +337,21 @@ function ProjectOverviewContent(props: {
             {displayName}
           </Text>
           <Text className="text-sm text-foreground-muted">
-            {props.members.length === 1 ? "1 checkout" : `${props.members.length} checkouts`}
+            {gt("{count, plural, one {{count} checkout} other {{count} checkouts}}", {
+              count: props.members.length,
+            })}
           </Text>
         </View>
       </View>
 
-      <SettingsSection title="Folder">
+      <SettingsSection title={gt("Folder")}>
         <View className="gap-3 p-4">
-          <Text className="text-sm font-t3-medium text-foreground-muted">Name</Text>
+          <Text className="text-sm font-t3-medium text-foreground-muted">
+            <T>Name</T>
+          </Text>
           <View className="flex-row items-center gap-3">
             <AppTextInput
-              accessibilityLabel="Folder name"
+              accessibilityLabel={gt("Folder name")}
               className="min-h-11 min-w-0 flex-1 rounded-xl border-continuous bg-card px-3 text-base text-foreground"
               value={draftName ?? displayName}
               onChangeText={setDraftName}
@@ -338,8 +361,8 @@ function ProjectOverviewContent(props: {
             />
             {canSave ? (
               <Button
-                label="Save"
-                accessibilityHint="Save folder name"
+                label={gt("Save")}
+                accessibilityHint={gt("Save folder name")}
                 tone="secondary"
                 onPress={saveName}
               />
@@ -349,14 +372,14 @@ function ProjectOverviewContent(props: {
       </SettingsSection>
 
       {canOrganize ? (
-        <SettingsSection title="Organize">
+        <SettingsSection title={gt("Organize")}>
           <SettingsSwitchRow
             icon="pin"
-            label="Pin"
+            label={gt("Pin", { $context: "verb, keep the project at the top" })}
             subtitle={
               offline
-                ? "Connect every machine with this folder to change this."
-                : "Pinned folders come first in folder pickers."
+                ? gt("Connect every machine with this folder to change this.")
+                : gt("Pinned folders come first in folder pickers.")
             }
             value={props.group.pinned}
             disabled={isOrganizing || offline}
@@ -364,11 +387,11 @@ function ProjectOverviewContent(props: {
           />
           <SettingsActionRow
             icon="archivebox"
-            label={props.group.archived ? "Unarchive folder" : "Archive folder"}
+            label={props.group.archived ? gt("Unarchive folder") : gt("Archive folder")}
             description={
               props.group.archived
-                ? "Hidden from folder pickers. Chats and files are kept."
-                : "Hides the folder from folder pickers. Chats and files are kept."
+                ? gt("Hidden from folder pickers. Chats and files are kept.")
+                : gt("Hides the folder from folder pickers. Chats and files are kept.")
             }
             disabled={isOrganizing || offline}
             onPress={() => void organize({ archived: !props.group.archived })}
@@ -376,7 +399,7 @@ function ProjectOverviewContent(props: {
         </SettingsSection>
       ) : null}
 
-      <SettingsSection title="Checkouts">
+      <SettingsSection title={gt("Checkouts")}>
         {props.members.map((member, index) => {
           const environment = props.environments.find(
             (entry) => entry.environmentId === member.environmentId,
@@ -393,7 +416,7 @@ function ProjectOverviewContent(props: {
                     : "text-lg text-foreground"
                 }
               >
-                {environment?.label ?? "Environment"}
+                {environment?.label ?? gt("Environment")}
               </Text>
               {environment?.displayUrl ? (
                 <Text className="text-sm leading-normal text-foreground-muted">
@@ -414,22 +437,47 @@ function ProjectOverviewContent(props: {
           );
         })}
       </SettingsSection>
-      <SettingsSection title="Danger">
+      {props.members.map((member) => {
+        const environment = props.environments.find(
+          (entry) => entry.environmentId === member.environmentId,
+        )?.label;
+        return (
+          <ProjectRepositoriesSection
+            key={`${member.environmentId}:${member.id}`}
+            member={member}
+            title={
+              props.members.length === 1
+                ? gt("Repositories")
+                : gt("Repositories · {environment}", {
+                    environment: environment ?? gt("Environment"),
+                  })
+            }
+          />
+        );
+      })}
+      <SettingsSection
+        title={gt("Danger", { $context: "section heading for destructive actions" })}
+      >
         <SettingsActionRow
           icon="trash"
           label={
             props.hasOtherMembers
-              ? "Remove checkout"
+              ? gt("Remove checkout")
               : props.members.length > 1
-                ? "Remove this folder everywhere"
-                : "Remove folder"
+                ? gt("Remove this folder everywhere")
+                : gt("Remove folder")
           }
           description={
             props.hasOtherMembers
-              ? "Deletes the selected machine's checkout entries and their chats. Other machines and files on disk are not touched."
+              ? gt(
+                  "Deletes the selected machine's checkout entries and their chats. Other machines and files on disk are not touched.",
+                )
               : props.members.length > 1
-                ? `Deletes all ${props.members.length} checkout entries and their chats on every machine. Files on disk are not touched.`
-                : "Deletes the folder entry and its chats. Files on disk are not touched."
+                ? gt(
+                    "{count, plural, other {Deletes all {count} checkout entries and their chats on every machine. Files on disk are not touched.}}",
+                    { count: props.members.length },
+                  )
+                : gt("Deletes the folder entry and its chats. Files on disk are not touched.")
           }
           tone="danger"
           disabled={!canRemoveGroup || isRemoving}
@@ -446,16 +494,19 @@ function RemoveCheckoutAction(props: {
   readonly disabled: boolean;
   readonly onPress: () => void;
 }) {
+  const gt = useGT();
   const canRemove = useEnvironmentScope(props.member.environmentId, AuthOrchestrationOperateScope);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Remove checkout ${props.member.workspaceRoot}`}
+      accessibilityLabel={gt("Remove checkout {path}", { path: props.member.workspaceRoot })}
       disabled={props.disabled || !canRemove}
       onPress={props.onPress}
       className="self-start rounded-full border border-border bg-card px-3 py-1.5 disabled:opacity-40"
     >
-      <Text className="font-t3-medium text-xs text-danger-foreground">Remove checkout</Text>
+      <Text className="font-t3-medium text-xs text-danger-foreground">
+        <T>Remove checkout</T>
+      </Text>
     </Pressable>
   );
 }

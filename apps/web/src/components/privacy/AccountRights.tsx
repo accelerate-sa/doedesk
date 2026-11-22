@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { SettingsRow, SettingsSection } from "../settings/settingsLayout";
-import { searchableSetting } from "../settings/settingsSearch";
+import { useSearchableSetting } from "../settings/settingsSearch";
 import { accountExportFileName, methodOfAccount } from "./AccountRights.logic";
 import { CloudSignIn } from "./PrivacySetup";
 import { ProfileQuestions } from "./ProfileQuestions";
@@ -49,6 +49,7 @@ const saveFile = (fileName: string, contents: string): void => {
 
 /** Settings, Privacy: the two documents, with the versions in force and when they were accepted. */
 export function LegalDocumentsSection({ status }: { readonly status: PrivacyStatus }) {
+  const searchableSetting = useSearchableSetting();
   const gt = useGT();
   const [locale] = useConsentLocale();
   const legal = status.legal ?? null;
@@ -105,6 +106,7 @@ type Deletion =
  * anyone. A copy of the data, the answers to the two questions, and deleting the account.
  */
 export function AccountRightsSection({ status }: { readonly status: PrivacyStatus }) {
+  const searchableSetting = useSearchableSetting();
   const gt = useGT();
   const m = useMessages();
   const [busy, setBusy] = useState(false);

@@ -19,11 +19,12 @@ import { ProviderMaskingSection } from "../privacy/ProviderMasking";
 import { UsageDataSettings } from "../privacy/UsageData";
 import { Button } from "../ui/button";
 import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 
 /** How personal data is kept from the model, what was masked, and the real values behind it. */
 export function PrivacySettingsPanel() {
   const gt = useGT();
+  const searchableSetting = useSearchableSetting();
   const state = usePrivacyStatus();
   const usageData = useUsageData();
   return (

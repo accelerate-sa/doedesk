@@ -1,8 +1,7 @@
-import {
-  managedRuntimeModeDenial,
-  type ManagedPolicySummary,
-  type RuntimeMode,
-} from "@t3tools/contracts";
+import { managedRuntimeModeDenial } from "@t3tools/client-runtime/contract-labels";
+import type { ManagedPolicySummary, RuntimeMode } from "@t3tools/contracts";
+import { msg } from "gt-react";
+import { m, type MessageResolver } from "~/i18n/messages";
 import {
   type LucideIcon,
   LockIcon,
@@ -18,23 +17,23 @@ export const runtimeModeConfig: Record<
   { label: string; description: string; icon: LucideIcon }
 > = {
   "approval-required": {
-    label: "Ask first",
-    description: "Ask before changing files or running commands.",
+    label: msg("Ask first", { $context: "permission mode, agent asks before acting" }),
+    description: msg("Ask before changing files or running commands."),
     icon: LockIcon,
   },
   "auto-accept-edits": {
-    label: "Auto-accept edits",
-    description: "Auto-approve edits, ask before other actions.",
+    label: msg("Auto-accept edits"),
+    description: msg("Auto-approve edits, ask before other actions."),
     icon: PenLineIcon,
   },
   auto: {
-    label: "Auto",
-    description: "Supported providers approve routine actions; others still ask.",
+    label: msg("Auto", { $context: "permission mode, provider approves routine actions" }),
+    description: msg("Supported providers approve routine actions; others still ask."),
     icon: ShieldCheckIcon,
   },
   "full-access": {
-    label: "Don't ask",
-    description: "Change files and run commands without asking.",
+    label: msg("Don't ask"),
+    description: msg("Change files and run commands without asking."),
     // An open lock reads like a closed one at small sizes; a crossed shield does not.
     icon: ShieldOffIcon,
   },
@@ -69,13 +68,51 @@ export function resolveCompatibleRuntimeMode(
   return { modes: offeredRuntimeModes(modes, mode), mode };
 }
 
+export function resolveRuntimeModeOption(
+  mode: RuntimeMode,
+  resolve: MessageResolver = m,
+): {
+  mode: RuntimeMode;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  disabledReason?: string;
+} {
+  const config = runtimeModeConfig[mode];
+  return {
+    mode,
+    ...config,
+    label: resolve(config.label),
+    description: resolve(config.description),
+  };
+}
+
+/** Why `mode` is unavailable under `managedPolicy`, or undefined when it is allowed. */
+export function runtimeModeDenial(
+  managedPolicy: ManagedPolicySummary | undefined,
+  mode: RuntimeMode,
+  resolve: MessageResolver = m,
+) {
+  const ceiling = managedPolicy?.limits?.maxRuntimeMode;
+  if (ceiling === undefined || managedRuntimeModeDenial(managedPolicy, mode) === undefined) {
+    return undefined;
+  }
+  return resolve(
+    msg("{organization} limits threads to {mode}.", {
+      organization: managedPolicy!.organization,
+      mode: resolve(runtimeModeConfig[ceiling].label),
+    }),
+  );
+}
+
 export function resolveRuntimeModeOptions(
   modes: ReadonlyArray<RuntimeMode>,
   managedPolicy: ManagedPolicySummary | undefined,
+  resolve: MessageResolver = m,
 ) {
   return modes.map((mode) => {
-    const option = { mode, ...runtimeModeConfig[mode] };
-    const disabledReason = managedRuntimeModeDenial(managedPolicy, mode);
+    const option = resolveRuntimeModeOption(mode, resolve);
+    const disabledReason = runtimeModeDenial(managedPolicy, mode, resolve);
     return disabledReason === undefined ? option : { ...option, disabledReason };
   });
 }

@@ -1,10 +1,13 @@
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import type { ThreadTitleRegenerationOutcome } from "@t3tools/contracts";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
+import { msg } from "gt-react";
 
+import { m } from "../i18n/messages";
 import { stackedThreadToast } from "./ui/toast";
 
 type TitleRegenerationResult = AtomCommandResult<ThreadTitleRegenerationOutcome | null, unknown>;
@@ -13,10 +16,10 @@ function failureMessage(result: TitleRegenerationResult): string | null {
   if (result._tag === "Failure") {
     if (isAtomCommandInterrupted(result)) return null;
     const error = squashAtomCommandFailure(result);
-    return error instanceof Error ? error.message : "An error occurred.";
+    return thrownErrorMessage(error, m) ?? m(msg("An error occurred."));
   }
   return result.value?.status === "failed"
-    ? (result.value.message ?? "Title generation failed.")
+    ? (result.value.message ?? m(msg("Title generation failed.")))
     : null;
 }
 
@@ -34,8 +37,16 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
       type: "error",
       title:
         results.length === 1
-          ? "Failed to regenerate chat title"
-          : `Failed to regenerate ${failures.length} of ${results.length} chat titles`,
+          ? m(msg("Failed to regenerate chat title"))
+          : m(
+              msg(
+                "{total, plural, one {Failed to regenerate {failed} of {total} chat titles} other {Failed to regenerate {failed} of {total} chat titles}}",
+                {
+                  failed: failures.length,
+                  total: results.length,
+                },
+              ),
+            ),
       description: failures[0],
     });
   }
@@ -44,16 +55,24 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
   if (results.length === 1) {
     return stackedThreadToast({
       type: "info",
-      title: "Title kept",
-      description: "The current title already fits this chat.",
+      title: m(msg("Title kept")),
+      description: m(msg("The current title already fits this chat.")),
     });
   }
   return stackedThreadToast({
     type: "info",
-    title: kept === results.length ? "Titles kept" : `Kept ${kept} of ${results.length} titles`,
+    title:
+      kept === results.length
+        ? m(msg("Titles kept"))
+        : m(
+            msg(
+              "{total, plural, one {Kept {kept} of {total} titles} other {Kept {kept} of {total} titles}}",
+              { kept, total: results.length },
+            ),
+          ),
     description:
       kept === results.length
-        ? "The current titles already fit these chats."
-        : "Those titles already fit their chats.",
+        ? m(msg("The current titles already fit these chats."))
+        : m(msg("Those titles already fit their chats.")),
   });
 }

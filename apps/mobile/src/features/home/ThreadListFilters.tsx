@@ -1,3 +1,4 @@
+import { useGT } from "gt-react-native";
 import { Pressable, ScrollView } from "react-native";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { ListFilterMenu } from "../layout/workspace/ListFilterMenu";
@@ -17,6 +18,7 @@ export function ThreadListFilters(props: {
   /** List padding the scroller bleeds through so pills start where row content does. */
   readonly gutter: number;
 }) {
+  const gt = useGT();
   const selectedEnvironment = props.environments.find(
     (environment) => environment.environmentId === props.selectedEnvironmentId,
   );
@@ -31,13 +33,13 @@ export function ThreadListFilters(props: {
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10, gap: 8 }}
     >
       <ListFilterMenu
-        label={selectedEnvironment?.label ?? "All computers"}
-        accessibilityLabel="Filter chats by environment"
+        label={selectedEnvironment?.label ?? gt("All computers")}
+        accessibilityLabel={gt("Filter chats by environment")}
         active={selectedEnvironment !== undefined}
         actions={[
           {
             id: "all",
-            title: "All computers",
+            title: gt("All computers"),
             state: props.selectedEnvironmentId === null ? "on" : "off",
           },
           ...props.environments.map((environment) => ({
@@ -60,13 +62,13 @@ export function ThreadListFilters(props: {
         }}
       />
       <ListFilterMenu
-        label={selectedProject?.label ?? "All folders"}
-        accessibilityLabel="Filter chats by folder"
+        label={selectedProject?.label ?? gt("All folders")}
+        accessibilityLabel={gt("Filter chats by folder")}
         active={selectedProject !== undefined}
         actions={[
           {
             id: "all",
-            title: "All folders",
+            title: gt("All folders"),
             state: props.selectedProjectKey === null ? "on" : "off",
           },
           ...props.projects.map((project) => ({
@@ -88,7 +90,7 @@ export function ThreadListFilters(props: {
       {props.selectedEnvironmentId !== null || props.selectedProjectKey !== null ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Reset chat filters"
+          accessibilityLabel={gt("Reset chat filters")}
           className="h-8 w-8 items-center justify-center"
           onPress={() => {
             props.onEnvironmentChange(null);

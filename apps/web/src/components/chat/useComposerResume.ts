@@ -1,3 +1,6 @@
+import { msg } from "gt-react";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import {
   type EnvironmentId,
   type ProviderInteractionMode,
@@ -146,7 +149,7 @@ export function useComposerResume(input: ComposerResumeInput) {
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
-        setThreadError(threadId, error instanceof Error ? error.message : "Could not resume chat.");
+        setThreadError(threadId, thrownErrorMessage(error, m) ?? m(msg("Could not resume chat.")));
       }
     } else {
       clearUsageLimitsFor(routeThreadKey);

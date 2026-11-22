@@ -37,6 +37,16 @@ resolve, delete every workflow the merge brought back (`git rm` anything in `.gi
 not named `doedesk-*.yml`; the pre-push hook refuses to push them), and run the checks.
 Merging T3 Code does not by itself make a release.
 
+Three files are regenerated after the merge, never merged by hand: the lockfile (`vp i`), the
+translation catalogs (`vp run i18n:generate` in `apps/web`, `apps/mobile` and `apps/desktop`;
+`vp run i18n:check` gates them), and `apps/server/src/provider/agentContextBudget.json` (set it
+to what `AgentContextBudget.test.ts` measures).
+
+T3 Code's new text arrives in T3 Code's words. Where DoeDesk's screens say DoeDesk, chat, folder
+and computer, reword it, in the server and provider packages as well as the apps, and the tests
+that assert it. A catalog key is a hash of its English, so a reworded string is a new key and
+reads in English in the other languages until someone translates it.
+
 ## CI and Actions
 
 Set up on 19 November 2026. All jobs run on [Blacksmith](https://blacksmith.sh) runners (the

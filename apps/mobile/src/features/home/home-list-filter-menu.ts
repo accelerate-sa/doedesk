@@ -2,7 +2,10 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
 
+import { msg } from "gt-react-native";
+
 import type { AppBarMenuItem } from "../../components/ui/AppBar.types";
+import { m, type MessageResolver } from "../../i18n/messages";
 import type { WorkspaceEnvironment } from "../../state/workspaceModel";
 
 export interface HomeListFilterMenuEnvironment {
@@ -28,23 +31,26 @@ export interface HomeListFilterMenuProject {
   readonly label: string;
 }
 
-export function buildHomeListFilterMenuItems(props: {
-  readonly environments: ReadonlyArray<HomeListFilterMenuEnvironment>;
-  readonly projects: ReadonlyArray<HomeListFilterMenuProject>;
-  readonly selectedEnvironmentId: EnvironmentId | null;
-  readonly selectedProjectKey: string | null;
-  readonly onEnvironmentChange: (environmentId: EnvironmentId | null) => void;
-  readonly onProjectChange: (projectKey: string | null) => void;
-}): AppBarMenuItem[] {
+export function buildHomeListFilterMenuItems(
+  props: {
+    readonly environments: ReadonlyArray<HomeListFilterMenuEnvironment>;
+    readonly projects: ReadonlyArray<HomeListFilterMenuProject>;
+    readonly selectedEnvironmentId: EnvironmentId | null;
+    readonly selectedProjectKey: string | null;
+    readonly onEnvironmentChange: (environmentId: EnvironmentId | null) => void;
+    readonly onProjectChange: (projectKey: string | null) => void;
+  },
+  resolve: MessageResolver = m,
+): AppBarMenuItem[] {
   const items: AppBarMenuItem[] = [
     {
       id: "environment",
-      title: "Computer",
+      title: resolve(msg("Computer", { $context: "filter menu heading" })),
       items: [
         {
           id: "environment:all",
-          title: "All computers",
-          subtitle: "Show chats from every computer",
+          title: resolve(msg("All computers")),
+          subtitle: resolve(msg("Show chats from every computer")),
           selected: props.selectedEnvironmentId === null,
           onPress: () => props.onEnvironmentChange(null),
         },
@@ -61,12 +67,12 @@ export function buildHomeListFilterMenuItems(props: {
   if (props.projects.length > 0) {
     items.push({
       id: "project",
-      title: "Folder",
+      title: resolve(msg("Folder", { $context: "filter menu heading" })),
       items: [
         {
           id: "project:all",
-          title: "All folders",
-          subtitle: "Show chats from every folder",
+          title: resolve(msg("All folders")),
+          subtitle: resolve(msg("Show chats from every folder")),
           selected: props.selectedProjectKey === null,
           onPress: () => props.onProjectChange(null),
         },
