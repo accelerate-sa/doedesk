@@ -40,6 +40,15 @@ function getPreferredSystemLanguages(): ReadonlyArray<string> {
   return typeof navigator !== "undefined" ? navigator.languages : [];
 }
 
+function readMirroredBootLanguage(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(LANGUAGE_BOOT_STORAGE_KEY)?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 function mirrorBootLanguage(language: string): void {
   if (typeof window === "undefined") return;
   try {
@@ -57,18 +66,21 @@ function applyDocumentLocale(locale: string): void {
 
 function resolveActiveLocale(): string {
   const settings = getClientSettings();
+  const language = isClientSettingsHydrated()
+    ? settings.language
+    : (readMirroredBootLanguage() ?? settings.language);
   const systemLanguages = getPreferredSystemLanguages();
   const isFreshSetup =
     settings.onboardingCompletedAt === null && settings.onboardingProgress?.locale == null;
   if (
     isFreshSetup &&
-    settings.language === DEFAULT_LOCALE &&
+    language === DEFAULT_LOCALE &&
     SUPPORTED_LOCALES.includes("ar") &&
     prefersArabicLanguage(systemLanguages)
   ) {
     return "ar";
   }
-  return resolveLocale(settings.language, systemLanguages, SUPPORTED_LOCALES, DEFAULT_LOCALE);
+  return resolveLocale(language, systemLanguages, SUPPORTED_LOCALES, DEFAULT_LOCALE);
 }
 
 function loadLocale(locale: string): Promise<void> {

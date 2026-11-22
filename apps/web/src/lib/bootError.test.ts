@@ -2,6 +2,7 @@ import type { DesktopBridge, DesktopCliCommandState, DesktopUpdateState } from "
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
+  bootErrorCopy,
   type BootErrorEnvironment,
   buildErrorReport,
   resolveTriageCommand,
@@ -129,5 +130,15 @@ describe("updateActionFor", () => {
       expect(updateActionFor(state(status))).toBeNull();
     }
     expect(updateActionFor(undefined)).toBeNull();
+  });
+});
+
+describe("bootErrorCopy", () => {
+  it("selects Arabic copy for Arabic document tags and English otherwise", () => {
+    expect(bootErrorCopy("ar").title).toBe("تعذّر تشغيل DoeDesk");
+    expect(bootErrorCopy("ar-SA").reload).toBe("إعادة التحميل");
+    expect(bootErrorCopy("ar").downloadingUpdate(42)).toBe("جارٍ تنزيل التحديث (42%)");
+    expect(bootErrorCopy("en").title).toBe("DoeDesk failed to start");
+    expect(bootErrorCopy(undefined).reload).toBe("Reload");
   });
 });

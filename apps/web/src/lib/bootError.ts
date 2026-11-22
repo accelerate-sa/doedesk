@@ -2,14 +2,99 @@ import type { DesktopBridge, DesktopUpdateState } from "@t3tools/contracts";
 
 const FALLBACK_TRIAGE_COMMAND = "npx t3 triage";
 const DOWNLOAD_URL = "https://doedesk.com/download";
-const ISSUE_URL = "https://github.com/pingdotgg/t3code/issues/new";
+const SUPPORT_EMAIL = "hello@doedesk.com";
 const LAST_FAILURE_KEY = "t3code:boot-failed-at";
 const REPEAT_FAILURE_MS = 5 * 60_000;
 const MAX_CAUSES = 3;
 const MAX_ERROR_CHARS = 6_000;
-const COPY_BLOCKED = "Copy was blocked. The text is selected so you can copy it manually.";
-const UPDATE_DOWNLOAD_FAILED = "The update download failed. Try Download update again.";
-const UPDATE_INSTALL_FAILED = "The update install failed. Try Restart to update again.";
+
+export interface BootErrorCopy {
+  readonly title: string;
+  readonly offline: string;
+  readonly unknownReason: string;
+  readonly reload: string;
+  readonly downloadUpdate: string;
+  readonly downloadingUpdate: (percent: number) => string;
+  readonly restartToUpdate: string;
+  readonly updateDownloadFailed: string;
+  readonly updateInstallFailed: string;
+  readonly copyCommand: string;
+  readonly copied: string;
+  readonly copiedToClipboard: string;
+  readonly copyBlocked: string;
+  readonly pressToCopyMac: string;
+  readonly pressToCopyOther: string;
+  readonly copyErrorDetails: string;
+  readonly moreOptions: string;
+  readonly reinstallNightly: string;
+  readonly reinstallStable: string;
+  readonly triageHelp: string;
+  readonly privacyNotice: string;
+  readonly contactSupport: string;
+}
+
+const BOOT_ERROR_COPY: Readonly<Record<"en" | "ar", BootErrorCopy>> = {
+  en: {
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
+    title: "DoeDesk failed to start",
+    offline: "This browser appears to be offline. Check the connection, then reload.",
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
+    unknownReason: "We are not sure why. Try a reload first.",
+    reload: "Reload",
+    downloadUpdate: "Download update",
+    downloadingUpdate: (percent) => `Downloading update (${percent}%)`,
+    restartToUpdate: "Restart to update",
+    updateDownloadFailed: "The update download failed. Try Download update again.",
+    updateInstallFailed: "The update install failed. Try Restart to update again.",
+    copyCommand: "Copy command",
+    copied: "Copied",
+    copiedToClipboard: "Copied to clipboard.",
+    copyBlocked: "Copy was blocked. The text is selected so you can copy it manually.",
+    pressToCopyMac: "Press ⌘C to copy",
+    pressToCopyOther: "Press Ctrl+C to copy",
+    copyErrorDetails: "Copy error details",
+    moreOptions: "More options if it keeps failing",
+    reinstallNightly: "Download and reinstall the latest nightly build",
+    reinstallStable: "Download and reinstall DoeDesk",
+    triageHelp:
+      "Run this on the computer that runs DoeDesk. Your agent can check the local logs and help you file a bug report.",
+    privacyNotice: "Details may include local file paths and names. Check before sharing.",
+    contactSupport: "Email DoeDesk support",
+  },
+  ar: {
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
+    title: "تعذّر تشغيل DoeDesk",
+    offline: "يبدو أن المتصفح غير متصل بالإنترنت. تحقّق من الاتصال ثم أعد التحميل.",
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
+    unknownReason: "لم نتمكّن من تحديد السبب. جرّب إعادة التحميل أولًا.",
+    reload: "إعادة التحميل",
+    downloadUpdate: "تنزيل التحديث",
+    downloadingUpdate: (percent) => `جارٍ تنزيل التحديث (${percent}%)`,
+    restartToUpdate: "إعادة التشغيل للتحديث",
+    updateDownloadFailed: "فشل تنزيل التحديث. جرّب تنزيل التحديث مرة أخرى.",
+    updateInstallFailed: "فشل تثبيت التحديث. جرّب إعادة التشغيل للتحديث مرة أخرى.",
+    copyCommand: "نسخ الأمر",
+    copied: "تم النسخ",
+    copiedToClipboard: "تم النسخ إلى الحافظة.",
+    copyBlocked: "تم منع النسخ تلقائيًا. النص محدّد الآن ويمكنك نسخه يدويًا.",
+    pressToCopyMac: "اضغط ⌘C للنسخ",
+    pressToCopyOther: "اضغط Ctrl+C للنسخ",
+    copyErrorDetails: "نسخ تفاصيل الخطأ",
+    moreOptions: "خيارات إضافية إذا استمر التعذّر",
+    reinstallNightly: "تنزيل أحدث إصدار ليلي وإعادة تثبيته",
+    reinstallStable: "تنزيل DoeDesk وإعادة تثبيته",
+    triageHelp:
+      "شغّل هذا الأمر على الجهاز الذي يعمل عليه DoeDesk لجمع السجلات المحلية ومساعدتك في الإبلاغ عن المشكلة.",
+    privacyNotice: "قد تتضمن التفاصيل مسارات وأسماء ملفات محلية. راجعها قبل المشاركة.",
+    contactSupport: "مراسلة دعم DoeDesk",
+  },
+};
+
+/** Selects boot-error copy from the document language index.html resolved before startup. */
+export function bootErrorCopy(lang: string | null | undefined): BootErrorCopy {
+  const subtag = lang?.trim().toLowerCase().split(/[-_]/)[0];
+  return subtag === "ar" ? BOOT_ERROR_COPY.ar : BOOT_ERROR_COPY.en;
+}
 
 /** The Windows launcher is a `.cmd` run from PowerShell, which needs `&` to run a quoted path. */
 function launcherCommand(launcherPath: string) {
@@ -185,12 +270,17 @@ function copySelection() {
 }
 
 /** Plain http has no Clipboard API, but the legacy copy command still works on a selection. */
-function copyText(target: HTMLElement, onCopied: () => void, onBlocked: (hint: string) => void) {
+function copyText(
+  target: HTMLElement,
+  copy: BootErrorCopy,
+  onCopied: () => void,
+  onBlocked: (hint: string) => void,
+) {
   const fallback = () => {
     selectContents(target);
     if (copySelection()) return onCopied();
     onBlocked(
-      /Mac|iPhone|iPad/.test(navigator.platform) ? "Press ⌘C to copy" : "Press Ctrl+C to copy",
+      /Mac|iPhone|iPad/.test(navigator.platform) ? copy.pressToCopyMac : copy.pressToCopyOther,
     );
   };
   const clipboard = window.isSecureContext ? navigator.clipboard : undefined;
@@ -200,6 +290,7 @@ function copyText(target: HTMLElement, onCopied: () => void, onBlocked: (hint: s
 
 function mountUpdateButton(
   bridge: DesktopBridge,
+  copy: BootErrorCopy,
   button: HTMLButtonElement,
   note: HTMLParagraphElement,
   announce: (text: string) => void,
@@ -210,16 +301,15 @@ function mountUpdateButton(
     button.hidden = action === null;
     // aria-disabled keeps keyboard focus on the button while the download runs.
     button.setAttribute("aria-disabled", String(action?.kind === "downloading"));
-    if (action?.kind === "download") button.textContent = "Download update";
-    if (action?.kind === "downloading")
-      button.textContent = `Downloading update (${action.percent}%)`;
-    if (action?.kind === "install") button.textContent = "Restart to update";
+    if (action?.kind === "download") button.textContent = copy.downloadUpdate;
+    if (action?.kind === "downloading") button.textContent = copy.downloadingUpdate(action.percent);
+    if (action?.kind === "install") button.textContent = copy.restartToUpdate;
     const failure = !action
       ? ""
       : state.errorContext === "download"
-        ? UPDATE_DOWNLOAD_FAILED
+        ? copy.updateDownloadFailed
         : state.errorContext === "install"
-          ? UPDATE_INSTALL_FAILED
+          ? copy.updateInstallFailed
           : "";
     if (failure === note.textContent) return;
     note.textContent = failure;
@@ -259,6 +349,7 @@ export function showBootError(error: unknown) {
   const bootShell = document.getElementById("boot-shell");
   if (!bootShell) return;
 
+  const copy = bootErrorCopy(document.documentElement.lang);
   const bridge = window.desktopBridge;
   const environment = readEnvironment(bridge);
   const offline = !bridge && navigator.onLine === false;
@@ -274,51 +365,44 @@ export function showBootError(error: unknown) {
   };
 
   const message = element("div", {}, [
-    element("h1", { textContent: "DoeDesk failed to start" }),
-    element("p", {
-      textContent: offline
-        ? "This browser appears to be offline. Check the connection, then reload."
-        : "We are not sure why. Try a reload first.",
-    }),
+    element("h1", { textContent: copy.title }),
+    element("p", { textContent: offline ? copy.offline : copy.unknownReason }),
   ]);
   message.setAttribute("role", "alert");
 
   const reload = element("button", {
     id: "boot-error-reload",
     type: "button",
-    textContent: "Reload",
+    textContent: copy.reload,
   });
   reload.addEventListener("click", () => window.location.reload());
   const update = element("button", { id: "boot-error-update", type: "button", hidden: true });
   const updateNote = element("p", { id: "boot-error-update-note", hidden: true });
-  if (bridge) mountUpdateButton(bridge, update, updateNote, announce);
+  if (bridge) mountUpdateButton(bridge, copy, update, updateNote, announce);
 
   const command = element("code", { textContent: FALLBACK_TRIAGE_COMMAND });
   const copyCommand = element("button", {
     className: "boot-error-icon",
     type: "button",
-    // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
-    title: "Copy command",
+    title: copy.copyCommand,
     innerHTML: COPY_ICON,
   });
-  // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
-  copyCommand.setAttribute("aria-label", "Copy command");
+  copyCommand.setAttribute("aria-label", copy.copyCommand);
   copyCommand.addEventListener("click", () =>
     copyText(
       command,
+      copy,
       () => {
         copyCommand.innerHTML = CHECK_ICON;
-        copyCommand.title = "Copied";
-        // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
-        copyCommand.setAttribute("aria-label", "Copied");
-        // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
-        announce("Copied to clipboard.");
+        copyCommand.title = copy.copied;
+        copyCommand.setAttribute("aria-label", copy.copied);
+        announce(copy.copiedToClipboard);
       },
       (hint) => {
         copyCommand.textContent = hint;
         copyCommand.title = hint;
         copyCommand.setAttribute("aria-label", hint);
-        announce(COPY_BLOCKED);
+        announce(copy.copyBlocked);
       },
     ),
   );
@@ -331,59 +415,49 @@ export function showBootError(error: unknown) {
     console.warn("Could not describe the startup error.", reportError);
   }
   const details = element("pre", { id: "boot-error-details", tabIndex: 0, textContent: report });
-  const copyDetails = element("button", { type: "button", textContent: "Copy error details" });
+  const copyDetails = element("button", { type: "button", textContent: copy.copyErrorDetails });
   copyDetails.addEventListener("click", () =>
     copyText(
       details,
+      copy,
       () => {
-        copyDetails.textContent = "Copied";
-        // oxlint-disable-next-line t3code/no-untranslated-copy -- boot failure page renders before the i18n runtime loads
-        announce("Copied to clipboard.");
+        copyDetails.textContent = copy.copied;
+        announce(copy.copiedToClipboard);
       },
       (hint) => {
         copyDetails.textContent = hint;
-        announce(COPY_BLOCKED);
+        announce(copy.copyBlocked);
       },
     ),
   );
 
-  const issue = new URL(ISSUE_URL);
-  issue.searchParams.set("template", "bug_report.yml");
-  issue.searchParams.set("title", "DoeDesk failed to start");
-  issue.searchParams.set("area", "apps/web");
-  issue.searchParams.set("version", `${environment.version} (${environment.channel})`);
-  issue.searchParams.set("environment", `${environment.surface}, ${environment.platform}`);
+  const supportHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+    `DoeDesk failed to start (${environment.version}, ${environment.surface})`,
+  )}`;
   const link = (href: string, textContent: string) =>
     element("a", { href, textContent, target: "_blank", rel: "noreferrer" });
   const nightly = environment.channel === "nightly";
 
   const more = element("details", { open: isRepeatFailure(Date.now()) }, [
-    element("summary", { textContent: "More options if it keeps failing" }),
+    element("summary", { textContent: copy.moreOptions }),
     ...(bridge
       ? [
           link(
             nightly ? `${DOWNLOAD_URL}?channel=nightly` : DOWNLOAD_URL,
-            nightly
-              ? "Download and reinstall the latest nightly build"
-              : "Download and reinstall DoeDesk",
+            nightly ? copy.reinstallNightly : copy.reinstallStable,
           ),
         ]
       : []),
     element("div", {}, [
-      element("p", {
-        textContent:
-          "Run this on the computer that runs DoeDesk. Your agent can check the local logs and help you file a bug report.",
-      }),
+      element("p", { textContent: copy.triageHelp }),
       element("div", { id: "boot-error-command" }, [command, copyCommand]),
     ]),
     element("div", {}, [
       details,
-      element("p", {
-        textContent: "Details may include local file paths and names. Check before sharing.",
-      }),
+      element("p", { textContent: copy.privacyNotice }),
       element("div", { id: "boot-error-report" }, [
         copyDetails,
-        link(issue.href, "File a bug report on GitHub"),
+        link(supportHref, copy.contactSupport),
       ]),
     ]),
   ]);
