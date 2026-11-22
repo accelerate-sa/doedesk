@@ -194,12 +194,12 @@ function FirstRunRecovery({
     <main className="flex h-dvh min-h-0 items-center justify-center bg-background px-6 text-foreground">
       <div className="flex max-w-sm flex-col items-center text-center">
         <h1 className="font-display text-2xl">
-          {settingsReadFailed ? gt("Could not read settings") : gt("Still connecting")}
+          {settingsReadFailed ? gt("Could not load settings") : gt("Still connecting")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {settingsReadFailed
-            ? gt("Your saved settings could not be loaded.")
-            : gt("DoeDesk could not confirm this workspace.")}
+            ? gt("DoeDesk could not load your saved settings. Try again.")
+            : gt("DoeDesk is taking longer than expected to connect to this computer.")}
         </p>
         <Button
           className="mt-5"
@@ -215,7 +215,7 @@ function FirstRunRecovery({
           }}
         >
           <RefreshIcon refreshing={retrying} />
-          {settingsReadFailed ? gt("Retry") : gt("Reload")}
+          {settingsReadFailed ? gt("Try again") : gt("Reload")}
         </Button>
       </div>
     </main>

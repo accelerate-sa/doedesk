@@ -159,13 +159,13 @@ describe("account rights in Settings", () => {
 
     await press(screen.getByRole("button", { name: "Delete" }));
     await press(page.getByRole("button", { name: "Delete my account" }));
-    await expect.element(page.getByText(/only within 10 minutes of a sign-in/)).toBeVisible();
+    await expect.element(page.getByText(/within 10 minutes of signing in/)).toBeVisible();
     // The account was made with a number, so it signs in with one; nobody is asked to agree.
     expect(page.getByRole("checkbox").query()).toBeNull();
     expect(page.getByRole("button", { name: "Email" }).query()).toBeNull();
     await userEvent.type(page.getByLabelText("Mobile number"), "0551234567");
     await press(page.getByRole("button", { name: "Send code" }));
-    await userEvent.type(page.getByLabelText("Code"), "123456");
+    await userEvent.type(page.getByLabelText("Verification code"), "123456");
 
     await expect.element(page.getByText("DoeDesk Cloud deleted the account")).toBeVisible();
     expect(client.signInToCloud).toHaveBeenNthCalledWith(1, {

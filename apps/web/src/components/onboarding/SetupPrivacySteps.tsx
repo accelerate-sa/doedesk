@@ -82,11 +82,15 @@ export function LanguageStep({
     <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
         {t(
-          "Setup takes a few steps, and you can go back to any of them.",
-          "يتم الإعداد في خطوات قليلة، ولك الرجوع إلى أيٍّ منها.",
+          "Choose a language for setup. It takes a few steps, and you can go back at any time.",
+          "اختر لغة الإعداد. لن يستغرق الأمر سوى خطوات قليلة، ويمكنك الرجوع إلى أي خطوة متى شئت.",
         )}
       </p>
-      <div role="radiogroup" aria-label={t("Language", "اللغة")} className="grid gap-2 sm:max-w-sm">
+      <div
+        role="radiogroup"
+        aria-label={t("Setup language", "لغة الإعداد")}
+        className="grid gap-2 sm:max-w-sm"
+      >
         <ChoiceCard
           selected={locale === "en"}
           title="English"
@@ -149,34 +153,34 @@ export function MaskingStep({
     <div className="grid gap-4">
       <div
         role="radiogroup"
-        aria-label={t("How names and numbers are found", "طريقة كشف الأسماء والأرقام")}
+        aria-label={t("Detection service", "خدمة الكشف")}
         className="grid gap-2"
       >
         <ChoiceCard
           selected={selected === "account"}
-          title={t("With a DoeDesk account", "بحساب في DoeDesk")}
+          title={t("Use a DoeDesk account", "استخدام حساب DoeDesk")}
           detail={t(
-            "Recommended. DoeDesk's detection service finds the names and numbers. You sign in with your phone or email next.",
-            "الخيار الموصى به. تكشف خدمة الكشف في DoeDesk الأسماء والأرقام، وتسجّل الدخول بجوالك أو بريدك في الخطوة التالية.",
+            "Recommended. Text and files are checked by DoeDesk Cloud and are not stored. Sign in or create an account in the next step.",
+            "الخيار الموصى به. تفحص خدمة DoeDesk Cloud النصوص والملفات دون تخزينها. سجّل الدخول أو أنشئ حسابًا في الخطوة التالية.",
           )}
           onSelect={() => onChoice("account")}
         />
         <ChoiceCard
           selected={selected === "ownService"}
-          title={t("With my own detection service", "بخدمة كشف خاصة بي")}
+          title={t("Use my own detection service", "استخدام خدمة كشف خاصة بي")}
           detail={t(
-            "For an organization that runs the detection service itself.",
-            "لجهة تشغّل خدمة الكشف بنفسها.",
+            "For teams or organizations that host their own detection server. Text and files are sent only to the address you enter.",
+            "للفرق والجهات التي تشغّل خادم الكشف الخاص بها. يقتصر إرسال النصوص والملفات للفحص على العنوان الذي تحدده.",
           )}
           onSelect={() => onChoice("ownService")}
         />
         {refused ? (
           <ChoiceCard
             selected={selected === "off"}
-            title={t("Without masking", "دون ترميز")}
+            title={t("Continue without masking", "المتابعة دون إخفاء البيانات")}
             detail={t(
-              "Names and numbers reach the AI as written.",
-              "تصل الأسماء والأرقام إلى الذكاء الاصطناعي كما كُتبت.",
+              "Everything you send, including messages and files, reaches the AI as written.",
+              "تصل جميع رسائلك وملفاتك إلى الذكاء الاصطناعي كما هي، دون إخفاء أي بيانات.",
             )}
             onSelect={() => onChoice("off")}
           />
@@ -186,7 +190,7 @@ export function MaskingStep({
       {selected === "off" ? (
         <div>
           <Button size="sm" disabled={busy} onClick={() => void configure({ mode: "off" })}>
-            {t("Use DoeDesk without masking", "استخدم DoeDesk دون ترميز")}
+            {t("Use DoeDesk without masking", "استخدام DoeDesk دون إخفاء البيانات")}
           </Button>
         </div>
       ) : null}
@@ -204,7 +208,10 @@ function PrivacyUnavailable() {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <p className="text-sm text-destructive">
-        {t("DoeDesk on this computer did not answer.", "لم يستجب DoeDesk على هذا الجهاز.")}
+        {t(
+          "Could not reach the DoeDesk service on this computer.",
+          "تعذّر الاتصال بخدمة DoeDesk على هذا الجهاز.",
+        )}
       </p>
       <Button variant="outline" size="sm" onClick={refreshPrivacyStatus}>
         {t("Try again", "أعد المحاولة")}
@@ -255,8 +262,8 @@ export function AccountStep({ status }: { readonly status: PrivacyStatus | null 
       )}
       <p className="text-xs text-muted-foreground">
         {t(
-          "To use another account, sign out from Settings, under Privacy.",
-          "لاستخدام حساب آخر، سجّل الخروج من الإعدادات، في قسم الخصوصية.",
+          "To switch accounts, sign out in Settings → Privacy.",
+          "للتبديل إلى حساب آخر، سجّل الخروج من الإعدادات، قسم الخصوصية.",
         )}
       </p>
     </div>

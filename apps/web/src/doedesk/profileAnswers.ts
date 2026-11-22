@@ -24,8 +24,16 @@ export const PROFILE_WORKPLACES: ReadonlyArray<{
   readonly labelAr: string;
 }> = [
   { value: "self", label: "On my own", labelAr: "أعمل لحسابي" },
-  { value: "small_company", label: "Company under 50 people", labelAr: "شركة يقل موظفوها عن 50" },
-  { value: "large_company", label: "Company of 50 or more", labelAr: "شركة موظفوها 50 أو أكثر" },
+  {
+    value: "small_company",
+    label: "Company (under 50 people)",
+    labelAr: "شركة (أقل من 50 موظفًا)",
+  },
+  {
+    value: "large_company",
+    label: "Company (50 or more)",
+    labelAr: "شركة (50 موظفًا فأكثر)",
+  },
   { value: "government", label: "Government entity", labelAr: "جهة حكومية" },
 ];
 

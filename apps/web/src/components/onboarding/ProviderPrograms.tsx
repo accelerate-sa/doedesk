@@ -32,6 +32,21 @@ import { toastManager } from "../ui/toast";
 
 const COMMAND_OPTIONS = { reportFailure: false, reportDefect: false } as const;
 const SEARCH_LIMIT_MINUTES = 2;
+const ARABIC_PLURAL_RULES = new Intl.PluralRules("ar");
+
+const formatArabicDrives = (count: number) => {
+  const formatted = count.toLocaleString("ar");
+  switch (ARABIC_PLURAL_RULES.select(count)) {
+    case "two":
+      return "قرصين";
+    case "few":
+      return `${formatted} أقراص`;
+    case "many":
+      return `${formatted} قرصًا`;
+    default:
+      return `${formatted} قرص`;
+  }
+};
 
 /**
  * Where each AI's program is on this computer. The usual places are checked on their own; other
@@ -106,8 +121,8 @@ export function ProviderPrograms({
       toastManager.add({
         type: "error",
         title: t(
-          `Could not save the program for ${agentName(provider)}`,
-          `تعذّر حفظ برنامج ${agentName(provider)}`,
+          `Could not save the program path for ${agentName(provider)}`,
+          `تعذّر حفظ مسار برنامج ${agentName(provider)}`,
         ),
       });
       return;
@@ -127,7 +142,7 @@ export function ProviderPrograms({
     <section className="mt-6 grid grid-cols-1 gap-3 border-t border-border/60 pt-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-medium text-foreground">
-          {t("Programs found on this computer", "البرامج الموجودة على هذا الجهاز")}
+          {t("Installed AI programs", "برامج الذكاء الاصطناعي المثبّتة")}
         </h3>
         <Button
           size="xs"
@@ -139,31 +154,34 @@ export function ProviderPrograms({
             void runScan();
           }}
         >
-          {t("Check again", "افحص مجددًا")}
+          {t("Check again", "إعادة الفحص")}
         </Button>
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
         {t(
-          "DoeDesk looked in your terminal's PATH, the usual install folders and the apps that carry these programs.",
-          "بحث DoeDesk في مسارات الطرفية (PATH) ومجلدات التثبيت المعتادة والتطبيقات التي تحمل هذه البرامج.",
+          "DoeDesk checked your system PATH, standard install folders, and installed apps for AI programs.",
+          "بحث DoeDesk في مسارات النظام المعتادة ومجلدات التثبيت والتطبيقات عن برامج الذكاء الاصطناعي.",
         )}
       </p>
       {automatic === null && !scanFailed ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner size="sm" tone="muted" />
-          {t("Looking…", "جارٍ البحث…")}
+          {t("Checking…", "جارٍ البحث…")}
         </p>
       ) : null}
       {scanFailed ? (
         <p role="alert" className="text-sm text-destructive">
-          {t("The check did not finish. Check again.", "لم يكتمل الفحص. أعد المحاولة.")}
+          {t(
+            "Could not finish checking for programs. Try again.",
+            "تعذّر إكمال الفحص عن البرامج. أعد المحاولة.",
+          )}
         </p>
       ) : null}
       {automatic !== null && groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {t(
-            "No AI programs were found in the usual places.",
-            "لم يُعثر على برامج ذكاء اصطناعي في الأماكن المعتادة.",
+            "No AI programs were found in the usual locations.",
+            "لم يجد DoeDesk برامج ذكاء اصطناعي في المواقع المعتادة.",
           )}
         </p>
       ) : null}
@@ -183,7 +201,7 @@ export function ProviderPrograms({
           onClick={() => setDrivesOpen((open) => !open)}
         >
           <HardDriveIcon className="size-3.5" />
-          {t("Look on other drives", "ابحث في الأقراص الأخرى")}
+          {t("Search other drives", "البحث في أقراص أخرى")}
         </Button>
         <Button
           size="xs"
@@ -192,7 +210,7 @@ export function ProviderPrograms({
           onClick={() => setManualOpen((open) => !open)}
         >
           <FolderSearchIcon className="size-3.5" />
-          {t("Point to a program", "حدّد برنامجًا بنفسك")}
+          {t("Choose a program manually", "تحديد برنامج يدويًا")}
         </Button>
       </div>
       {drivesOpen ? (
@@ -226,7 +244,7 @@ export function ProviderPrograms({
 function sourceLabel(find: ProviderFind, t: ReturnType<typeof useSetupText>): string {
   switch (find.source) {
     case "path":
-      return t("On PATH", "ضمن PATH");
+      return t("System PATH", "مسار النظام (PATH)");
     case "knownLocation":
       return t("Install folder", "مجلد تثبيت");
     case "appBundle":
@@ -234,7 +252,7 @@ function sourceLabel(find: ProviderFind, t: ReturnType<typeof useSetupText>): st
     case "volume":
       return t("Another drive", "قرص آخر");
     case "manual":
-      return t("Chosen by you", "اخترته بنفسك");
+      return t("Selected manually", "محدّد يدويًا");
   }
 }
 
@@ -285,7 +303,7 @@ function ProgramGroup({
               {inUse ? (
                 <span className="inline-flex shrink-0 items-center gap-1 text-xs text-success-foreground">
                   <CheckIcon className="size-3.5" />
-                  {t("In use", "مستخدم")}
+                  {t("In use", "قيد الاستخدام")}
                 </span>
               ) : (
                 <Button
@@ -357,8 +375,8 @@ function DriveSearch({
     <div className="grid grid-cols-1 gap-3 rounded-lg border border-border/70 p-3">
       <p className="text-xs leading-relaxed text-muted-foreground">
         {t(
-          "DoeDesk reads only file and folder names on the drives you tick, never what is in your files. Nothing found leaves this computer.",
-          "يقرأ DoeDesk أسماء الملفات والمجلدات وحدها في الأقراص التي تختارها، ولا يقرأ ما في ملفاتك. ولا يغادر شيء مما يجده هذا الجهاز.",
+          "DoeDesk checks only file and folder names on the drives you select, never the contents of your files. Everything stays on this computer.",
+          "يفحص DoeDesk أسماء الملفات والمجلدات فقط في الأقراص التي تحددها، ولا يقرأ محتوى ملفاتك أبدًا. وتبقى جميع النتائج على جهازك.",
         )}
       </p>
       {listFailed ? (
@@ -370,18 +388,18 @@ function DriveSearch({
       ) : !supported ? (
         <p className="text-sm text-muted-foreground">
           {t(
-            "DoeDesk cannot list drives on this computer.",
-            "لا يستطيع DoeDesk عرض الأقراص على هذا الجهاز.",
+            "Drive search is not available on this operating system. Choose a program manually instead.",
+            "البحث في الأقراص غير متاح على نظام التشغيل هذا. يمكنك تحديد البرنامج يدويًا.",
           )}
         </p>
       ) : (
         <fieldset className="grid gap-1.5" disabled={searching}>
           <legend className="pb-1 text-sm text-foreground">
-            {t("Which drives should DoeDesk search?", "أي الأقراص يبحث فيها DoeDesk؟")}
+            {t("Select drives to search", "اختر الأقراص للبحث فيها")}
           </legend>
           {offered.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              {t("No other drives are connected.", "لا توجد أقراص أخرى متصلة.")}
+              {t("No other drives are connected.", "لا توجد أقراص أخرى متصلة بهذا الجهاز.")}
             </p>
           ) : null}
           {offered.map((volume) => (
@@ -414,7 +432,7 @@ function DriveSearch({
                 checked={showAll}
                 onCheckedChange={(checked) => setShowAll(checked === true)}
               />
-              {t("Show network drives and disk images", "اعرض أقراص الشبكة وصور الأقراص")}
+              {t("Show network drives and disk images", "إظهار أقراص الشبكة وصور الأقراص")}
             </label>
           ) : null}
         </fieldset>
@@ -429,32 +447,35 @@ function DriveSearch({
             </>
           ) : null}
           {t(
-            `${progress.foldersChecked.toLocaleString()} folders checked, ${progress.finds.length} found.`,
-            `فُحص ${progress.foldersChecked.toLocaleString("ar")} مجلد، وعُثر على ${progress.finds.length.toLocaleString("ar")}.`,
+            `Checked ${progress.foldersChecked.toLocaleString()} folders, ${progress.finds.length} found.`,
+            `تم فحص ${progress.foldersChecked.toLocaleString("ar")} مجلد، والعثور على ${progress.finds.length.toLocaleString("ar")}.`,
           )}
           {progress.stoppedBy === "time"
             ? t(
-                ` Stopped after ${SEARCH_LIMIT_MINUTES} minutes; some folders were not searched.`,
-                ` توقف البحث بعد دقيقتين، وبقيت مجلدات لم يصل إليها.`,
+                ` Stopped after ${SEARCH_LIMIT_MINUTES} minutes; some folders were skipped.`,
+                ` توقّف البحث بعد دقيقتين، ولم يشمل بقية المجلدات.`,
               )
             : progress.stoppedBy === "folders"
               ? t(
-                  " Stopped at the folder limit; some folders were not searched.",
-                  " توقف البحث عند حد المجلدات، وبقيت مجلدات لم يصل إليها.",
+                  " Stopped at the folder limit; some folders were skipped.",
+                  " توقّف البحث عند الحد الأقصى للمجلدات، ولم يشمل بقية المجلدات.",
                 )
               : null}
         </p>
       ) : null}
       {failed ? (
         <p role="alert" className="text-sm text-destructive">
-          {t("The search stopped with an error.", "توقف البحث بسبب خطأ.")}
+          {t(
+            "The drive search stopped due to an error. Try again.",
+            "توقّف البحث في الأقراص بسبب خطأ. أعد المحاولة.",
+          )}
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
         {searching ? (
           <Button size="xs" variant="outline" onClick={onStop}>
             <Spinner size="sm" tone="muted" />
-            {t("Stop", "أوقف")}
+            {t("Stop", "إيقاف")}
           </Button>
         ) : (
           <Button
@@ -463,10 +484,10 @@ function DriveSearch({
             onClick={() => onSearch(tickedOffered.map((volume) => volume.path))}
           >
             {tickedOffered.length <= 1
-              ? t("Search", "ابحث")
+              ? t("Search", "بدء البحث")
               : t(
                   `Search ${tickedOffered.length} drives`,
-                  `ابحث في ${tickedOffered.length.toLocaleString("ar")} أقراص`,
+                  `ابحث في ${formatArabicDrives(tickedOffered.length)}`,
                 )}
           </Button>
         )}
@@ -504,7 +525,7 @@ function ManualProgram({
     const result = await inspect({ environmentId, input: { driver, path: value.trim() } });
     setBusy(false);
     if (result._tag === "Failure") {
-      setProblem(t("The check did not finish.", "لم يكتمل الفحص."));
+      setProblem(t("Could not check that path. Try again.", "تعذّر فحص هذا المسار. أعد المحاولة."));
       return;
     }
     if (result.value.ok) {
@@ -514,10 +535,16 @@ function ManualProgram({
     }
     setProblem(
       result.value.reason === "notAbsolute"
-        ? t("Enter the full path, starting with /.", "أدخل المسار كاملًا، بدءًا بالشرطة المائلة /.")
+        ? t(
+            "Enter the full path to the program or its folder.",
+            "أدخل المسار الكامل للبرنامج أو المجلد.",
+          )
         : result.value.reason === "notFound"
-          ? t("Nothing that runs was found there.", "لم يُعثر هناك على برنامج يمكن تشغيله.")
-          : t("That file cannot be run as a program.", "لا يمكن تشغيل هذا الملف برنامجًا."),
+          ? t(
+              "No runnable program was found at that path.",
+              "لم نجد برنامجًا قابلًا للتشغيل في هذا المسار.",
+            )
+          : t("That file is not an executable program.", "هذا الملف ليس برنامجًا قابلًا للتشغيل."),
     );
   };
 
@@ -531,7 +558,7 @@ function ManualProgram({
       }}
     >
       <label htmlFor={selectId} className="text-sm text-foreground">
-        {t("Which AI is it for?", "لأي ذكاء اصطناعي هذا البرنامج؟")}
+        {t("AI tool", "أداة الذكاء الاصطناعي")}
       </label>
       <select
         id={selectId}
@@ -556,7 +583,7 @@ function ManualProgram({
       />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="xs" disabled={busy || path.trim().length === 0}>
-          {t("Check", "افحص")}
+          {t("Check", "تحقّق")}
         </Button>
         {canPick ? (
           <Button

@@ -83,7 +83,7 @@ export function ProfileQuestions({
       <ConsentBlock locale={locale} className="text-sm text-muted-foreground">
         <ConsentSentence parts={CONSENT_WORDS[locale].onboarding} locale={locale} legal={legal} />
       </ConsentBlock>
-      <Question label={t(gt("Your field"), "مجال عملك")}>
+      <Question label={t(gt("What field do you work in?"), "ما مجال عملك؟")}>
         {PROFILE_FIELDS.map((option) => (
           <Chip
             key={option.value}
@@ -97,15 +97,15 @@ export function ProfileQuestions({
           <Input
             autoFocus
             maxLength={80}
-            placeholder={t(gt("Your field"), "مجال عملك")}
-            aria-label={t(gt("Your field"), "مجال عملك")}
+            placeholder={t(gt("Describe your field"), "اذكر مجال عملك")}
+            aria-label={t(gt("Describe your field"), "اذكر مجال عملك")}
             className="mt-1 sm:max-w-xs"
             value={fieldOther}
             onChange={(event) => change({ fieldOther: event.target.value })}
           />
         ) : null}
       </Question>
-      <Question label={t(gt("Where you work"), "جهة عملك")}>
+      <Question label={t(gt("What kind of organization do you work in?"), "ما طبيعة جهة عملك؟")}>
         {PROFILE_WORKPLACES.map((option) => (
           <Chip
             key={option.value}

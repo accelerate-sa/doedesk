@@ -83,7 +83,7 @@ export function PrivacySetup({
         <div className="flex min-w-0 items-center gap-3">
           <ShieldCheckIcon className="size-5 shrink-0 text-success" />
           <div className="min-w-0">
-            <p className="text-sm text-foreground">{t("Masking is on", "الترميز مفعّل")}</p>
+            <p className="text-sm text-foreground">{t("Masking is on", "إخفاء البيانات مفعّل")}</p>
             <p className="truncate text-xs text-muted-foreground">
               <bdi>{(status.mode === "cloud" ? status.accountLabel : status.endpoint) ?? ""}</bdi>
             </p>
@@ -107,11 +107,11 @@ export function PrivacySetup({
         <div className="flex min-w-0 items-center gap-3">
           <ShieldOffIcon className="size-5 shrink-0 text-warning" />
           <div className="min-w-0">
-            <p className="text-sm text-foreground">{t("Masking is off", "الترميز متوقف")}</p>
+            <p className="text-sm text-foreground">{t("Masking is off", "إخفاء البيانات متوقف")}</p>
             <p className="text-xs text-muted-foreground">
               {t(
-                "Names and numbers reach the AI as written.",
-                "تصل الأسماء والأرقام إلى الذكاء الاصطناعي كما كُتبت.",
+                "Your messages and files reach the AI as written.",
+                "تصل رسائلك وملفاتك إلى الذكاء الاصطناعي كما هي، دون إخفاء.",
               )}
             </p>
           </div>
@@ -182,8 +182,8 @@ function SignedOut({
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
         <button type="button" className={LINK_CLASS} onClick={() => onOwnService(!ownService)}>
           {ownService
-            ? t(gt("Sign in to DoeDesk instead"), "سجّل الدخول إلى DoeDesk بدلًا من ذلك")
-            : t(gt("Use my own detection service"), "استخدم خدمة كشف خاصة بي")}
+            ? t(gt("Sign in to DoeDesk instead"), "تسجيل الدخول إلى DoeDesk بدلًا من ذلك")
+            : t(gt("Use my own detection service"), "استخدام خدمة كشف خاصة بي")}
         </button>
         {allowTurningOff || refused ? (
           <button
@@ -192,7 +192,7 @@ function SignedOut({
             className={LINK_CLASS}
             onClick={() => void configure({ mode: "off" })}
           >
-            {t(gt("Use DoeDesk without masking"), "استخدم DoeDesk دون ترميز")}
+            {t(gt("Use DoeDesk without masking"), "استخدام DoeDesk دون إخفاء البيانات")}
           </button>
         ) : null}
       </div>
@@ -294,8 +294,8 @@ export function CloudSignIn({
       setError(
         result.code == null && result.message === null
           ? t(
-              gt("This sign-in has expired. Start again."),
-              "انتهت صلاحية تسجيل الدخول هذا. ابدأ من جديد.",
+              gt("This sign-in link has expired. Request a new one."),
+              "انتهت صلاحية رابط تسجيل الدخول. اطلب رابطًا جديدًا.",
             )
           : messageFor(result),
       );
@@ -462,7 +462,7 @@ export function CloudSignIn({
           }}
         >
           <p className="text-sm text-muted-foreground">
-            {t(gt("Code sent to"), "أُرسل الرمز إلى")}{" "}
+            {t(gt("Enter the 6-digit code sent to"), "أدخل الرمز المكوّن من 6 أرقام المرسل إلى")}{" "}
             <bdi className="text-foreground">{stage.phone}</bdi>
           </p>
           <Input
@@ -473,7 +473,7 @@ export function CloudSignIn({
             required
             maxLength={6}
             placeholder="000000"
-            aria-label={t(gt("Code"), "الرمز")}
+            aria-label={t(gt("Verification code"), "رمز التحقّق")}
             value={code}
             onChange={(event) => {
               const value = event.target.value.replace(/\D/g, "").slice(0, 6);
@@ -491,7 +491,7 @@ export function CloudSignIn({
               onResend={() => void sendCode()}
             />
             <button type="button" className={LINK_CLASS} onClick={startOver}>
-              {t(gt("Change number"), "غيّر الرقم")}
+              {t(gt("Use another number"), "استخدام رقم آخر")}
             </button>
           </div>
         </form>
@@ -500,12 +500,16 @@ export function CloudSignIn({
           <p className="flex items-center gap-2 text-sm text-foreground">
             <Spinner size="sm" tone="muted" />
             <span>
-              {t(gt("Open the link sent to"), "افتح الرابط المرسل إلى")} <bdi>{stage.email}</bdi>
+              {t(
+                gt("Check your inbox and open the sign-in link sent to"),
+                "افتح رابط تسجيل الدخول الذي أرسلناه إلى",
+              )}{" "}
+              <bdi>{stage.email}</bdi>
             </span>
           </p>
           <div>
             <button type="button" className={LINK_CLASS} onClick={startOver}>
-              {t(gt("Use another email"), "استخدم بريدًا آخر")}
+              {t(gt("Use another email"), "استخدام بريد آخر")}
             </button>
           </div>
         </div>
@@ -525,7 +529,7 @@ export function CloudSignIn({
           {agreement}
           <div dir={controlsDir}>
             <Button type="submit" disabled={busy || blocked || unavailable}>
-              {submitLabel(words.sendCode, t(gt("Send code"), "أرسل الرمز"))}
+              {submitLabel(words.sendCode, t(gt("Send code"), "إرسال الرمز"))}
             </Button>
           </div>
         </form>
@@ -544,7 +548,7 @@ export function CloudSignIn({
           {agreement}
           <div dir={controlsDir}>
             <Button type="submit" disabled={busy || blocked || unavailable}>
-              {submitLabel(words.sendLink, t(gt("Send link"), "أرسل الرابط"))}
+              {submitLabel(words.sendLink, t(gt("Send link"), "إرسال الرابط"))}
             </Button>
           </div>
         </form>
@@ -586,7 +590,7 @@ function ResendButton({
           {t("s", " ث")}
         </span>
       ) : (
-        t(gt("Resend"), "أعد الإرسال")
+        t(gt("Resend code"), "إعادة إرسال الرمز")
       )}
     </Button>
   );
@@ -633,7 +637,7 @@ export function OwnServiceForm({
       />
       <div className="mt-1">
         <Button type="submit" disabled={busy}>
-          {busy ? t("Checking…", "جارٍ الفحص…") : t("Connect", "اتصل")}
+          {busy ? t("Checking…", "جارٍ التحقّق…") : t("Connect", "اتصال")}
         </Button>
       </div>
     </form>

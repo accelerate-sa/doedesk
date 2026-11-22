@@ -124,7 +124,7 @@ describe("PrivacySetup", () => {
     await expect.element(screen.getByText("0551234567")).toBeVisible();
     await expect.element(screen.getByRole("button", { name: /Resend in/ })).toBeDisabled();
     // The sixth digit submits the code without a press.
-    await userEvent.type(screen.getByLabelText("Code"), "123456");
+    await userEvent.type(screen.getByLabelText("Verification code"), "123456");
 
     await vi.waitFor(() => expect(onStatus).toHaveBeenCalledWith(signedIn));
     // What was on the screen goes with the request: these versions, this language, this wording.
@@ -156,7 +156,7 @@ describe("PrivacySetup", () => {
 
     await toggle(screen.getByRole("checkbox"));
     await press(send);
-    await press(screen.getByRole("button", { name: "Change number" }));
+    await press(screen.getByRole("button", { name: "Use another number" }));
     await expect.element(screen.getByRole("checkbox")).not.toBeChecked();
     await expect.element(send).toBeDisabled();
   });
@@ -222,7 +222,9 @@ describe("PrivacySetup", () => {
     await userEvent.type(screen.getByLabelText("Email"), "sara@example.com");
     await toggle(screen.getByRole("checkbox"));
     await press(screen.getByRole("button", { name: "Agree and send link" }));
-    await expect.element(screen.getByText(/Open the link sent to/)).toBeVisible();
+    await expect
+      .element(screen.getByText(/Check your inbox and open the sign-in link sent to/))
+      .toBeVisible();
     expect(onStatus).not.toHaveBeenCalled();
 
     opened = true;
@@ -291,7 +293,7 @@ describe("PrivacySetup", () => {
     await userEvent.type(screen.getByLabelText("Mobile number"), "0551234567");
     await toggle(screen.getByRole("checkbox"));
     await press(screen.getByRole("button", { name: "Agree and send code" }));
-    await userEvent.type(screen.getByLabelText("Code"), "123456");
+    await userEvent.type(screen.getByLabelText("Verification code"), "123456");
     await expect.element(screen.getByRole("alert")).toHaveTextContent(notice);
     await expect.element(screen.getByLabelText("Mobile number")).toBeVisible();
 
@@ -303,7 +305,7 @@ describe("PrivacySetup", () => {
     const { screen } = await setup(["email"], status(), { reached: false });
     await using _ = screen;
 
-    await expect.element(screen.getByText(/cannot show which Terms of Use/)).toBeVisible();
+    await expect.element(screen.getByText(/to load the current Terms of Use/)).toBeVisible();
     expect(screen.getByRole("checkbox").query()).toBeNull();
     await expect
       .element(screen.getByRole("button", { name: "Agree and send link" }))
@@ -324,10 +326,10 @@ describe("PrivacySetup", () => {
     await userEvent.type(screen.getByLabelText("Mobile number"), "0551234567");
     await toggle(screen.getByRole("checkbox"));
     await press(screen.getByRole("button", { name: "Agree and send code" }));
-    await userEvent.type(screen.getByLabelText("Code"), "000000");
+    await userEvent.type(screen.getByLabelText("Verification code"), "000000");
 
     await expect.element(screen.getByRole("alert")).toHaveTextContent("That code is not right.");
-    await expect.element(screen.getByLabelText("Code")).toBeVisible();
+    await expect.element(screen.getByLabelText("Verification code")).toBeVisible();
   });
 
   it("connects a self-hosted service with the address the user typed", async () => {

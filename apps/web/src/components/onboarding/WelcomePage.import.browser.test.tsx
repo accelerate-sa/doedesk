@@ -240,7 +240,8 @@ const readyClaude: ServerProvider = {
   slashCommands: [],
   skills: [],
 };
-const permissionMessage = "This connection cannot import folders or chat history.";
+const permissionMessage =
+  "This connection does not have permission to import folders or chat history.";
 
 function session(scopes: ReadonlyArray<AuthEnvironmentScope>): AuthSessionState {
   return {
@@ -355,10 +356,10 @@ async function click(label: string) {
 // step unless a test turns T3 Connect on.
 const STEP_TITLES = [
   "Welcome to DoeDesk",
-  "Protect names and numbers",
-  "Connect an AI",
-  "Folders",
-  "Your phone",
+  "Choose how personal details are detected",
+  "Connect an AI tool",
+  "Import folders",
+  "Connect your phone",
 ] as const;
 
 // Takes setup from the step on screen to `title` with Continue, as the person would.
@@ -522,11 +523,11 @@ it("waits for a ready agent to continue, and going on without one still imports 
   appAtomRegistry.set(state.providers as Atom.Writable<ReadonlyArray<ServerProvider>>, []);
   {
     await using _screen = await mountWelcome();
-    await continueTo("Connect an AI");
+    await continueTo("Connect an AI tool");
     expect(button("Continue").disabled).toBe(true);
     // Skipping the AI still imports the folders checked on the next step.
     await click("Skip for now");
-    await vi.waitFor(() => expect(heading()).toBe("Folders"));
+    await vi.waitFor(() => expect(heading()).toBe("Import folders"));
     await click("Import 2 folders and start");
     await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
     expect(state.createProject).toHaveBeenCalledTimes(2);
@@ -536,9 +537,9 @@ it("waits for a ready agent to continue, and going on without one still imports 
   state.onDone.mockReset();
   appAtomRegistry.set(candidatesAtom(), []);
   await using _screen = await mountWelcome();
-  await continueTo("Connect an AI");
+  await continueTo("Connect an AI tool");
   expect(button("Start").disabled).toBe(true);
-  await click("Start without an AI");
+  await click("Start without an AI tool");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
 });
 
@@ -633,7 +634,7 @@ it("keeps the project choice across a visit to Settings until setup finishes", a
   }
   // Opened again from Settings after setup finished: it starts over, with the default picks.
   await using _third = await mountWelcome();
-  await continueTo("Folders");
+  await continueTo("Import folders");
   expect(button("Import 2 folders and start").disabled).toBe(false);
 });
 
@@ -672,7 +673,7 @@ it("leaves projects already in DoeDesk out of the default import, unless the box
   ]);
   {
     await using _screen = await mountWelcome();
-    await vi.waitFor(() => expect(pageText()).toContain("Import 1 folder and their chats"));
+    await vi.waitFor(() => expect(pageText()).toContain("Import 1 folder and its chats"));
   }
 
   // With every project already in DoeDesk, checking the box still picks them.
@@ -712,9 +713,9 @@ it("keeps the project controls when a later scan fails", async () => {
   await act(async () =>
     appAtomRegistry.set(candidatesAtom(), [...appAtomRegistry.get(candidatesAtom())]),
   );
-  await vi.waitFor(() => expect(pageText()).toContain("Could not check folders again."));
+  await vi.waitFor(() => expect(pageText()).toContain("Could not rescan folders."));
   expect(button("Import 2 folders and start").disabled).toBe(false);
-  expect(button("Retry").disabled).toBe(false);
+  expect(button("Try again").disabled).toBe(false);
 });
 
 it("keeps saved picks when Start comes before the project list loads", async () => {
@@ -819,7 +820,7 @@ it("opens the list of agents to add once the checks find none, even after a wron
   );
   const fold = () =>
     [...document.querySelectorAll("button")].find((element) =>
-      element.textContent?.startsWith("Set up an AI"),
+      element.textContent?.startsWith("Set up an AI tool"),
     );
   await vi.waitFor(() => expect(fold()?.getAttribute("aria-expanded")).toBe("true"));
 
