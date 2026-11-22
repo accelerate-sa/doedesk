@@ -87,7 +87,7 @@ export function ProfileQuestions({
           <Chip
             key={option.value}
             selected={field === option.value}
-            onSelect={() => change({ field: option.value })}
+            onSelect={() => change({ field: field === option.value ? null : option.value })}
           >
             {m(option.label)}
           </Chip>
@@ -109,7 +109,7 @@ export function ProfileQuestions({
           <Chip
             key={option.value}
             selected={workplace === option.value}
-            onSelect={() => change({ workplace: option.value })}
+            onSelect={() => change({ workplace: workplace === option.value ? null : option.value })}
           >
             {m(option.label)}
           </Chip>

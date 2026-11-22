@@ -34,6 +34,8 @@ export interface OnboardingFacts {
   readonly usageDataDue: boolean;
   /** True while the server is still deciding the usage-data rule for this region. */
   readonly usageDataPending?: boolean;
+  /** True when the user has entered a detection service address for "Use my own detection service". */
+  readonly ownServiceReady?: boolean;
   readonly developerMode: boolean;
   readonly foldersAvailable: boolean;
   readonly phoneAvailable: boolean;
@@ -110,12 +112,13 @@ function canContinue(
   facts: OnboardingFacts,
 ): boolean {
   switch (step) {
-    case "masking":
-      // The account is the preselected way, so it needs no click to go on with.
-      return (
-        privacyDecided(facts) ||
-        ((state.masking ?? "account") === "account" && facts.privacyMode !== null)
-      );
+    case "masking": {
+      if (privacyDecided(facts)) return true;
+      if (facts.privacyMode === null) return false;
+      const choice = state.masking ?? "account";
+      if (choice === "account" || choice === "off") return true;
+      return facts.ownServiceReady === true;
+    }
     case "account":
       return facts.privacyMode === "cloud" && !facts.termsOutstanding;
     case "usageData":
@@ -128,6 +131,17 @@ function canContinue(
 }
 
 const GATES: ReadonlyArray<OnboardingStep> = ["masking", "account"];
+
+function gateSatisfied(
+  step: OnboardingStep,
+  state: OnboardingState,
+  facts: OnboardingFacts,
+): boolean {
+  if (step === "masking") {
+    return privacyDecided(facts) || (usesAccount(state, facts) && facts.privacyMode !== null);
+  }
+  return canContinue(step, state, facts);
+}
 
 function visibleSteps(state: OnboardingState, facts: OnboardingFacts) {
   return ONBOARDING_STEPS.filter((step) => applies(step, state, facts));
@@ -146,7 +160,7 @@ function currentStep(state: OnboardingState, facts: OnboardingFacts): Onboarding
     (step) =>
       GATES.includes(step) &&
       ONBOARDING_STEPS.indexOf(step) < ONBOARDING_STEPS.indexOf(target) &&
-      !canContinue(step, state, facts),
+      !gateSatisfied(step, state, facts),
   );
   return blocked ?? target;
 }

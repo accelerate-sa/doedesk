@@ -1,11 +1,14 @@
 import { useAuth } from "@clerk/react";
 import {
+  configurePrivacy,
+  isPrivacyDecided,
   savePrivacyProfile,
   setPrivacyStatus,
   useConsentLocale,
   usePrivacyStatus,
   useUsageDataState,
 } from "~/privacy/privacyClient";
+import { NOT_WORKED, UNREACHABLE, usePrivacyMessage } from "~/doedesk/privacyMessages";
 import { settleUsageDataFirstRun, usageDataChoiceDue } from "../privacy/UsageData";
 import { termsAcceptanceDue } from "../privacy/TermsAcceptanceSheet";
 import { useDeveloperMode } from "~/doedesk/product";
@@ -24,6 +27,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type {
   AgentSessionProjectCandidate,
   EnvironmentId,
+  PrivacyConfigureRequest,
   PrivacyProfileRequest,
   ProjectId,
   ProviderInstanceId,
@@ -147,6 +151,7 @@ import {
   AccountStep,
   LanguageStep,
   MaskingStep,
+  type OwnServiceDraft,
   ProfileStep,
   UsageDataStep,
 } from "./SetupPrivacySteps";
@@ -185,6 +190,7 @@ export function WelcomePage({
 }) {
   const developerMode = useDeveloperMode();
   const gt = useGT();
+  const privacyMessages = usePrivacyMessage();
   const { environments } = useEnvironments();
   const environmentLabel = environments.find(
     (environment) => environment.environmentId === environmentId,
@@ -332,6 +338,11 @@ export function WelcomePage({
     if (state.locale !== null && state.locale !== consentLocale) setConsentLocale(state.locale);
   }, [state.locale, consentLocale, setConsentLocale]);
 
+  const [ownServiceDraft, setOwnServiceDraft] = useState<OwnServiceDraft>({
+    endpoint: "",
+    token: "",
+  });
+  const [maskingError, setMaskingError] = useState<string | null>(null);
   const scan = scans[0];
   const facts: OnboardingFacts = {
     privacyMode: privacyStatus?.mode ?? null,
@@ -339,6 +350,7 @@ export function WelcomePage({
     profileAnswered: privacyStatus?.profileAnswered ?? false,
     usageDataDue: usageDataOffered,
     usageDataPending,
+    ownServiceReady: ownServiceDraft.endpoint.trim().length > 0,
     developerMode,
     foldersAvailable:
       scan !== undefined &&
@@ -368,7 +380,45 @@ export function WelcomePage({
 
   // Each step's own answer is recorded on the way out, then the next step that applies opens.
   const advance = async (options: { readonly skip?: boolean } = {}) => {
+    if (advancing) return;
+    let nextFacts = facts;
     setAdvancing(true);
+    if (
+      view.step === "masking" &&
+      privacyStatus !== null &&
+      !isPrivacyDecided(privacyStatus) &&
+      (state.masking === "ownService" || state.masking === "off")
+    ) {
+      setMaskingError(null);
+      const payload: PrivacyConfigureRequest =
+        state.masking === "off"
+          ? { mode: "off" }
+          : {
+              mode: "selfHosted",
+              endpoint: ownServiceDraft.endpoint.trim(),
+              ...(ownServiceDraft.token.trim().length > 0
+                ? { token: ownServiceDraft.token.trim() }
+                : {}),
+            };
+      const result = await configurePrivacy(payload).catch(() => null);
+      if (result === null) {
+        setMaskingError(privacyMessages(UNREACHABLE));
+        setAdvancing(false);
+        return;
+      }
+      setPrivacyStatus(result.status);
+      if (!result.ok) {
+        setMaskingError(result.message ?? privacyMessages(NOT_WORKED));
+        setAdvancing(false);
+        return;
+      }
+      nextFacts = {
+        ...facts,
+        privacyMode: result.status.mode,
+        termsOutstanding: termsAcceptanceDue(result.status),
+        profileAnswered: result.status.profileAnswered,
+      };
+    }
     // Both saves catch their own failures, so nothing here can skip the reset below.
     if (view.step === "profile" && privacyStatus !== null) {
       const answers = profileAnswersRef.current;
@@ -390,7 +440,7 @@ export function WelcomePage({
       return;
     }
     const base = view.step === "welcome" ? { ...state, locale } : state;
-    const nextState = goForward(base, facts, options);
+    const nextState = goForward(base, nextFacts, options);
     if (view.step === "welcome") {
       // Lock the chosen (or Arabic-OS default) language into app settings for all later launches.
       void updateClientSettings({
@@ -442,7 +492,18 @@ export function WelcomePage({
                     status={privacyStatus}
                     loading={privacy.kind === "loading"}
                     choice={state.masking}
-                    onChoice={(masking) => saveState({ ...state, masking })}
+                    ownServiceDraft={ownServiceDraft}
+                    busy={advancing}
+                    error={maskingError}
+                    onChoice={(masking) => {
+                      setMaskingError(null);
+                      saveState({ ...state, masking });
+                    }}
+                    onOwnServiceDraftChange={(draft) => {
+                      setMaskingError(null);
+                      setOwnServiceDraft(draft);
+                    }}
+                    onSubmitOwnService={() => void advance()}
                   />
                 ) : view.step === "account" ? (
                   <AccountStep status={privacyStatus} loading={privacy.kind === "loading"} />
@@ -485,6 +546,11 @@ export function WelcomePage({
                 canContinue={view.canContinue && !advancing && !isImporting}
                 canSkip={view.canSkip && !view.canContinue && !isImporting}
                 hint={stepHint(view.step, view.canContinue, facts)}
+                continueLabel={
+                  advancing && view.step === "masking" && state.masking === "ownService"
+                    ? gt("Connecting…")
+                    : null
+                }
                 startLabel={
                   isImporting
                     ? selected.length > 0
@@ -513,7 +579,7 @@ export function WelcomePage({
 }
 
 const STEP_HINTS = {
-  masking: msg("Complete your choice above to continue."),
+  masking: msg("Enter your detection service address to continue."),
   terms: msg("Accept the Terms of Use to continue."),
   signIn: msg("Sign in to continue."),
   agents: msg("Connect at least one AI tool to continue, or skip this step for now."),
@@ -638,6 +704,7 @@ function StepFooter({
   canContinue,
   canSkip,
   hint,
+  continueLabel,
   startLabel,
   onBack,
   onContinue,
@@ -648,6 +715,7 @@ function StepFooter({
   readonly canContinue: boolean;
   readonly canSkip: boolean;
   readonly hint: string | null;
+  readonly continueLabel?: string | null;
   /** The last step's button while folders are picked or the import runs. */
   readonly startLabel: string | null;
   readonly onBack: () => void;
@@ -674,7 +742,7 @@ function StepFooter({
             </Button>
           ) : null}
           <Button disabled={!canContinue} onClick={onContinue}>
-            {isLast ? (startLabel ?? gt("Start")) : gt("Continue")}
+            {isLast ? (startLabel ?? gt("Start")) : (continueLabel ?? gt("Continue"))}
           </Button>
         </div>
       </div>

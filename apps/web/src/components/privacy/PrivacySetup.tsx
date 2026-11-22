@@ -583,13 +583,31 @@ function ResendButton({
 export function OwnServiceForm({
   busy,
   onSubmit,
+  hideSubmit = false,
+  endpoint: controlledEndpoint,
+  token: controlledToken,
+  onDraftChange,
 }: {
   readonly busy: boolean;
-  readonly onSubmit: (payload: PrivacyConfigureRequest) => Promise<void>;
+  readonly onSubmit: (payload: PrivacyConfigureRequest) => Promise<void> | void;
+  readonly hideSubmit?: boolean;
+  readonly endpoint?: string;
+  readonly token?: string;
+  readonly onDraftChange?: (draft: { readonly endpoint: string; readonly token: string }) => void;
 }) {
   const gt = useGT();
-  const [endpoint, setEndpoint] = useState("");
-  const [token, setToken] = useState("");
+  const [localEndpoint, setLocalEndpoint] = useState("");
+  const [localToken, setLocalToken] = useState("");
+  const endpoint = controlledEndpoint ?? localEndpoint;
+  const token = controlledToken ?? localToken;
+  const setEndpoint = (next: string) => {
+    setLocalEndpoint(next);
+    onDraftChange?.({ endpoint: next, token });
+  };
+  const setToken = (next: string) => {
+    setLocalToken(next);
+    onDraftChange?.({ endpoint, token: next });
+  };
   return (
     <form
       className="grid gap-2 sm:max-w-sm"
@@ -597,7 +615,7 @@ export function OwnServiceForm({
         event.preventDefault();
         void onSubmit({
           mode: "selfHosted",
-          endpoint,
+          endpoint: endpoint.trim(),
           ...(token.trim().length > 0 ? { token: token.trim() } : {}),
         });
       }}
@@ -619,11 +637,22 @@ export function OwnServiceForm({
         value={token}
         onChange={(event) => setToken(event.target.value)}
       />
-      <div className="mt-1">
-        <Button type="submit" disabled={busy}>
-          {busy ? gt("Checking…", { $context: "verifying the sign-in code" }) : gt("Connect")}
-        </Button>
-      </div>
+      {hideSubmit ? (
+        // Keeps Enter submission working in a two-input form when the step footer owns Continue.
+        <button
+          type="submit"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          disabled={busy || endpoint.trim().length === 0}
+        />
+      ) : (
+        <div className="mt-1">
+          <Button type="submit" disabled={busy}>
+            {busy ? gt("Checking…", { $context: "verifying the sign-in code" }) : gt("Connect")}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

@@ -14,11 +14,13 @@ import {
   type AuthEnvironmentScope,
   type AuthSessionState,
   type EnvironmentCloudLinkStateResult,
+  type PrivacyStatus,
   type ServerProvider,
   type UsageDataStatus,
 } from "@t3tools/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { expect, it, vi } from "vite-plus/test";
+import { userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
 import { act, render } from "../../../test/render";
@@ -57,6 +59,13 @@ const state = vi.hoisted(() => ({
   closeTerminal: vi.fn(),
   usageData: null as UsageDataStatus | null,
   setUsageData: vi.fn(),
+  privacyStatus: null as unknown,
+  signInOptions: {
+    methods: ["email"] as ReadonlyArray<"phone" | "email">,
+    signUpAvailable: true,
+    reached: true,
+  },
+  configurePrivacy: vi.fn(),
 }));
 
 // DoeDesk: the import flow is a Developer mode tool, and Start waits for a privacy choice. These
@@ -66,28 +75,27 @@ vi.mock(import("~/doedesk/product"), () => ({
   isDeveloperMode: () => true,
 }));
 
-vi.mock(import("~/privacy/privacyClient"), async (original) => ({
-  ...(await original()),
-  usePrivacyStatus: () => ({
-    kind: "ready" as const,
-    status: {
-      mode: "off" as const,
-      active: false,
-      accountLabel: null,
-      endpoint: null,
-      vaultSize: 0,
-      problem: null,
-      profileAnswered: true,
-    },
-  }),
-  useUsageData: () => state.usageData,
-  useUsageDataState: () =>
-    state.usageData === null
-      ? ({ kind: "error", status: null } as const)
-      : ({ kind: "ready", status: state.usageData } as const),
-  setUsageData: (...args: unknown[]) => state.setUsageData(...args),
-  useConsentLocale: () => ["en", () => {}, false] as const,
-}));
+vi.mock(import("~/privacy/privacyClient"), async (original) => {
+  const { useAtomValue } = await import("@effect/atom-react");
+  return {
+    ...(await original()),
+    usePrivacyStatus: () => ({
+      kind: "ready" as const,
+      status: useAtomValue(state.privacyStatus as Atom.Atom<PrivacyStatus>),
+    }),
+    setPrivacyStatus: (next: PrivacyStatus) =>
+      appAtomRegistry.set(state.privacyStatus as Atom.Writable<PrivacyStatus>, next),
+    configurePrivacy: (...args: unknown[]) => state.configurePrivacy(...args),
+    useSignInOptions: () => state.signInOptions,
+    useUsageData: () => state.usageData,
+    useUsageDataState: () =>
+      state.usageData === null
+        ? ({ kind: "error", status: null } as const)
+        : ({ kind: "ready", status: state.usageData } as const),
+    setUsageData: (...args: unknown[]) => state.setUsageData(...args),
+    useConsentLocale: () => ["en", () => {}, false] as const,
+  };
+});
 
 vi.mock(import("@t3tools/client-runtime/state/session"), async (original) => {
   const actual = await original();
@@ -446,6 +454,17 @@ function setup() {
   }
   state.usageData = null;
   state.setUsageData.mockReset().mockResolvedValue(null);
+  state.privacyStatus = Atom.make<PrivacyStatus>({
+    mode: "off",
+    active: false,
+    accountLabel: null,
+    endpoint: null,
+    vaultSize: 0,
+    problem: null,
+    profileAnswered: true,
+  }).pipe(Atom.keepAlive);
+  state.signInOptions = { methods: ["email"], signUpAvailable: true, reached: true };
+  state.configurePrivacy.mockReset();
   localStorage.removeItem(welcomeImportSelectionKey(primaryId));
   // Most tests are about the folders step; the others resume or walk to their own step.
   resumeAt("folders");
@@ -938,4 +957,74 @@ it("does not silently settle usage data on Start when the country answer arrived
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
   // Leaving without having shown the notice must keep usage data unset so PrivacyPrompts asks next.
   expect(state.setUsageData).not.toHaveBeenCalled();
+});
+
+it("commits own detection service and no-masking choices with a single Continue click", async () => {
+  using _now = setup();
+  const unconfigured: PrivacyStatus = {
+    mode: "unconfigured",
+    active: true,
+    accountLabel: null,
+    endpoint: null,
+    vaultSize: 0,
+    problem: null,
+    profileAnswered: false,
+  };
+  appAtomRegistry.set(state.privacyStatus as Atom.Writable<PrivacyStatus>, unconfigured);
+  state.signInOptions = { methods: ["email"], signUpAvailable: false, reached: true };
+  resumeAt("masking");
+  await using screen = await mountWelcome();
+
+  // Own detection service: no separate Connect button; Continue submits and advances directly.
+  await act(async () => {
+    (
+      screen.getByRole("radio", { name: /Use my own detection service/ }).element() as HTMLElement
+    ).click();
+  });
+  expect(screen.getByRole("button", { name: "Connect" }).query()).toBeNull();
+  expect(button("Continue").disabled).toBe(true);
+
+  await userEvent.type(screen.getByLabelText("Service address"), "http://localhost:8080");
+  expect(button("Continue").disabled).toBe(false);
+
+  state.configurePrivacy.mockResolvedValueOnce({
+    ok: false,
+    message: "Service did not answer.",
+    status: unconfigured,
+  });
+  await click("Continue");
+  await vi.waitFor(() => expect(pageText()).toContain("Service did not answer."));
+  expect(heading()).toBe("Choose how personal details are detected");
+
+  const selfHosted: PrivacyStatus = {
+    ...unconfigured,
+    mode: "selfHosted",
+    endpoint: "http://localhost:8080",
+  };
+  state.configurePrivacy.mockResolvedValueOnce({ ok: true, message: null, status: selfHosted });
+  await click("Continue");
+  await vi.waitFor(() => expect(heading()).toBe("Connect an AI tool"));
+  expect(state.configurePrivacy).toHaveBeenLastCalledWith({
+    mode: "selfHosted",
+    endpoint: "http://localhost:8080",
+  });
+
+  // Continue without masking: no separate confirmation button; Continue commits and advances.
+  appAtomRegistry.set(state.privacyStatus as Atom.Writable<PrivacyStatus>, unconfigured);
+  await click("Back");
+  await vi.waitFor(() => expect(heading()).toBe("Choose how personal details are detected"));
+  await act(async () => {
+    (
+      screen.getByRole("radio", { name: /Continue without masking/ }).element() as HTMLElement
+    ).click();
+  });
+  expect(screen.getByRole("button", { name: "Use DoeDesk without masking" }).query()).toBeNull();
+  state.configurePrivacy.mockResolvedValueOnce({
+    ok: true,
+    message: null,
+    status: { ...unconfigured, mode: "off", active: false },
+  });
+  await click("Continue");
+  await vi.waitFor(() => expect(heading()).toBe("Connect an AI tool"));
+  expect(state.configurePrivacy).toHaveBeenLastCalledWith({ mode: "off" });
 });

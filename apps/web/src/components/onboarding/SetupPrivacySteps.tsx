@@ -1,17 +1,9 @@
-import type {
-  PrivacyConfigureRequest,
-  PrivacyProfileRequest,
-  PrivacyStatus,
-  UsageDataStatus,
-} from "@t3tools/contracts";
+import type { PrivacyProfileRequest, PrivacyStatus, UsageDataStatus } from "@t3tools/contracts";
 import { T, useGT, Var } from "gt-react";
 import { CheckIcon } from "lucide-react";
-import { useState } from "react";
 
-import { NOT_WORKED, UNREACHABLE, usePrivacyMessage } from "~/doedesk/privacyMessages";
 import type { MaskingChoice, SetupLocale } from "~/onboarding/onboardingSteps.logic";
 import {
-  configurePrivacy,
   isPrivacyDecided,
   refreshPrivacyStatus,
   setPrivacyStatus,
@@ -86,7 +78,11 @@ export function LanguageStep({
           "Choose your language for DoeDesk. Setup takes a few steps, and you can change this later in Settings.",
         )}
       </p>
-      <div role="radiogroup" aria-label={gt("App language")} className="grid gap-2 sm:max-w-sm">
+      <div
+        role="radiogroup"
+        aria-label={gt("App language")}
+        className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+      >
         <ChoiceCard
           selected={locale === "en"}
           // oxlint-disable-next-line t3code/no-untranslated-copy -- each language is named in itself
@@ -106,27 +102,39 @@ export function LanguageStep({
   );
 }
 
+export interface OwnServiceDraft {
+  readonly endpoint: string;
+  readonly token: string;
+}
+
 /**
  * How names and numbers are found: a DoeDesk account, a detection service of one's own, or, only
- * where no account can be made here, no masking. Once one is in place the step shows it, and
- * changing it means signing out or disconnecting first.
+ * where no account can be made here, no masking. The step footer's Continue button commits the
+ * choice and advances in one step. Once configured, the step shows it until signed out or disconnected.
  */
 export function MaskingStep({
   status,
   loading = false,
   choice,
+  ownServiceDraft,
+  busy = false,
+  error = null,
   onChoice,
+  onOwnServiceDraftChange,
+  onSubmitOwnService,
 }: {
   readonly status: PrivacyStatus | null;
   readonly loading?: boolean;
   readonly choice: MaskingChoice | null;
+  readonly ownServiceDraft: OwnServiceDraft;
+  readonly busy?: boolean;
+  readonly error?: string | null;
   readonly onChoice: (choice: MaskingChoice) => void;
+  readonly onOwnServiceDraftChange: (draft: OwnServiceDraft) => void;
+  readonly onSubmitOwnService: () => void;
 }) {
   const gt = useGT();
-  const m = usePrivacyMessage();
   const options = useSignInOptions();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (loading) return <Spinner size="md" tone="muted" aria-label={gt("Loading")} />;
   if (status === null) return <PrivacyUnavailable />;
@@ -134,18 +142,6 @@ export function MaskingStep({
     return <PrivacySetup status={status} onStatus={setPrivacyStatus} />;
   }
 
-  const configure = async (payload: PrivacyConfigureRequest) => {
-    setBusy(true);
-    setError(null);
-    const result = await configurePrivacy(payload).catch(() => null);
-    setBusy(false);
-    if (result === null) {
-      setError(m(UNREACHABLE));
-      return;
-    }
-    setPrivacyStatus(result.status);
-    if (!result.ok) setError(result.message ?? m(NOT_WORKED));
-  };
   // Without masking is offered only where DoeDesk Cloud will not open an account from here.
   const refused = options?.signUpAvailable === false;
   const selected = choice ?? "account";
@@ -180,13 +176,15 @@ export function MaskingStep({
           />
         ) : null}
       </div>
-      {selected === "ownService" ? <OwnServiceForm busy={busy} onSubmit={configure} /> : null}
-      {selected === "off" ? (
-        <div>
-          <Button size="sm" disabled={busy} onClick={() => void configure({ mode: "off" })}>
-            {gt("Use DoeDesk without masking")}
-          </Button>
-        </div>
+      {selected === "ownService" ? (
+        <OwnServiceForm
+          busy={busy}
+          hideSubmit
+          endpoint={ownServiceDraft.endpoint}
+          token={ownServiceDraft.token}
+          onDraftChange={onOwnServiceDraftChange}
+          onSubmit={onSubmitOwnService}
+        />
       ) : null}
       {error !== null ? (
         <p role="alert" className="text-sm text-destructive">
@@ -242,12 +240,16 @@ export function AccountStep({
       <p className="flex items-center gap-2 text-sm text-foreground">
         <CheckIcon className="size-4 shrink-0 text-success-foreground" />
         <span>
-          <T>
-            Signed in as{" "}
-            <bdi>
-              <Var>{status.accountLabel ?? ""}</Var>
-            </bdi>
-          </T>
+          {status.accountLabel ? (
+            <T>
+              Signed in as{" "}
+              <bdi>
+                <Var>{status.accountLabel}</Var>
+              </bdi>
+            </T>
+          ) : (
+            gt("Signed in")
+          )}
         </span>
       </p>
       {outstanding ? (

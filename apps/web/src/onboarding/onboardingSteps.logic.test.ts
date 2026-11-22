@@ -180,4 +180,27 @@ describe("onboarding steps", () => {
     // Going back while still loading does not lock an unshown usageData step into seen either.
     expect(goBack(reachedPending, signedInLoading).seen).not.toContain("usageData");
   });
+
+  it("lets Continue commit ownService once an address is entered, or off immediately, while still gating resumed steps", () => {
+    const atMaskingOwn = state({ step: "masking", masking: "ownService" });
+    expect(onboardingView(atMaskingOwn, facts({ ownServiceReady: false })).canContinue).toBe(false);
+    expect(onboardingView(atMaskingOwn, facts({ ownServiceReady: true })).canContinue).toBe(true);
+
+    const atMaskingOff = state({ step: "masking", masking: "off" });
+    expect(onboardingView(atMaskingOff, facts()).canContinue).toBe(true);
+
+    // If privacy was reset to unconfigured while the app was closed, resuming past masking returns to it.
+    const resumedOff = state({
+      step: "agents",
+      seen: ["welcome", "masking", "agents"],
+      masking: "off",
+    });
+    expect(onboardingView(resumedOff, facts()).step).toBe("masking");
+    const resumedOwn = state({
+      step: "agents",
+      seen: ["welcome", "masking", "agents"],
+      masking: "ownService",
+    });
+    expect(onboardingView(resumedOwn, facts({ ownServiceReady: true })).step).toBe("masking");
+  });
 });
