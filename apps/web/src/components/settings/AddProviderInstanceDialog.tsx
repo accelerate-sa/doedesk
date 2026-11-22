@@ -510,9 +510,9 @@ export function AddProviderInstanceDialog({
                 />
                 <MultipleAccountsNote environmentId={environmentId} driver={driver} />
               </div>
-              {consumerLoginWarning(driver) === undefined ? null : (
+              {consumerLoginWarning(driver, m) === undefined ? null : (
                 <p role="alert" className="pt-2 text-sm text-destructive">
-                  {consumerLoginWarning(driver)}
+                  {consumerLoginWarning(driver, m)}
                 </p>
               )}
 

@@ -88,12 +88,14 @@ export function LanguageStep({
       <div role="radiogroup" aria-label={gt("App language")} className="grid gap-2 sm:max-w-sm">
         <ChoiceCard
           selected={locale === "en"}
+          // oxlint-disable-next-line t3code/no-untranslated-copy -- each language is named in itself
           title="English"
           lang="en"
           onSelect={() => onLocale("en")}
         />
         <ChoiceCard
           selected={locale === "ar"}
+          // oxlint-disable-next-line t3code/no-untranslated-copy -- each language is named in itself
           title="العربية"
           lang="ar"
           onSelect={() => onLocale("ar")}

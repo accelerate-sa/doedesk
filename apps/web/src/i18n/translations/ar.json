@@ -2858,6 +2858,21 @@
   "ca64bdbac00392e9": "شركة (أقل من 50 موظفًا)",
   "b62656afc93b5f88": "شركة (50 موظفًا فأكثر)",
   "3266f7f9a29c2378": "جهة حكومية",
+  "f9151e75d91ff2b3": "وكلاء ACP Registry",
+  "d5bcf97ebbe14cda": "وكيل من ACP Registry",
+  "042d0e492432cc1a": "شركة الذكاء الاصطناعي التي يستخدمها ذلك الوكيل",
+  "89969d9dc15da1cd": "شركة الذكاء الاصطناعي التي يستخدمها {label}",
+  "df552b07b7a9370a": "يشغّل DoeDesk أداة {tool} بحسابك أنت، وترسل {Tool} طلباتك إلى {company}.",
+  "5c141e7e4ac8bab6": "قبل أن يغادر أي طلب هذا الجهاز، يستبدل DoeDesk البيانات الشخصية فيه برموز بديلة مثل {example}، ويضع مكان الصور وملفات PDF النص المقروء منها. ثم يعيد DoeDesk البيانات الحقيقية إلى الرد.",
+  "df3ae132a56ddefd": "تستطيع {Company} أن تعرف أن DoeDesk عدّل الطلب بعد أن كتبته {tool}.",
+  "9a81f6e79647904a": "لم يجد DoeDesk قاعدة لدى {company} تمنع ذلك، ولا بلاغًا عن حساب قيّدته {company} بسببه. ولا يستطيع DoeDesk أن يضمن ألا تقيّد {company} حسابك.",
+  "797ed5681180006d": "إن كانت خسارة هذا الحساب ستضرّك، فاربط {name} بمفتاح API أو باشتراك أعمال بدلًا منه؛ فهاتان الطريقتان أقل خطرًا.",
+  "f2499c3c3b9ed031": "ما الذي يغيّره DoeDesk فيما يصل إلى {company}",
+  "943f9e739bfc64a8": "سيرسل DoeDesk طلباتك إلى {company} كما تكتبها {tool} تمامًا، وستصل الأسماء وغيرها من البيانات الشخصية في رسائلك وملفاتك إلى {company}.",
+  "a5a593372811ce35": "يخفي DoeDesk البيانات الشخصية فيما ترسله {tool} إلى {company}.",
+  "5d69ba459347e487": "دون إخفاء. تصل رسائلك وملفاتك إلى {Company} كما هي.",
+  "287dfbe03618ee64": "أعلنت Google أن استخدام حساب Antigravity في أدوات غير أدواتها يخالف شروطها، وقد أوقفت حسابات بسبب ذلك. ولا يستطيع DoeDesk أن يجعل هذا آمنًا، فاستخدم مفتاح API إن كان حساب Google مهمًا لك.",
+  "5eedba356f861d2d": "تسجّل pi الدخول إلى اشتراكات Claude وChatGPT وGemini وCopilot على أنها برنامجها الخاص، وتقول Anthropic وGoogle إن استخدام الاشتراك بهذه الطريقة يخالف شروطهما. أما مفتاح API في pi فلا مشكلة فيه.",
   "14185ad8c9e2efed": "Settled {count, plural, one {{count} chat} other {{count} chats}}",
   "3ed697bd63bb8b95": "Snoozed {count, plural, one {{count} chat} other {{count} chats}}",
   "3476aa3a7fedbaee": "Unpinned {count, plural, one {{count} chat} other {{count} chats}}",
@@ -5585,7 +5600,7 @@
   "3c3e2a86f7fb439d": "Failed to copy mention",
   "39c9238711305724": "Open a chat for this folder and try again.",
   "e3796d26e9912913": "The chat isn't ready to accept input right now.",
-  "4ff72c2acc7f6656": "Loading…",
+  "4ff72c2acc7f6656": "جارٍ التحميل…",
   "69858f722a57708c": "Search {projectName} files",
   "e1e1094e43a5f3d7": "{error} Click to retry.",
   "ddb58ada5516a46d": "{projectName} files",
@@ -5837,7 +5852,7 @@
   "20194b81e50497ad": "Unable to load folder.",
   "0061fff77e36bd4f": "Could not reach the server.",
   "084bb2d8127a508d": "Sent",
-  "e7c59185f8ab3987": "Not sent",
+  "e7c59185f8ab3987": "لم يُرسل",
   "77c01a15bd36d17c": "This link has ended or is not valid",
   "e0e736810f3cbef2": "Ask the owner for a new link. Each link works in one browser.",
   "c3c53aa46f7330e5": "This link has ended",
@@ -6568,6 +6583,32 @@
   "3f6fbe33a48baaac": "معرّف الحساب",
   "39a87547762bff73": "تاريخ الحذف",
   "46631231b7fcf4c2": "يُحفظ سجل موافقة الحساب على شروط الاستخدام حتى",
+  "5986c8e1f8131a80": "صورة محجوبة",
+  "fa65a5d11d6ad245": "يرى الذكاء الاصطناعي الصورة وعلى كل بيان شخصي فيها مربع أسود يحمل رمزه البديل. وإن تعذّر حجب الصورة بأمان، تُرسل نصًّا مخفي البيانات بدلًا منها.",
+  "97a7dd2b69ffade1": "نص مخفي البيانات فقط",
+  "d7d471ce6cb3411c": "لا يرى الذكاء الاصطناعي إلا النص المقروء من الصورة، وقد استُبدلت فيه البيانات الشخصية برموز بديلة. ولا يُرسل أي جزء من الصورة نفسها.",
+  "a64505b657ebbfb6": "عدم الإرسال",
+  "1007cd1591026038": "يُبلَّغ الذكاء الاصطناعي بأن صورة حُجبت عنه، ولا يُقرأ منها شيء ولا يُرسل.",
+  "f3617607a4426a6b": "{count, plural, zero {أُرسلت الصورة محجوبة، دون مربعات} one {أُرسلت الصورة محجوبة، بمربع واحد} two {أُرسلت الصورة محجوبة، بمربعين} few {أُرسلت الصورة محجوبة، بـ {count} مربعات} many {أُرسلت الصورة محجوبة، بـ {count} مربعًا} other {أُرسلت الصورة محجوبة، بـ {count} مربع}}",
+  "d269f2ffb5032f2e": "{count, plural, zero {أُرسل المستند محجوبًا، دون مربعات} one {أُرسل المستند محجوبًا، بمربع واحد} two {أُرسل المستند محجوبًا، بمربعين} few {أُرسل المستند محجوبًا، بـ {count} مربعات} many {أُرسل المستند محجوبًا، بـ {count} مربعًا} other {أُرسل المستند محجوبًا، بـ {count} مربع}}",
+  "69484f5cb7e75b82": "أُرسلت الصورة نصًّا مخفي البيانات",
+  "f5550c79bc562231": "أُرسل المستند نصًّا مخفي البيانات",
+  "885552cd14342487": "حُجبت الصورة ولم تُرسل",
+  "5a389e1daf014120": "حُجب المستند ولم يُرسل",
+  "ef70c6fa3f19d431": "الصور والمستندات",
+  "f9dc134f4bc959b6": "طريقة إرسال الصور",
+  "350eeef7284c6b18": "لا يشمل ذلك الوجوه والتواقيع والشعارات وكل ما ليس كتابة. أما ملفات PDF فتُرسل دائمًا نصًّا مخفي البيانات.",
+  "d2674697c3c9fa5c": "أداة القراءة للوكلاء",
+  "b7cf77bdffb52cfd": "يمكن للوكلاء أن يطلبوا من DoeDesk قراءة صورة أو ملف PDF في مجلد عملهم، فيحصلون على النص وقد استُبدلت فيه البيانات الشخصية برموز بديلة، ولا يرون البيانات نفسها أبدًا.",
+  "d0f9584babf0463b": "لم يعد هذا الملف محفوظًا.",
+  "25d1be241b107e99": "تعذّرت قراءة الملف.",
+  "7adf67c16a8a4034": "ما أُرسل بدل الملفات",
+  "0de6520cecde98d1": "تعذّر الحذف.",
+  "0441c3a3d221c378": "حذف الكل",
+  "cd46d820ef072fc0": "لا شيء بعد.",
+  "78147bd34982e385": "الصورة المحجوبة",
+  "66777c5fe4ada9b7": "النص المخفي البيانات",
+  "4b0738ad6b5f39f9": "تُحفظ على هذا الجهاز سبعة أيام، وتحمل رموزًا بديلة لا البيانات الحقيقية.",
   "d6e423e3e7f9e978": "إخفاء البيانات مفعّل",
   "a656dc69a38a3639": "تسجيل الخروج",
   "c291bdeadbb22b96": "قطع الاتصال",
@@ -6597,6 +6638,29 @@
   "5a01fbc84ffb9263": "اذكر مجال عملك",
   "9345f2b4491652c6": "ما طبيعة جهة عملك؟",
   "471ab3589040c416": "حذف إجاباتي",
+  "daf308437c650c9f": "ما الذي يغيّره DoeDesk",
+  "edf818859b8e0738": "إخفاء البيانات فيما ترسله {tool} إلى {company}",
+  "836163ecee7d1043": "إيقاف إخفاء البيانات في {name}؟",
+  "92ef84322a62b6bf": "تتوقف محادثات {name} الجارية الآن، كي لا تبقى أي منها على الإعداد القديم.",
+  "17ab54b321dbcf05": "إبقاء إخفاء البيانات",
+  "f7d5742e86471cf9": "إيقاف إخفاء البيانات في {name}",
+  "0e80aa0591936ef9": "شركات الذكاء الاصطناعي",
+  "b4c87a4c87452bf4": "تقارير استخدام Claude Code",
+  "50c784202d064b4c": "يُبلغ Claude Code شركة Anthropic بطريقة استخدامه: أوقات وأعداد أخطاء، لا رسائلك ولا ملفاتك. ويُبقي DoeDesk هذه التقارير مفعّلة.",
+  "1ff4cac958dcd3dc": "يُبلغ Claude Code شركة Anthropic بطريقة استخدامه: أوقات وأعداد أخطاء، لا رسائلك ولا ملفاتك. ويوقف DoeDesk هذه التقارير.",
+  "e7ce36361fce6435": "السماح لـ Claude Code بإرسال تقارير الاستخدام إلى Anthropic",
+  "950a1ecb50c00a2d": "في المحادثة المخفية البيانات يضبط DoeDesk مفاتيح Claude Code هذه وحدها: {switches}.",
+  "45295a7000e925a4": "في المحادثة المخفية البيانات، يوقف DoeDesk أجزاء Claude Code التي قد ترسل نصك إلى Anthropic دون إخفاء: تقارير الأخطاء، والملاحظات، والأعمال المنشورة، وموصّلات claude.ai.",
+  "9254e03e74ce8bed": [
+    "لاستخدام ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " دون إخفاء البيانات، افتح الإعدادات ثم الخصوصية."
+  ],
+  "0cba1f5dd57f69fe": "فهمت",
   "7622d3176f68d3c6": "إخفاء عنوان الخدمة",
   "7fc781eb08818b97": "تُوقف إعدادات هذا الجهاز بيانات الاستخدام. لن يرسل DoeDesk أي بيانات أيًا كان الاختيار هنا.",
   "d57887cdb1ec11c6": "نسخ معرّف التثبيت",
@@ -8337,7 +8401,7 @@
   "2b382086196fdd96": "Default distro",
   "dd2ebe5b11195240": "Network exposure changes restart the backend and must be controlled where the server process is launched.",
   "5efa21c55ba2ac54": "This connection can create access links but cannot view authorized clients.",
-  "40335d08877bc746": "Applying…",
+  "40335d08877bc746": "جارٍ التطبيق…",
   "84fc63fcbcce915e": "Disable Tailscale HTTPS?",
   "f4dcaf6fd86c76ca": "DoeDesk will restart the local backend without Tailscale Serve.",
   "336b538d6e55ed78": "Restarting…",
@@ -9179,6 +9243,17 @@
   "dfabc4c20ab78d41": "No licenses match that search.",
   "a6f0345697704afa": "Loading open-source notices…",
   "9268a10862868fe5": "Replay panel animation preview",
+  "1a714850c6952db1": "أُرسل مخفي البيانات",
+  "55275713cf9a475f": "أُرسل دون تغيير",
+  "daf859acc53ecd56": "حُظر",
+  "64d47750e302370a": "إخفاء البيانات",
+  "ce598aee0cae8117": "تعذّرت قراءة إعدادات الخصوصية.",
+  "cd63417e42bd46af": "الطلبات الأخيرة",
+  "1451a6351809fb60": "أُخفي {masked}، وحُجب {withheld}",
+  "a9459f6020ae8abc": "أُخفي {masked}",
+  "44d606981ea844ce": "الرموز البديلة على هذا الجهاز",
+  "9e8b7675aab946c3": "إظهار",
+  "c982b1dada9624d0": "لم يُخفَ شيء بعد.",
   "1c16849175c9fdd3": "Send {signal}",
   "3e2c2cacab23110c": [
     "Send ",
@@ -10362,7 +10437,7 @@
   "37d596657443be1b": "Open all computers",
   "ef4d89cd14dc286c": "Computer scope",
   "3c2a43018b7c4901": "No environments",
-  "33b0e9df9f6b029a": "All computers",
+  "33b0e9df9f6b029a": "كل الأجهزة",
   "33416907a5a672d6": "Search computers",
   "f61dcf47eafa98d4": "Checkout scope",
   "d353a1a3cf3b5c29": "Unavailable checkout",
@@ -10378,7 +10453,7 @@
         {
           "t": "span",
           "i": 2,
-          "c": "Applying settings for"
+          "c": "تُطبَّق الإعدادات على"
         },
         {
           "i": 3,
@@ -10394,7 +10469,7 @@
         {
           "t": "span",
           "i": 5,
-          "c": "on"
+          "c": "في"
         },
         {
           "i": 6,
@@ -10410,7 +10485,7 @@
         {
           "t": "span",
           "i": 8,
-          "c": "in"
+          "c": "ضمن"
         },
         {
           "i": 9,
@@ -10428,7 +10503,7 @@
         {
           "t": "span",
           "i": 2,
-          "c": "Applying settings for"
+          "c": "تُطبَّق الإعدادات على"
         },
         {
           "i": 3,
@@ -10444,7 +10519,7 @@
         {
           "t": "span",
           "i": 5,
-          "c": "on"
+          "c": "في"
         },
         {
           "i": 6,
@@ -10462,7 +10537,7 @@
         {
           "t": "span",
           "i": 2,
-          "c": "Applying settings for"
+          "c": "تُطبَّق الإعدادات على"
         },
         {
           "i": 3,
@@ -10478,7 +10553,7 @@
         {
           "t": "span",
           "i": 5,
-          "c": "across"
+          "c": "في"
         },
         {
           "i": 6,
@@ -10494,7 +10569,7 @@
         {
           "t": "span",
           "i": 8,
-          "c": "in"
+          "c": "ضمن"
         },
         {
           "i": 9,
@@ -10512,7 +10587,7 @@
         {
           "t": "span",
           "i": 2,
-          "c": "Applying settings for"
+          "c": "تُطبَّق الإعدادات على"
         },
         {
           "i": 3,
@@ -10528,7 +10603,7 @@
         {
           "t": "span",
           "i": 5,
-          "c": "across"
+          "c": "في"
         },
         {
           "i": 6,
@@ -11943,9 +12018,7 @@
   "553c73b455015cf8": "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar chat status order working approval",
   "6826fa9579c22035": "beta share guest invite link teammate watch t3 connect tunnel",
   "f10c06cba0cdf7fe": "beta link another machine vps peer agents work there delegate",
-  "ef70c6fa3f19d431": "Images and documents",
   "d9257e602d129e56": "image screenshot photo redact black box censor OCR reading tool scan PDF attachment withhold",
-  "7adf67c16a8a4034": "What was sent in place of files",
   "0236862a1f6eacdc": "download redacted image masked text attachment recent files",
   "4d70fbbe2be1bec5": "telemetry analytics tracking opt out statistics installation identifier",
   "2fd055ce2f001704": "onboarding questions field workplace correct change remove profile",
@@ -12432,7 +12505,7 @@
   "49c4cd88ca4d260a": "No activity in this window.",
   "0a492183a4c7bb3d": "Unpriced",
   "7853bd9e23f25bb6": "Total",
-  "160d93ef2683463c": "All computers",
+  "160d93ef2683463c": "كل الأجهزة",
   "215f41ed1f99730b": "No computers connected.",
   "27d1e9e87e13ca31": "Totals are partial while selected computers scan.",
   "8062808b87ce6032": "Model prices",

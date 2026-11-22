@@ -1,5 +1,5 @@
 import type { PrivacyActivityEntry } from "@t3tools/contracts";
-import { useGT } from "gt-react";
+import { msg, useGT, useMessages } from "gt-react";
 import { useState } from "react";
 
 import {
@@ -29,17 +29,19 @@ export function PrivacySettingsPanel() {
   const usageData = useUsageData();
   return (
     <SettingsPageContainer>
-      <SettingsSection id="privacy-masking" title="Masking">
+      <SettingsSection id="privacy-masking" title={gt("Masking")}>
         <div className="px-4 py-2">
           {state.kind === "ready" ? (
             <PrivacySetup status={state.status} onStatus={setPrivacyStatus} allowTurningOff />
           ) : state.kind === "loading" ? (
-            <p className="py-2 text-sm text-muted-foreground">Checking…</p>
+            <p className="py-2 text-sm text-muted-foreground">{gt("Checking…")}</p>
           ) : (
             <div className="flex items-center gap-3 py-2">
-              <p className="text-sm text-destructive">Could not read the privacy settings.</p>
+              <p className="text-sm text-destructive">
+                {gt("Could not read the privacy settings.")}
+              </p>
               <Button variant="outline" size="sm" onClick={refreshPrivacyStatus}>
-                Retry
+                {gt("Retry")}
               </Button>
             </div>
           )}
@@ -60,33 +62,35 @@ export function PrivacySettingsPanel() {
 }
 
 const OUTCOME_LABELS: Record<PrivacyActivityEntry["outcome"], string> = {
-  masked: "Sent, masked",
-  passed: "Sent unchanged",
-  refused: "Not sent",
-  blocked: "Blocked",
+  masked: msg("Sent, masked"),
+  passed: msg("Sent unchanged"),
+  refused: msg("Not sent"),
+  blocked: msg("Blocked", { $context: "a request DoeDesk did not let through" }),
 };
 
 const TIME_FORMAT = new Intl.DateTimeFormat(undefined, { timeStyle: "medium" });
 
 function ActivitySection() {
+  const gt = useGT();
+  const resolve = useMessages();
   const entries = usePrivacyActivity();
   // Only requests to the AI itself are worth a line; background calls would bury them.
   const shown = (entries ?? []).filter((entry) => entry.outcome !== "passed").slice(0, 50);
   return (
     <SettingsSection
       id="privacy-activity"
-      title="Recent requests"
+      title={gt("Recent requests")}
       headerAction={
         <Button variant="ghost" size="sm" onClick={refreshPrivacyActivity}>
-          Refresh
+          {gt("Refresh")}
         </Button>
       }
     >
       <div className="px-4 py-2">
         {entries === null ? (
-          <p className="py-2 text-sm text-muted-foreground">Loading…</p>
+          <p className="py-2 text-sm text-muted-foreground">{gt("Loading…")}</p>
         ) : shown.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">Nothing yet.</p>
+          <p className="py-2 text-sm text-muted-foreground">{gt("Nothing yet.")}</p>
         ) : (
           <ul className="divide-y divide-border/60">
             {shown.map((entry) => (
@@ -95,16 +99,21 @@ function ActivitySection() {
                 className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-1.5 text-sm"
               >
                 <span className="min-w-0 truncate text-foreground">
-                  {OUTCOME_LABELS[entry.outcome]}
+                  {resolve(OUTCOME_LABELS[entry.outcome])}
                   <span className="text-muted-foreground">
                     {" · "}
                     <bdi dir="ltr">{entry.host}</bdi>
                   </span>
                 </span>
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  {entry.outcome === "masked"
-                    ? `${entry.masked} masked${entry.withheld > 0 ? `, ${entry.withheld} withheld` : ""} · `
-                    : ""}
+                  {entry.outcome !== "masked"
+                    ? ""
+                    : entry.withheld > 0
+                      ? `${gt("{masked} masked, {withheld} withheld", {
+                          masked: entry.masked,
+                          withheld: entry.withheld,
+                        })} · `
+                      : `${gt("{masked} masked", { masked: entry.masked })} · `}
                   {TIME_FORMAT.format(new Date(entry.at))}
                 </span>
                 {entry.reason !== null ? (
@@ -120,13 +129,14 @@ function ActivitySection() {
 }
 
 function VaultSection() {
+  const gt = useGT();
   const { entries, loading } = usePrivacyVault();
   const [shown, setShown] = useState(false);
   const visible = shown ? entries : null;
   return (
     <SettingsSection
       id="privacy-vault"
-      title="Stand-ins on this computer"
+      title={gt("Stand-ins on this computer")}
       headerAction={
         <Button
           variant="ghost"
@@ -138,14 +148,14 @@ function VaultSection() {
             setShown(!shown);
           }}
         >
-          {shown ? "Hide" : "Show"}
+          {shown ? gt("Hide") : gt("Show")}
         </Button>
       }
     >
       {visible === null ? null : (
         <div className="px-4 py-2">
           {visible.length === 0 ? (
-            <p className="py-2 text-sm text-muted-foreground">Nothing masked yet.</p>
+            <p className="py-2 text-sm text-muted-foreground">{gt("Nothing masked yet.")}</p>
           ) : (
             <ul className="max-h-96 divide-y divide-border/60 overflow-y-auto">
               {visible.map((entry) => (

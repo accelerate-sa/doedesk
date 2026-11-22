@@ -595,12 +595,8 @@ export default defineConfig({
           "**/{test-fixtures,*TestFixtures}.ts",
           "apps/mobile/src/features/development/**",
           "packages/client-runtime/src/rpc/**",
-          // DoeDesk's privacy and first-run setup screens carry their own English and Arabic
-          // (apps/web/src/onboarding/setupLocale.ts) until they move to the catalogs.
-          "apps/web/src/components/privacy/**",
-          "apps/web/src/doedesk/**",
-          "apps/web/src/components/onboarding/SetupPrivacySteps.tsx",
-          "apps/web/src/components/settings/PrivacySettingsPanel.tsx",
+          // Consent wording is legally fixed in both languages (docs/operations/consent-and-rights.md).
+          "apps/web/src/doedesk/consentWords.ts",
         ],
         rules: { "t3code/no-untranslated-copy": "error" },
       },

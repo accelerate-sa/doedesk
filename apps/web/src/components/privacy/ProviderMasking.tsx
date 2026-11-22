@@ -1,5 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { PrivacyStatus } from "@t3tools/contracts";
+import { isolateLeftToRight } from "@t3tools/shared/textDirection";
+import { T, useGT, useMessages, Var } from "gt-react";
 import { useState } from "react";
 
 import {
@@ -9,6 +11,7 @@ import {
   maskingNotice,
   maskingNoticeTitle,
   type ProviderWords,
+  resolveProviderWords,
   stopMaskingWarning,
 } from "~/doedesk/providerConnections";
 import { useDeveloperMode } from "~/doedesk/product";
@@ -37,24 +40,30 @@ function NoticeDialog({
   readonly open: boolean;
   readonly onClose: () => void;
 }) {
+  const resolve = useMessages();
+  const { name } = resolveProviderWords(words, resolve);
   return (
     <AlertDialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>{maskingNoticeTitle(words)}</AlertDialogTitle>
+          <AlertDialogTitle>{maskingNoticeTitle(words, resolve)}</AlertDialogTitle>
           <AlertDialogDescription render={<div />}>
             <ul className="list-disc space-y-2 ps-5 text-start">
-              {maskingNotice(words).map((sentence) => (
+              {maskingNotice(words, resolve).map((sentence) => (
                 <li key={sentence}>{sentence}</li>
               ))}
             </ul>
             <p className="mt-3 text-start">
-              To use {words.name} without masking, open Settings, then Privacy.
+              <T>
+                To use <Var>{name}</Var> without masking, open Settings, then Privacy.
+              </T>
             </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <Button onClick={onClose}>I understand</Button>
+          <Button onClick={onClose}>
+            <T>I understand</T>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
@@ -87,23 +96,26 @@ function ProviderRow({
   readonly provider: MaskedProvider;
   readonly direct: boolean;
 }) {
+  const gt = useGT();
+  const resolve = useMessages();
   const [confirming, setConfirming] = useState(false);
   const [reading, setReading] = useState(false);
   const { words, driver } = provider;
-  const warning = consumerLoginWarning(driver);
+  const { name, tool, company } = resolveProviderWords(words, resolve);
+  const warning = consumerLoginWarning(driver, resolve);
   return (
     <>
       <SettingsRow
-        title={words.name}
+        title={name}
         description={
           <>
-            {direct ? directRowText(words) : maskedRowText(words)}{" "}
+            {direct ? directRowText(words, resolve) : maskedRowText(words, resolve)}{" "}
             <button
               type="button"
               className="underline underline-offset-2"
               onClick={() => setReading(true)}
             >
-              What DoeDesk changes
+              {gt("What DoeDesk changes")}
             </button>
             {warning === undefined ? null : (
               <span className="mt-1 block text-destructive">{warning}</span>
@@ -113,7 +125,7 @@ function ProviderRow({
         control={
           <Switch
             checked={!direct}
-            aria-label={`Mask what ${words.tool} sends to ${words.company}`}
+            aria-label={gt("Mask what {tool} sends to {company}", { tool, company })}
             onCheckedChange={(checked) => {
               if (!checked) {
                 setConfirming(true);
@@ -135,14 +147,19 @@ function ProviderRow({
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Stop masking {words.name}?</AlertDialogTitle>
+            <AlertDialogTitle>{gt("Stop masking {name}?", { name })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {stopMaskingWarning(words)} Chats with {words.name} that are running now are stopped,
-              so that none keeps the old setting.
+              {stopMaskingWarning(words, resolve)}{" "}
+              {gt(
+                "Chats with {name} that are running now are stopped, so that none keeps the old setting.",
+                { name },
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Keep masking</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {gt("Keep masking")}
+            </AlertDialogClose>
             <Button
               variant="destructive"
               onClick={() => {
@@ -154,7 +171,7 @@ function ProviderRow({
                 });
               }}
             >
-              Stop masking {words.name}
+              {gt("Stop masking {name}", { name })}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -165,6 +182,7 @@ function ProviderRow({
 
 /** Settings, Privacy: masking for one AI company at a time, and Claude Code's usage reports. */
 export function ProviderMaskingSection({ status }: { readonly status: PrivacyStatus }) {
+  const gt = useGT();
   const developerMode = useDeveloperMode();
   // A provider that is not installed, or is signed out, sends nothing: it gets no row.
   const providers = maskedProviders(useAtomValue(primaryServerProvidersAtom)).filter(
@@ -177,7 +195,7 @@ export function ProviderMaskingSection({ status }: { readonly status: PrivacySta
     .map(([name, value]) => `${name}=${value}`)
     .join(", ");
   return (
-    <SettingsSection id="privacy-providers" title="AI companies">
+    <SettingsSection id="privacy-providers" title={gt("AI companies")}>
       {providers.map((provider) => (
         <ProviderRow
           key={provider.driver}
@@ -186,14 +204,20 @@ export function ProviderMaskingSection({ status }: { readonly status: PrivacySta
         />
       ))}
       <SettingsRow
-        title="Claude Code usage reports"
-        description={`Claude Code tells Anthropic how it is used: timings and error counts, not your messages or files. ${
-          reportsOn ? "DoeDesk leaves these reports on." : "DoeDesk turns these reports off."
-        }`}
+        title={gt("Claude Code usage reports")}
+        description={
+          reportsOn
+            ? gt(
+                "Claude Code tells Anthropic how it is used: timings and error counts, not your messages or files. DoeDesk leaves these reports on.",
+              )
+            : gt(
+                "Claude Code tells Anthropic how it is used: timings and error counts, not your messages or files. DoeDesk turns these reports off.",
+              )
+        }
         control={
           <Switch
             checked={reportsOn}
-            aria-label="Let Claude Code send usage reports to Anthropic"
+            aria-label={gt("Let Claude Code send usage reports to Anthropic")}
             onCheckedChange={(checked) =>
               void setPrivacyPreference({ kind: "usageReports", send: Boolean(checked) })
             }
@@ -202,8 +226,15 @@ export function ProviderMaskingSection({ status }: { readonly status: PrivacySta
       >
         <p className="px-4 pb-3 text-xs text-muted-foreground">
           {developerMode
-            ? `For a masked chat DoeDesk sets these Claude Code switches and no others: ${switches}.`
-            : "For a masked chat, DoeDesk turns off the parts of Claude Code that would send your text to Anthropic unmasked: error reports, feedback, published artifacts and claude.ai connectors."}
+            ? gt(
+                "For a masked chat DoeDesk sets these Claude Code switches and no others: {switches}.",
+                {
+                  switches: isolateLeftToRight(switches),
+                },
+              )
+            : gt(
+                "For a masked chat, DoeDesk turns off the parts of Claude Code that would send your text to Anthropic unmasked: error reports, feedback, published artifacts and claude.ai connectors.",
+              )}
         </p>
       </SettingsRow>
     </SettingsSection>

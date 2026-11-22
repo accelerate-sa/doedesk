@@ -506,6 +506,7 @@ export function CloudSignIn({
             inputMode="tel"
             autoComplete="tel-national"
             required
+            // oxlint-disable-next-line t3code/no-untranslated-copy -- the shape of a Saudi mobile number
             placeholder="05X XXX XXXX"
             aria-label={gt("Mobile number")}
             value={phone}
