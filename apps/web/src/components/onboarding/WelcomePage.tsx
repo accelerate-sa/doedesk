@@ -55,14 +55,7 @@ import {
 } from "@t3tools/contracts";
 import { Link, useBlocker } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
-import {
-  CheckIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  PlusIcon,
-  SmartphoneIcon,
-  TerminalIcon,
-} from "lucide-react";
+import { CheckIcon, ChevronDownIcon, ChevronRightIcon, PlusIcon, TerminalIcon } from "lucide-react";
 import { msg, T, useGT, useLocale, useMessages, Var } from "gt-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
@@ -1379,47 +1372,30 @@ function ProjectsSection({
 
 function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const gt = useGT();
-  const [open, setOpen] = useState(false);
   return (
     <WelcomeSection title={gt("Phone")}>
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <div className="flex min-h-10 items-center gap-3 py-1">
-          <RowIcon>
-            <SmartphoneIcon className="size-4" />
-          </RowIcon>
-          <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
-            {gt("Use DoeDesk on your phone")}
-          </span>
-          <CollapsibleTrigger render={<Button variant="ghost-muted" size="xs" />}>
-            {open ? gt("Hide") : gt("Set up")}
-            <ChevronDownIcon className={cn("size-3.5", open && "rotate-180")} />
-          </CollapsibleTrigger>
+      <div className="flex flex-col gap-6 pt-1 sm:flex-row sm:items-center sm:gap-8">
+        <ol className="min-w-0 flex-1 space-y-5">
+          <PhoneStep step={1}>
+            <p className="text-sm text-foreground">
+              {gt("Scan this code with your phone to install the app.")}
+            </p>
+          </PhoneStep>
+          <PhoneStep step={2}>
+            <PhoneConnectLink environmentId={environmentId} />
+          </PhoneStep>
+        </ol>
+        {/* One code for both stores: the link opens the store that matches the phone. */}
+        <div className="w-fit shrink-0 rounded-lg bg-white p-1.5">
+          <QRCodeSvg
+            value={MOBILE_APP_URL}
+            size={124}
+            level="M"
+            marginSize={2}
+            title={gt("DoeDesk app for iPhone and Android")}
+          />
         </div>
-        <CollapsiblePanel>
-          <div className="flex items-center gap-8 pt-2 pb-3 ps-8">
-            <ol className="min-w-0 flex-1 space-y-5">
-              <PhoneStep step={1}>
-                <p className="text-sm text-foreground">
-                  {gt("Scan this code with your phone to install the app.")}
-                </p>
-              </PhoneStep>
-              <PhoneStep step={2}>
-                <PhoneConnectLink environmentId={environmentId} />
-              </PhoneStep>
-            </ol>
-            {/* One code for both stores: the link opens the store that matches the phone. */}
-            <div className="shrink-0 rounded-lg bg-white p-1.5">
-              <QRCodeSvg
-                value={MOBILE_APP_URL}
-                size={124}
-                level="M"
-                marginSize={2}
-                title={gt("DoeDesk app for iPhone and Android")}
-              />
-            </div>
-          </div>
-        </CollapsiblePanel>
-      </Collapsible>
+      </div>
     </WelcomeSection>
   );
 }
@@ -1503,7 +1479,9 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
   return (
     <>
       <p className="text-sm text-foreground">
-        {gt("Sign in to T3 Connect here, then sign in to the mobile app with the same account.")}
+        {gt(
+          "T3 Connect uses a separate account from your DoeDesk account. Sign in to T3 Connect here, then sign in to the mobile app with that same account.",
+        )}
       </p>
       {loadFailed ? (
         <Button variant="outline" size="xs" onClick={retryClerkLoad}>

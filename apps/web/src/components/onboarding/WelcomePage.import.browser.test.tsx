@@ -886,7 +886,6 @@ it("says the phone is set up only once this computer is shared with the signed-i
   );
   state.linkError = "Could not read T3 Connect link state.";
   await using _screen = await mountWelcome();
-  await click("Set up");
   // A failed read says so instead of asking to share the computer again.
   await vi.waitFor(() => expect(pageText()).toContain("Could not check T3 Connect."));
   expect(pageText()).not.toContain("Set up T3 Connect");

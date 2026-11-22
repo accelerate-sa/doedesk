@@ -77,11 +77,11 @@ an AI** on the last step) to go on without one. Checked folders are still import
 
 ## Phone
 
-Select **Set up** and scan the code with your phone. It opens the App Store on an
-iPhone and Google Play on Android. Then select **Sign in to T3 Connect** and allow
-this computer when T3 Code asks, so the app can reach it. Sign in to the app with
-the same account. If you are signed in but this computer is not shared yet, select
-**Set up T3 Connect**. If T3 Connect is on but the app cannot reach this computer,
+Scan the code with your phone to open the App Store on an iPhone or Google Play
+on Android. Then select **Sign in to T3 Connect** (a separate account from your
+DoeDesk account) and allow this computer when DoeDesk asks, so the app can reach
+it. Sign in to the mobile app with that same T3 Connect account. If you are
+signed in but this computer is not shared yet, select **Set up T3 Connect**. If T3 Connect is on but the app cannot reach this computer,
 select **Check T3 Connect** to see why. The page leaves the phone out on builds
 without T3 Connect, or when your organization turns it off. You can still pair the
 app with a code from **Settings → Sharing & access**.
