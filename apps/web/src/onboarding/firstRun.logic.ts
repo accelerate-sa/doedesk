@@ -151,3 +151,12 @@ export function resolveHostedFirstRunDecision(hydrated: boolean): {
 } {
   return { decision: hydrated ? "app" : "pending", persistCompletion: false };
 }
+
+/**
+ * Routes owned by first-run setup while redirecting from home.
+ * Includes `/welcome` because TanStack Router updates `location.pathname` before the
+ * `/welcome` match commits into `<Outlet />`, so passing through there would flash `/`.
+ */
+export function isFirstRunWizardOwnedRoute(pathname: string): boolean {
+  return pathname === "/" || pathname === "/welcome";
+}

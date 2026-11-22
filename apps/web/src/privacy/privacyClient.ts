@@ -194,6 +194,11 @@ const decidedUsageDataAtom = Atom.make(() =>
   Effect.promise(() => usageDataRequest({ action: "decide", ...deviceRegionSignals() })),
 ).pipe(Atom.keepAlive, Atom.withLabel("privacy:usage-data"));
 
+/** Starts the startup usage-data rule check in the background without mounting any prompt. */
+export const prefetchUsageData = (): void => {
+  appAtomRegistry.get(decidedUsageDataAtom);
+};
+
 const changedUsageDataAtom = Atom.make<UsageDataStatus | null>(null).pipe(
   Atom.keepAlive,
   Atom.withLabel("privacy:changed-usage-data"),

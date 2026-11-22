@@ -389,8 +389,11 @@ export function WelcomePage({
   const [advancing, setAdvancing] = useState(false);
 
   const start = () => {
-    // Leaving with the choice untouched is an answer too: see settleUsageDataFirstRun.
-    void settleUsageDataFirstRun(usageData, locale).catch(() => undefined);
+    // Leaving with the choice untouched is an answer only if the person actually saw that step;
+    // a late region answer that arrived after they passed it stays unset so PrivacyPrompts asks next.
+    if (state.seen.includes("usageData")) {
+      void settleUsageDataFirstRun(usageData, locale).catch(() => undefined);
+    }
     keepChoicesRef.current = scans.some((entry) => entry.data === null);
     if (selected.length === 0) {
       projectImport.finishAfterImport();

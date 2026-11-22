@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  isFirstRunWizardOwnedRoute,
   isFirstRunWorkspaceProvenanceAuthoritative,
   isFreshFirstRunWorkspace,
   resolveFirstRunDecision,
@@ -239,5 +240,13 @@ describe("isFreshFirstRunWorkspace", () => {
         ],
       }),
     ).toBe(false);
+  });
+});
+
+describe("isFirstRunWizardOwnedRoute", () => {
+  it("holds home and in-flight /welcome while letting direct links pass through", () => {
+    expect(isFirstRunWizardOwnedRoute("/")).toBe(true);
+    expect(isFirstRunWizardOwnedRoute("/welcome")).toBe(true);
+    expect(isFirstRunWizardOwnedRoute("/settings/general")).toBe(false);
   });
 });

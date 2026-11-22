@@ -15,6 +15,7 @@ import {
   type AuthSessionState,
   type EnvironmentCloudLinkStateResult,
   type ServerProvider,
+  type UsageDataStatus,
 } from "@t3tools/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { expect, it, vi } from "vite-plus/test";
@@ -54,6 +55,8 @@ const state = vi.hoisted(() => ({
   openTerminal: vi.fn(),
   writeTerminal: vi.fn(),
   closeTerminal: vi.fn(),
+  usageData: null as UsageDataStatus | null,
+  setUsageData: vi.fn(),
 }));
 
 // DoeDesk: the import flow is a Developer mode tool, and Start waits for a privacy choice. These
@@ -77,7 +80,8 @@ vi.mock(import("~/privacy/privacyClient"), async (original) => ({
       profileAnswered: true,
     },
   }),
-  useUsageData: () => null,
+  useUsageData: () => state.usageData,
+  setUsageData: (...args: unknown[]) => state.setUsageData(...args),
   useConsentLocale: () => ["en", () => {}, false] as const,
 }));
 
@@ -436,6 +440,8 @@ function setup() {
   for (const command of [state.openTerminal, state.writeTerminal, state.closeTerminal]) {
     command.mockReset().mockResolvedValue(AsyncResult.success(undefined));
   }
+  state.usageData = null;
+  state.setUsageData.mockReset().mockResolvedValue(null);
   localStorage.removeItem(welcomeImportSelectionKey(primaryId));
   // Most tests are about the folders step; the others resume or walk to their own step.
   resumeAt("folders");
@@ -905,4 +911,27 @@ it("says the phone is set up only once this computer is shared with the signed-i
   await share({ status: "reachable", checkedAt, readyConnections: 4, protocol: "quic" });
   await vi.waitFor(() => expect(pageText()).toContain("Your phone can reach this computer."));
   expect(pageText()).not.toContain("Check T3 Connect");
+});
+
+it("does not silently settle usage data on Start when the country answer arrived after the person passed that step", async () => {
+  using _now = setup();
+  // User is already on the last step (`agents`) without having seen `usageData` because country
+  // detection had not returned yet when they advanced past it.
+  state.candidates = Atom.make<ReadonlyArray<AgentSessionProjectCandidate>>([]).pipe(
+    Atom.keepAlive,
+  );
+  resumeAt("agents");
+  state.usageData = {
+    state: "unset",
+    basis: "notice",
+    installId: null,
+    sending: false,
+    blockedBy: null,
+  };
+  await using _screen = await mountWelcome();
+
+  await click("Start");
+  await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
+  // Leaving without having shown the notice must keep usage data unset so PrivacyPrompts asks next.
+  expect(state.setUsageData).not.toHaveBeenCalled();
 });

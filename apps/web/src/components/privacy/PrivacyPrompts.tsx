@@ -26,6 +26,7 @@ export function PrivacyPrompts({
   // Open from the moment the choice is due until the person continues, whatever they tick, and
   // shown once in a session.
   const [usagePrompt, setUsagePrompt] = useState<"idle" | "open" | "done">("idle");
+  if (onWelcome && usagePrompt === "open") setUsagePrompt("idle");
   if (usagePrompt === "idle" && !onWelcome && usageDataChoiceDue(usage)) setUsagePrompt("open");
 
   const signedIn = status?.mode === "cloud";
@@ -49,7 +50,7 @@ export function PrivacyPrompts({
       );
     }
   }
-  if (usagePrompt === "open" && usage !== null) {
+  if (!onWelcome && usagePrompt === "open" && usage !== null) {
     return <UsageDataChoiceOnce status={usage} onDone={() => setUsagePrompt("done")} />;
   }
   return <ProviderMaskingNoticeOnce />;

@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 import * as Option from "effect/Option";
 
 import { NoProjectsHero } from "../components/NoProjectsHero";
+import { BootShell } from "../components/onboarding/FirstRunGate";
 import { WelcomePage } from "../components/onboarding/WelcomePage";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import { useEnvironments, usePrimaryEnvironmentId } from "../state/environments";
@@ -41,7 +42,7 @@ function WelcomeRouteView() {
   const isWelcomeRoute = useLocation({ select: (location) => location.pathname === "/welcome" });
   const [dismissed, setDismissed] = useState(false);
   const openNewThread = useNewThreadHandler();
-  if (waitingForCatalog) return null;
+  if (waitingForCatalog) return <BootShell />;
   if (environmentId === null || !isWelcomeRoute || dismissed) return <NoProjectsHero />;
   return (
     <WelcomePage

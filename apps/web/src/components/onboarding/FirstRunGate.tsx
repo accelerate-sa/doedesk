@@ -12,6 +12,7 @@ import {
 } from "../../hooks/useSettings";
 import { completeOnboarding } from "../../onboarding/firstRun";
 import {
+  isFirstRunWizardOwnedRoute,
   isFirstRunWorkspaceProvenanceAuthoritative,
   isFreshFirstRunWorkspace,
   resolveFirstRunDecision,
@@ -161,13 +162,14 @@ export function FirstRunGate({
 
   // Setup opens by itself only from the home route. A direct link, such as
   // Settings, opens as asked so setup can never lock a user out of the app.
-  const wizardOwnsRoute = pathname === "/";
+  const shouldRedirectToWelcome = pathname === "/";
+  const wizardOwnsRoute = isFirstRunWizardOwnedRoute(pathname);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- navigates from the home route to /welcome when the gate decides on the wizard
   useEffect(() => {
-    if (decision === "wizard" && wizardOwnsRoute) {
+    if (decision === "wizard" && shouldRedirectToWelcome) {
       void navigate({ to: "/welcome", replace: true });
     }
-  }, [decision, navigate, wizardOwnsRoute]);
+  }, [decision, navigate, shouldRedirectToWelcome]);
 
   if (settingsReadFailed) {
     return <FirstRunRecovery reason="settings" retrying={hydrationStatus === "retrying"} />;
@@ -176,9 +178,23 @@ export function FirstRunGate({
     return children;
   }
   if (decision !== "app") {
-    return stalled ? <FirstRunRecovery reason="connection" /> : null;
+    return stalled ? <FirstRunRecovery reason="connection" /> : <BootShell />;
   }
   return children;
+}
+
+/** Matches index.html's static #boot-shell visually without reusing its pre-mount DOM ids. */
+export function BootShell() {
+  return (
+    <div className="relative flex min-h-full w-full items-center justify-center overflow-hidden bg-background text-foreground">
+      <div
+        className="relative z-1 flex size-24 items-center justify-center"
+        aria-label="DoeDesk splash screen"
+      >
+        <img className="size-16 object-contain" src="/apple-touch-icon.png" alt="DoeDesk" />
+      </div>
+    </div>
+  );
 }
 
 function FirstRunRecovery({

@@ -7,6 +7,7 @@ import {
   createRootRoute,
   type ErrorComponentProps,
   useLocation,
+  useMatches,
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
@@ -35,6 +36,7 @@ import { ReopenClosedViewShortcut } from "../components/ReopenClosedViewShortcut
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
 import { ConnectDeviceApprovalCoordinator } from "../components/ConnectDeviceApprovalCoordinator";
 import { PrivacyPrompts } from "../components/privacy/PrivacyPrompts";
+import { prefetchUsageData } from "../privacy/privacyClient";
 import { ChatGptWelcomeCoordinator } from "../components/settings/ChatGptWelcomeCoordinator";
 import { ThemeEditorHost } from "../components/settings/ThemeEditorHost";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
@@ -95,6 +97,7 @@ export const Route = createRootRoute({
     if (authGateState.status === "authenticated") {
       // Idempotent, so every navigation can ask for it.
       void configureClientTracing();
+      prefetchUsageData();
     }
     if (
       authGateState.status === "authenticated" &&
@@ -151,13 +154,17 @@ function RootRouteView() {
 
 function RootRouteBranch() {
   const pathname = useLocation({ select: (location) => location.pathname });
+  // Follow the committed route match so `<FirstRunGate>` stays up until `/welcome` replaces `<Outlet />`.
+  const isWelcome = useMatches({
+    select: (matches) => matches.some((match) => match.routeId === "/welcome"),
+  });
   const { authGateState } = Route.useRouteContext();
   const primaryEnvironmentAuthenticated = authGateState.status === "authenticated";
   // A sync IPC read; the setting only changes across a relaunch.
   const [localEnvironmentDisabled] = useState(isLocalEnvironmentDisabled);
   // Once true, stays true: a visit to /welcome means the bootstrap already chose a route.
-  const [returningFromWelcome, setReturningFromWelcome] = useState(pathname === "/welcome");
-  if (pathname === "/welcome" && !returningFromWelcome) setReturningFromWelcome(true);
+  const [returningFromWelcome, setReturningFromWelcome] = useState(isWelcome);
+  if (isWelcome && !returningFromWelcome) setReturningFromWelcome(true);
   const hostedPromptLinkLanding = useHostedPromptLinkLanding(
     authGateState.status === "hosted-static",
   );
@@ -178,7 +185,6 @@ function RootRouteBranch() {
     return hostedPromptLinkLanding;
   }
 
-  const isWelcome = pathname === "/welcome";
   if (authGateState.status !== "authenticated" && authGateState.status !== "hosted-static") {
     return <Outlet />;
   }
@@ -221,9 +227,9 @@ function RootRouteBranch() {
   return (
     <>
       <ChatGptWelcomeCoordinator />
-      <PrivacyPrompts onWelcome={isWelcome} />
       {isWelcome ? (
         <>
+          <PrivacyPrompts onWelcome />
           {appHosts}
           {appShell}
         </>
@@ -232,6 +238,7 @@ function RootRouteBranch() {
           enabled={primaryEnvironmentAuthenticated}
           hostedStatic={authGateState.status === "hosted-static"}
         >
+          <PrivacyPrompts onWelcome={false} />
           {appHosts}
           {primaryEnvironmentAuthenticated ? (
             <EventRouter skipInitialBootstrapNavigation={returningFromWelcome} />

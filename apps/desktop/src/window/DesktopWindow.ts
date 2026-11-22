@@ -163,8 +163,9 @@ function getIconOption(
   });
 }
 
+// Match DoeDesk's default theme canvas so the window opens in the same color as `#boot-shell`.
 function getInitialWindowBackgroundColor(shouldUseDarkColors: boolean): string {
-  return shouldUseDarkColors ? "#000000" : "#ffffff";
+  return shouldUseDarkColors ? "#121311" : "#f5f3ee";
 }
 
 type DisplayBounds = Pick<Electron.Rectangle, "x" | "y" | "width" | "height">;

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { type Locator, page } from "vite-plus/test/browser";
 
 import { render } from "../../../test/render";
+import { PrivacyPrompts } from "./PrivacyPrompts";
 import {
   settleUsageDataFirstRun,
   UsageDataChoice,
@@ -12,11 +13,20 @@ import {
 } from "./UsageData";
 
 const client = vi.hoisted(() => ({
+  reloadPrivacyStatus: vi.fn(),
   setUsageData: vi.fn(),
   useConsentLocale: vi.fn(),
   usePrivacyStatus: vi.fn(),
+  useUsageData: vi.fn(),
 }));
 vi.mock("~/privacy/privacyClient", () => client);
+vi.mock("./ProviderMasking", () => ({
+  ProviderMaskingNoticeOnce: () => null,
+}));
+vi.mock("./TermsAcceptanceSheet", () => ({
+  TermsAcceptanceSheet: () => null,
+  termsAcceptanceDue: () => false,
+}));
 
 const usage = (overrides: Partial<UsageDataStatus> = {}): UsageDataStatus => ({
   state: "unset",
@@ -41,8 +51,10 @@ const toggle = async (locator: Locator) => {
 
 const setup = (locale: "en" | "ar" = "en") => {
   for (const mock of Object.values(client)) mock.mockReset();
+  client.reloadPrivacyStatus.mockResolvedValue(undefined);
   client.useConsentLocale.mockReturnValue([locale, vi.fn(), locale === "ar"]);
   client.usePrivacyStatus.mockReturnValue({ kind: "loading" });
+  client.useUsageData.mockReturnValue(null);
   client.setUsageData.mockImplementation(async () => usage());
 };
 
@@ -129,6 +141,52 @@ describe("usage data at first run", () => {
       wordingId: "usage-data-notice-2026-11",
       locale: "en",
     });
+  });
+
+  it("hides the usage-data dialog when entering /welcome and re-evaluates on return", async () => {
+    setup();
+    client.useUsageData.mockReturnValue(usage({ basis: "notice" }));
+    await using screen = await render(<PrivacyPrompts onWelcome={false} />, { router: false });
+
+    await expect.element(page.getByText("Usage data is on.")).toBeVisible();
+
+    await screen.rerender(<PrivacyPrompts onWelcome />);
+    expect(page.getByText("Usage data is on.").query()).toBeNull();
+
+    // After the user answers the usage-data step during setup, leaving /welcome must not reopen it.
+    client.useUsageData.mockReturnValue(
+      usage({ state: "on_by_default_notice_shown", basis: "notice", sending: true }),
+    );
+    await screen.rerender(<PrivacyPrompts onWelcome={false} />);
+    expect(page.getByText("Usage data is on.").query()).toBeNull();
+  });
+
+  it("opens the usage-data dialog after leaving /welcome when the choice becomes due late, and stays quiet if answered in setup", async () => {
+    setup();
+    // Choice not yet known during setup (country detection still in flight).
+    client.useUsageData.mockReturnValue(null);
+    {
+      await using _welcome = await render(<PrivacyPrompts onWelcome />, { router: false });
+      expect(page.getByText("Usage data is on.").query()).toBeNull();
+    }
+
+    // Remounts in the app shell after setup; once country detection settles as due, it asks.
+    await using app = await render(<PrivacyPrompts onWelcome={false} />, { router: false });
+    expect(page.getByText(/Send usage data to help improve DoeDesk/).query()).toBeNull();
+
+    client.useUsageData.mockReturnValue(usage({ basis: "ask" }));
+    await app.rerender(<PrivacyPrompts onWelcome={false} />);
+    await expect.element(page.getByText(/Send usage data to help improve DoeDesk/)).toBeVisible();
+  });
+
+  it("does not reopen the usage-data dialog after remounting when setup already answered it", async () => {
+    setup();
+    client.useUsageData.mockReturnValue(
+      usage({ state: "on_consented", basis: "ask", sending: true }),
+    );
+    await using _app = await render(<PrivacyPrompts onWelcome={false} />, { router: false });
+    expect(page.getByText(/Send usage data to help improve DoeDesk/).query()).toBeNull();
+    expect(page.getByText("Usage data is on.").query()).toBeNull();
   });
 });
 
