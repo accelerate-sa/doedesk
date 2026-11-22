@@ -185,11 +185,12 @@ export function FirstRunGate({
 
 /** Matches index.html's static #boot-shell visually without reusing its pre-mount DOM ids. */
 export function BootShell() {
+  const gt = useGT();
   return (
     <div className="relative flex min-h-full w-full items-center justify-center overflow-hidden bg-background text-foreground">
       <div
         className="relative z-1 flex size-24 items-center justify-center"
-        aria-label="DoeDesk splash screen"
+        aria-label={gt("DoeDesk splash screen")}
       >
         <img className="size-16 object-contain" src="/apple-touch-icon.png" alt="DoeDesk" />
       </div>
