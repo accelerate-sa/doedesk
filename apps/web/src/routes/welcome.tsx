@@ -19,6 +19,7 @@ export const Route = createFileRoute("/welcome")({
       throw redirect({ to: "/pair", replace: true });
     }
   },
+  pendingComponent: BootShell,
   component: WelcomeRouteView,
 });
 

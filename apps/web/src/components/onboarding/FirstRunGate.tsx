@@ -1,6 +1,6 @@
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { useAtomValue } from "@effect/atom-react";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { Atom } from "effect/reactivity";
 import { useGT } from "gt-react";
 import { useEffect, useState } from "react";
@@ -76,6 +76,7 @@ export function FirstRunGate({
   readonly children: React.ReactNode;
 }) {
   const navigate = useNavigate();
+  const router = useRouter();
   const pathname = useLocation({ select: (location) => location.pathname });
   const hydrationStatus = useClientSettingsHydrationStatus();
   const hydrated = hydrationStatus === "ready";
@@ -164,6 +165,11 @@ export function FirstRunGate({
   // Settings, opens as asked so setup can never lock a user out of the app.
   const shouldRedirectToWelcome = pathname === "/";
   const wizardOwnsRoute = isFirstRunWizardOwnedRoute(pathname);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- preloads the lazy /welcome chunk while checking whether first-run setup will open
+  useEffect(() => {
+    if (!enabled || !hydrated || onboardingCompletedAt !== null || !shouldRedirectToWelcome) return;
+    void router.preloadRoute({ to: "/welcome" }).catch(() => undefined);
+  }, [enabled, hydrated, onboardingCompletedAt, router, shouldRedirectToWelcome]);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- navigates from the home route to /welcome when the gate decides on the wizard
   useEffect(() => {
     if (decision === "wizard" && shouldRedirectToWelcome) {
