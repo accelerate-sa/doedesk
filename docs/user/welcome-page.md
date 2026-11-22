@@ -54,7 +54,7 @@ on your `PATH`, **Add to PATH** adds one line to your shell's startup file.
 
 ### Finding AI programs
 
-Under **Programs found on this computer**, DoeDesk lists each AI program it found,
+Open **Find an installed AI program** to see each AI program DoeDesk found,
 with its path and version. It looks without asking in your terminal's `PATH`, the
 usual install folders (Homebrew, `~/.local/bin`, npm, nvm, fnm, Volta, Bun, asdf,
 mise, pnpm), and inside the ChatGPT, Codex and Claude apps. Select **Use** to run a

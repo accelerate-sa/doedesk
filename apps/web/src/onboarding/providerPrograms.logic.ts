@@ -16,7 +16,14 @@ function configuredProgram(
       ? config.binaryPath
       : undefined;
   // A bare name such as "claude" is the default: PATH decides.
-  return typeof binaryPath === "string" && binaryPath.includes("/") ? binaryPath : null;
+  return typeof binaryPath === "string" && (binaryPath.includes("/") || binaryPath.includes("\\"))
+    ? binaryPath
+    : null;
+}
+
+/** Example path shown in the manual program field, matching the computer's OS. */
+export function manualProgramPlaceholder(os: string | null | undefined): string {
+  return os === "win32" ? "C:\\Users\\name\\.local\\bin\\claude.exe" : "/usr/local/bin/claude";
 }
 
 export interface ProviderPrograms {

@@ -528,6 +528,7 @@ export function WelcomePage({
                       environmentId={environmentId}
                       providers={agents.allowed}
                       settings={agents.serverConfig?.settings}
+                      platformOs={agents.serverConfig?.environment.platform.os}
                     />
                   </>
                 ) : view.step === "folders" ? (
@@ -806,6 +807,7 @@ const isInstallableDriver = (driver: string): driver is OnboardingAgentDriver =>
 interface AgentTerminalSession {
   readonly environmentId: EnvironmentId;
   readonly driver: OnboardingAgentDriver;
+  readonly displayName: string;
   readonly providerInstanceId: ServerProvider["instanceId"];
   readonly cwd: string;
   readonly command: string;
@@ -911,6 +913,7 @@ function AgentsSection({
     setTerminalSession({
       environmentId,
       driver: provider.driver,
+      displayName: agentName(provider),
       providerInstanceId: provider.instanceId,
       cwd: serverConfig.cwd,
       command: provider.installed
@@ -1683,7 +1686,8 @@ function AgentInstallTerminal({
   readonly onCommandFinished: () => void;
   readonly onClose: () => void;
 }) {
-  const { command, cwd, driver, environmentId, keybindings, providerInstanceId } = session;
+  const { command, cwd, displayName, driver, environmentId, keybindings, providerInstanceId } =
+    session;
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const gt = useGT();
   const [advancedTypography] = useLocalStorage(
@@ -1842,7 +1846,7 @@ function AgentInstallTerminal({
             threadRef={threadRef}
             threadId={AGENT_ONBOARDING_THREAD_ID}
             terminalId={terminalId}
-            terminalLabel={gt("Install {agent}", { agent: driver })}
+            terminalLabel={gt("Install {agent}", { agent: displayName })}
             cwd={cwd}
             providerInstanceId={providerInstanceId}
             advancedTypography={advancedTypography}

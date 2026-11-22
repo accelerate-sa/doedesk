@@ -152,7 +152,7 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
           ) : props.provider?.installed ? (
             existingSummary.headline
           ) : (
-            gt("Code with your ChatGPT subscription.")
+            gt("Use your ChatGPT subscription.")
           )
         }
         control={
@@ -753,6 +753,7 @@ function ManagedCodexSetup({
         >
           <div className="min-w-0 flex-1">
             <Input
+              dir="ltr"
               aria-label={gt("ChatGPT sign-in redirect URL")}
               type="password"
               autoComplete="off"
@@ -791,7 +792,7 @@ function ManagedCodexSetup({
               <T>Other ways to connect</T>
             </summary>
             <Button className="mt-2" size="sm" variant="outline" render={<a href={handoffUrl} />}>
-              <T>Use T3 desktop for automatic return</T>
+              <T>Use DoeDesk desktop for automatic return</T>
             </Button>
           </details>
         ) : null}
@@ -892,7 +893,7 @@ function ManagedCodexSetup({
             ) : authActive || auth?.phase === "failed" || auth?.phase === "cancelled" ? (
               accountDescription
             ) : (
-              gt("Code with your ChatGPT subscription.")
+              gt("Use your ChatGPT subscription.")
             )
           }
           control={
@@ -1223,7 +1224,10 @@ function CodexSignInDescription({
       onClick={onToggle}
     >
       {label}
-      <ChevronRightIcon aria-hidden className={`size-3 shrink-0 ${expanded ? "rotate-90" : ""}`} />
+      <ChevronRightIcon
+        aria-hidden
+        className={`size-3 shrink-0 ${expanded ? "rotate-90" : "rtl:rotate-180"}`}
+      />
     </button>
   );
 }

@@ -10,13 +10,14 @@ import {
 import { isRtlLocale } from "@t3tools/client-runtime/locales";
 import { resolveProviderInstanceDisplayName as agentName } from "@t3tools/client-runtime/state/provider-instance-display";
 import { useGT, useLocale } from "gt-react";
-import { CheckIcon, FolderSearchIcon, HardDriveIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, FolderSearchIcon, HardDriveIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { usePersistEnvironmentProviderInstanceMutation } from "../../hooks/useSettings";
 import { readLocalApi } from "../../localApi";
 import {
   groupProviderPrograms,
+  manualProgramPlaceholder,
   type ProviderPrograms,
   volumesToOffer,
 } from "../../onboarding/providerPrograms.logic";
@@ -27,6 +28,7 @@ import { useEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { Input } from "../ui/input";
 import { Spinner } from "../ui/spinner";
 import { toastManager } from "../ui/toast";
@@ -43,17 +45,20 @@ export function ProviderPrograms({
   environmentId,
   providers,
   settings,
+  platformOs,
 }: {
   readonly environmentId: EnvironmentId;
   /** The providers the setup page offers, in its order. */
   readonly providers: ReadonlyArray<ServerProvider>;
   readonly settings: Pick<ServerSettings, "providerInstances"> | null | undefined;
+  readonly platformOs?: string | null | undefined;
 }) {
   const gt = useGT();
   const canManage = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const scan = useAtomCommand(serverEnvironment.scanProviderPrograms, COMMAND_OPTIONS);
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, COMMAND_OPTIONS);
   const persistInstance = usePersistEnvironmentProviderInstanceMutation(environmentId);
+  const [open, setOpen] = useState(false);
   const [automatic, setAutomatic] = useState<ReadonlyArray<ProviderFind> | null>(null);
   const [scanFailed, setScanFailed] = useState(false);
   const [extra, setExtra] = useState<ReadonlyArray<ProviderFind>>([]);
@@ -78,14 +83,14 @@ export function ProviderPrograms({
       setScanFailed(result._tag !== "Success");
       if (result._tag === "Success") setAutomatic(result.value.finds);
     });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the automatic check reads the computer's disk once when the step opens
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- scans the computer's disk lazily once the user opens the program finder
   useEffect(() => {
-    if (!canManage) return;
+    if (!canManage || !open || automatic !== null || scanFailed) return;
     void scan({ environmentId, input: {} }).then((result) => {
       setScanFailed(result._tag !== "Success");
       if (result._tag === "Success") setAutomatic(result.value.finds);
     });
-  }, [canManage, environmentId, scan]);
+  }, [automatic, canManage, environmentId, open, scan, scanFailed]);
 
   const finds = [...(automatic ?? []), ...(lastSearch?.finds ?? []), ...extra];
   const groups = groupProviderPrograms({ providers, finds, settings });
@@ -122,95 +127,111 @@ export function ProviderPrograms({
   if (!canManage) return null;
 
   return (
-    <section className="mt-6 grid grid-cols-1 gap-3 border-t border-border/60 pt-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-medium text-foreground">{gt("Installed AI programs")}</h3>
-        <Button
-          size="xs"
-          variant="ghost-muted"
-          disabled={automatic === null && !scanFailed}
-          onClick={() => {
-            setAutomatic(null);
-            setScanFailed(false);
-            void runScan();
-          }}
-        >
-          {gt("Check again")}
-        </Button>
-      </div>
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        {gt(
-          "DoeDesk checked your system PATH, standard install folders, and installed apps for AI programs.",
-        )}
-      </p>
-      {automatic === null && !scanFailed ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Spinner size="sm" tone="muted" />
-          {gt("Checking…", { $context: "looking for AI programs on this computer" })}
-        </p>
-      ) : null}
-      {scanFailed ? (
-        <p role="alert" className="text-sm text-destructive">
-          {gt("Could not finish checking for programs. Try again.")}
-        </p>
-      ) : null}
-      {automatic !== null && groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {gt("No AI programs were found in the usual locations.")}
-        </p>
-      ) : null}
-      {groups.map((group) => (
-        <ProgramGroup
-          key={group.provider.instanceId}
-          group={group}
-          saving={saving}
-          onChoose={(path) => void choose(group.provider, path)}
-        />
-      ))}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="xs"
-          variant="outline"
-          aria-expanded={drivesOpen}
-          onClick={() => setDrivesOpen((open) => !open)}
-        >
-          <HardDriveIcon className="size-3.5" />
-          {gt("Search other drives")}
-        </Button>
-        <Button
-          size="xs"
-          variant="ghost-muted"
-          aria-expanded={manualOpen}
-          onClick={() => setManualOpen((open) => !open)}
-        >
-          <FolderSearchIcon className="size-3.5" />
-          {gt("Choose a program manually")}
-        </Button>
-      </div>
-      {drivesOpen ? (
-        <DriveSearch
-          environmentId={environmentId}
-          progress={lastSearch}
-          searching={search !== null && searchQuery.error === null}
-          failed={search !== null && searchQuery.error !== null}
-          onSearch={(volumes) => {
-            setLastSearch(null);
-            setSearch({ volumes });
-          }}
-          onStop={() => setSearch(null)}
-          onClose={() => {
-            setSearch(null);
-            setDrivesOpen(false);
-          }}
-        />
-      ) : null}
-      {manualOpen ? (
-        <ManualProgram
-          environmentId={environmentId}
-          providers={providers}
-          onFound={(find) => addFinds([find])}
-        />
-      ) : null}
+    <section className="mt-4 border-t border-border/60 pt-3">
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger className="group flex min-h-9 w-full items-center gap-3 rounded-md text-start outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+          <span className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
+            <FolderSearchIcon className="size-4" />
+          </span>
+          <span className="text-sm text-muted-foreground group-hover:text-foreground">
+            {gt("Find an installed AI program")}
+          </span>
+          <ChevronDownIcon className="ms-auto size-4 text-muted-foreground group-data-panel-open:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsiblePanel>
+          <div className="grid grid-cols-1 gap-3 pt-3 pb-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-sm font-medium text-foreground">{gt("Installed AI programs")}</h3>
+              <Button
+                size="xs"
+                variant="ghost-muted"
+                disabled={automatic === null && !scanFailed}
+                onClick={() => {
+                  setAutomatic(null);
+                  setScanFailed(false);
+                  void runScan();
+                }}
+              >
+                {gt("Check again")}
+              </Button>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {gt(
+                "DoeDesk checked your system PATH, standard install folders, and installed apps for AI programs.",
+              )}
+            </p>
+            {automatic === null && !scanFailed ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner size="sm" tone="muted" />
+                {gt("Checking…", { $context: "looking for AI programs on this computer" })}
+              </p>
+            ) : null}
+            {scanFailed ? (
+              <p role="alert" className="text-sm text-destructive">
+                {gt("Could not finish checking for programs. Try again.")}
+              </p>
+            ) : null}
+            {automatic !== null && groups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {gt("No AI programs were found in the usual locations.")}
+              </p>
+            ) : null}
+            {groups.map((group) => (
+              <ProgramGroup
+                key={group.provider.instanceId}
+                group={group}
+                saving={saving}
+                onChoose={(path) => void choose(group.provider, path)}
+              />
+            ))}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="xs"
+                variant="outline"
+                aria-expanded={drivesOpen}
+                onClick={() => setDrivesOpen((currentlyOpen) => !currentlyOpen)}
+              >
+                <HardDriveIcon className="size-3.5" />
+                {gt("Search other drives")}
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost-muted"
+                aria-expanded={manualOpen}
+                onClick={() => setManualOpen((currentlyOpen) => !currentlyOpen)}
+              >
+                <FolderSearchIcon className="size-3.5" />
+                {gt("Choose a program manually")}
+              </Button>
+            </div>
+            {drivesOpen ? (
+              <DriveSearch
+                environmentId={environmentId}
+                progress={lastSearch}
+                searching={search !== null && searchQuery.error === null}
+                failed={search !== null && searchQuery.error !== null}
+                onSearch={(volumes) => {
+                  setLastSearch(null);
+                  setSearch({ volumes });
+                }}
+                onStop={() => setSearch(null)}
+                onClose={() => {
+                  setSearch(null);
+                  setDrivesOpen(false);
+                }}
+              />
+            ) : null}
+            {manualOpen ? (
+              <ManualProgram
+                environmentId={environmentId}
+                providers={providers}
+                platformOs={platformOs}
+                onFound={(find) => addFinds([find])}
+              />
+            ) : null}
+          </div>
+        </CollapsiblePanel>
+      </Collapsible>
     </section>
   );
 }
@@ -405,7 +426,9 @@ function DriveSearch({
           {progress.state === "searching" ? (
             <>
               {gt("Searching")}{" "}
-              <bdi>{progress.volume?.slice(progress.volume.lastIndexOf("/") + 1) ?? ""}</bdi>
+              <bdi>
+                {progress.volume?.split(/[/\\]/).filter(Boolean).at(-1) ?? progress.volume ?? ""}
+              </bdi>
               {" · "}
             </>
           ) : null}
@@ -457,10 +480,12 @@ function DriveSearch({
 function ManualProgram({
   environmentId,
   providers,
+  platformOs,
   onFound,
 }: {
   readonly environmentId: EnvironmentId;
   readonly providers: ReadonlyArray<ServerProvider>;
+  readonly platformOs?: string | null | undefined;
   readonly onFound: (find: ProviderFind) => void;
 }) {
   const gt = useGT();
@@ -525,7 +550,7 @@ function ManualProgram({
       </select>
       <Input
         dir="ltr"
-        placeholder="/Volumes/work/tools/bin/claude"
+        placeholder={manualProgramPlaceholder(platformOs)}
         aria-label={gt("Program path")}
         value={path}
         onChange={(event) => setPath(event.target.value)}

@@ -6,7 +6,11 @@ import {
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { groupProviderPrograms, volumesToOffer } from "./providerPrograms.logic";
+import {
+  groupProviderPrograms,
+  manualProgramPlaceholder,
+  volumesToOffer,
+} from "./providerPrograms.logic";
 
 function provider(driver: string, overrides: Partial<ServerProvider> = {}): ServerProvider {
   return {
@@ -72,6 +76,32 @@ describe("groupProviderPrograms", () => {
       },
     });
     expect(claude?.inUse).toBe("/Volumes/work/tools/bin/claude");
+  });
+
+  it("recognizes Windows configured binary paths with backslashes", () => {
+    const winPath = "C:\\Users\\sam\\.local\\bin\\claude.exe";
+    const [claude] = groupProviderPrograms({
+      providers: [provider("claudeAgent")],
+      finds: [find("claudeAgent", winPath, "knownLocation")],
+      settings: {
+        providerInstances: {
+          [ProviderInstanceId.make("claudeAgent")]: {
+            driver: ProviderDriverKind.make("claudeAgent"),
+            config: { binaryPath: winPath },
+          },
+        },
+      },
+    });
+    expect(claude?.inUse).toBe(winPath);
+  });
+});
+
+describe("manualProgramPlaceholder", () => {
+  it("matches the target computer's operating system", () => {
+    expect(manualProgramPlaceholder("win32")).toBe("C:\\Users\\name\\.local\\bin\\claude.exe");
+    expect(manualProgramPlaceholder("darwin")).toBe("/usr/local/bin/claude");
+    expect(manualProgramPlaceholder("linux")).toBe("/usr/local/bin/claude");
+    expect(manualProgramPlaceholder(undefined)).toBe("/usr/local/bin/claude");
   });
 });
 
