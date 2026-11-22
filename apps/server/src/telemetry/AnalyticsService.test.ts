@@ -190,6 +190,9 @@ const sendFor = (
 
     yield* Effect.gen(function* () {
       yield* record;
+      // The choice is saved to disk in the background, under the lock a send takes. These virtual
+      // minutes pass in real milliseconds, so the clock starts only once that save is done.
+      yield* Effect.flatMap(UsageDataConsent.UsageDataConsent, (consent) => consent.reported);
       for (let second = 0; second < minutes * 60; second += 1) {
         yield* TestClock.adjust("1 second");
       }
