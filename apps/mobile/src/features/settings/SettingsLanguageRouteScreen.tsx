@@ -3,12 +3,15 @@ import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useGT } from "gt-react-native";
+import { reloadAppAsync } from "expo";
+import { useGT, useLocale } from "gt-react-native";
 import { useLanguagePreference } from "../../i18n/I18nProvider";
 import { SYSTEM_LANGUAGE, nativeLanguageName } from "@t3tools/client-runtime/locales";
+import { isLayoutRestartNeeded } from "../../i18n/layoutDirection";
 import { SUPPORTED_LOCALES } from "../../i18n/locales";
 import { mobilePreferencesAtom, saveMobilePreferences } from "../../state/preferences";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { ListActionRow } from "../../components/ui/ListActionRow";
 import { ListChoiceRow as SettingsChoiceRow } from "../../components/ui/ListChoiceRow";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
@@ -39,6 +42,7 @@ export function SettingsLanguageRouteScreen() {
   const savePreferences = useAtomCommand(saveMobilePreferences);
   const preferencesReady = AsyncResult.isSuccess(preferencesResult) && !preferencesResult.waiting;
   const language = useLanguagePreference();
+  const restartNeeded = isLayoutRestartNeeded(useLocale());
   const options = [
     { language: SYSTEM_LANGUAGE, label: gt("System default") },
     ...SUPPORTED_LOCALES.map((locale) => ({ language: locale, label: nativeLanguageName(locale) })),
@@ -67,6 +71,19 @@ export function SettingsLanguageRouteScreen() {
             />
           ))}
         </SettingsSection>
+        {restartNeeded ? (
+          <SettingsSection>
+            <ListActionRow
+              label={gt("Restart DoeDesk")}
+              description={gt(
+                "This language reads in the other direction. Text has changed already; the layout changes when DoeDesk restarts.",
+              )}
+              onPress={() => {
+                void reloadAppAsync();
+              }}
+            />
+          </SettingsSection>
+        ) : null}
       </ScrollView>
     </SettingsScreen>
   );

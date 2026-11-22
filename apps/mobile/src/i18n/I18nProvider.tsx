@@ -7,6 +7,7 @@ import { Platform, TurboModuleRegistry, View, type TurboModule } from "react-nat
 
 import { mobilePreferencesAtom } from "../state/preferences";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./locales";
+import { saveLayoutDirection } from "./layoutDirection";
 import { setActiveLocale } from "./messages";
 
 const FormattingLocaleContext = createContext(DEFAULT_LOCALE);
@@ -19,6 +20,7 @@ export function useFormattingLocale(): string {
 // Required on demand: Metro runs every statically imported module at startup, and only one
 // locale's catalog is ever used.
 const CATALOGS: Readonly<Record<string, () => unknown>> = {
+  ar: () => require("./translations/ar.json"),
   es: () => require("./translations/es.json"),
   zh: () => require("./translations/zh.json"),
   "pt-BR": () => require("./translations/pt-BR.json"),
@@ -86,7 +88,10 @@ export function I18nProvider(props: { readonly children: ReactNode }) {
 
 function ActiveLocale() {
   const locale = useLocale();
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- call-time m() outside React reads the committed locale, whose catalog GT has loaded
-  useEffect(() => setActiveLocale(locale), [locale]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- call-time m() outside React reads the committed locale, whose catalog GT has loaded; the native layout direction is saved for the next launch
+  useEffect(() => {
+    setActiveLocale(locale);
+    saveLayoutDirection(locale);
+  }, [locale]);
   return null;
 }

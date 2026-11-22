@@ -3397,6 +3397,8 @@
   "9c5e5750662724b7": "Return キー",
   "06cd6b2977eca575": "ハードウェアキーボードが接続されているときの入力欄に適用されます。",
   "7eed14b9c7fd7661": "システムのデフォルト",
+  "e68c01aded74684a": "Restart DoeDesk",
+  "d508ef38850bdee5": "This language reads in the other direction. Text has changed already; the layout changes when DoeDesk restarts.",
   "55a38a5aa88cfa1e": "法的情報",
   "b2c0d69e1aba23e5": "スマートフォンでは有効なセクションの最初の 4 つが表示され、Android タブレットのレールでは有効なセクションがすべて表示されます。残りのセクションは設定の上部に表示されます。非表示のセクションはここにのみ表示されます。設定は常に最後になります。このデバイスに保存されます。",
   "158e33cd4694c0af": "設定を含めてセクションが 6 つになると、タブをカスタマイズできるようになります。",

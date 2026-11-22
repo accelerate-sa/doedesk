@@ -3403,6 +3403,8 @@
   "9c5e5750662724b7": "Return 键",
   "06cd6b2977eca575": "连接硬件键盘时应用于输入框。",
   "7eed14b9c7fd7661": "系统默认",
+  "e68c01aded74684a": "Restart DoeDesk",
+  "d508ef38850bdee5": "This language reads in the other direction. Text has changed already; the layout changes when DoeDesk restarts.",
   "55a38a5aa88cfa1e": "法律信息",
   "b2c0d69e1aba23e5": "手机显示前四个已启用的分区；Android 平板侧栏显示所有已启用的分区。其余分区显示在“设置”顶部。隐藏的分区只显示在这里。“设置”始终排在最后。保存在此设备上。",
   "158e33cd4694c0af": "当有六个分区（包括“设置”）时，即可自定义标签栏。",

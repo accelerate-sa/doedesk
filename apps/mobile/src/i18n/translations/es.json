@@ -3401,6 +3401,8 @@
   "9c5e5750662724b7": "Tecla Retorno",
   "06cd6b2977eca575": "Se aplica al cuadro de mensaje cuando hay un teclado físico conectado.",
   "7eed14b9c7fd7661": "Del sistema",
+  "e68c01aded74684a": "Restart DoeDesk",
+  "d508ef38850bdee5": "This language reads in the other direction. Text has changed already; the layout changes when DoeDesk restarts.",
   "55a38a5aa88cfa1e": "Legal",
   "b2c0d69e1aba23e5": "Los teléfonos muestran las cuatro primeras secciones activadas; las barras de las tabletas Android muestran todas las activadas. Las secciones restantes aparecen arriba en Ajustes. Las secciones ocultas solo aparecen aquí. Ajustes siempre queda al final. Se guarda en este dispositivo.",
   "158e33cd4694c0af": "La personalización de pestañas está disponible cuando hay seis secciones, incluida Ajustes.",

@@ -3408,6 +3408,8 @@
   "9c5e5750662724b7": "Return key",
   "06cd6b2977eca575": "Applies to the composer when a hardware keyboard is connected.",
   "7eed14b9c7fd7661": "System default",
+  "e68c01aded74684a": "Restart DoeDesk",
+  "d508ef38850bdee5": "This language reads in the other direction. Text has changed already; the layout changes when DoeDesk restarts.",
   "55a38a5aa88cfa1e": "Legal",
   "b2c0d69e1aba23e5": "Phones show the first four enabled sections; Android tablet rails show all enabled sections. Remaining sections appear at the top of Settings. Hidden sections appear only here. Settings always stays last. Saved on this device.",
   "158e33cd4694c0af": "Tab customization becomes available when there are six sections, including Settings.",
