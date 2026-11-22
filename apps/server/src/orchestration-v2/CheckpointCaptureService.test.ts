@@ -1510,10 +1510,9 @@ it.layer(layerProjectionStoreTest)("CheckpointCaptureServiceV2", (it) => {
           status: "ready",
           files: files ?? [],
         });
-        const missingRoot = (ordinal: number, run: boolean) => ({
-          ...ready("root", ordinal, run ? [] : undefined),
-          status: "missing",
-        });
+        // DoeDesk gives a plain folder a history of its own, so the wrapper has a checkpoint too.
+        const plainRoot = (ordinal: number, run: boolean) =>
+          ready("root", ordinal, run ? [] : undefined);
 
         // Only the repository the turn changed is recorded; `web` and the plain folder are not.
         assert.deepEqual(
@@ -1522,8 +1521,8 @@ it.layer(layerProjectionStoreTest)("CheckpointCaptureServiceV2", (it) => {
             { type: "scope", label: "api" },
             ready("api", 0),
             ready("api", 1, ["README.md"]),
-            missingRoot(0, false),
-            missingRoot(1, true),
+            plainRoot(0, false),
+            plainRoot(1, true),
           ],
         );
         // An at-least-once retry of a settled run commits nothing more.
@@ -1549,8 +1548,8 @@ it.layer(layerProjectionStoreTest)("CheckpointCaptureServiceV2", (it) => {
             { type: "scope", label: "docs" },
             ready("docs", 1),
             ready("docs", 2, ["README.md"]),
-            missingRoot(0, false),
-            missingRoot(2, true),
+            // Its baseline exists from the first turn and is not recorded again.
+            plainRoot(2, true),
           ],
         );
         const context = yield* ProjectionStore.ProjectionStoreV2.use((store) =>
