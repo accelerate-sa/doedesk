@@ -163,7 +163,7 @@ function UserFileCard({
             type="button"
             aria-label={gt("Preview {label}", { label })}
             onClick={() => ctx.onFileOpen(file)}
-            className="group/file focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
+            className="group/file focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl text-start focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
           >
             {identity}
           </button>
@@ -416,7 +416,7 @@ export function FoldedMessageHeader(props: {
       aria-expanded={props.expanded}
       data-scroll-anchor-ignore
       onClick={props.onToggle}
-      className="flex w-full min-w-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
+      className="flex w-full min-w-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-start text-sm focus-visible:outline-2 focus-visible:outline-ring"
     >
       <Icon className="size-4 shrink-0 stroke-2 text-muted-foreground" />
       <span
@@ -555,8 +555,8 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
     regularImages.every((image) => image.source?.kind !== "snap-shot");
   // Corners that touch the bubble or a neighbouring message tighten, like the bubble's.
   const mediaCornerClassName = cn(
-    row.groupedWithPrevious && "rounded-tr-md",
-    (mediaAboveText || row.groupedWithNext) && "rounded-br-md",
+    row.groupedWithPrevious && "rounded-se-md",
+    (mediaAboveText || row.groupedWithNext) && "rounded-ee-md",
   );
   // Files sent without words show as cards, not as a bubble around a name chip.
   const fileCardsOnly =

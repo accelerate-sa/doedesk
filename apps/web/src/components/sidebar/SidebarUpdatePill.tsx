@@ -520,7 +520,7 @@ function SidebarUpdateControl() {
   );
 
   return (
-    <SidebarMenuItem className="ml-auto shrink-0">
+    <SidebarMenuItem className="ms-auto shrink-0">
       <Popover
         handle={releaseNotesPopoverHandle}
         open={releaseNotesOpen && showReleaseNotesPopover}
@@ -561,7 +561,7 @@ function SidebarUpdateControl() {
               variant={showUpdateDetails ? "glass" : "default"}
             >
               {idleTooltip?.detail ? (
-                <div className="text-left">
+                <div className="text-start">
                   <div className="font-medium">{idleTooltip.title}</div>
                   <div className="text-muted-foreground">{idleTooltip.detail}</div>
                 </div>

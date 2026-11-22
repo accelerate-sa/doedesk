@@ -419,7 +419,7 @@ export function AttachmentFilePreview(props: {
             {props.name}
           </span>
           {props.sizeBytes > 0 ? (
-            <span className="ml-2 shrink-0 text-muted-foreground">
+            <span className="ms-2 shrink-0 text-muted-foreground">
               {formatAttachmentSize(props.sizeBytes, messages)}
             </span>
           ) : null}

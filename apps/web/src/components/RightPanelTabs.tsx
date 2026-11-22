@@ -541,7 +541,7 @@ function RightPanelEmptyState(props: {
                   type="button"
                   onClick={action.onClick}
                   className={cn(
-                    "flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-(--control-radius) px-2.5 text-left text-sm transition-colors group-hover:bg-accent/60",
+                    "flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-(--control-radius) px-2.5 text-start text-sm transition-colors group-hover:bg-accent/60",
                     isHighlighted(action) && "bg-accent/60",
                   )}
                 >
@@ -549,7 +549,7 @@ function RightPanelEmptyState(props: {
                   <span
                     className={cn(
                       "min-w-0 flex-1 truncate",
-                      action.label === "Browser" && props.browserProfiles.length > 1 && "pr-7",
+                      action.label === "Browser" && props.browserProfiles.length > 1 && "pe-7",
                     )}
                   >
                     {messages(action.label)}
@@ -562,7 +562,7 @@ function RightPanelEmptyState(props: {
                       render={
                         <Button
                           aria-label={gt("Open browser in a profile")}
-                          className="absolute top-1/2 right-8 -translate-y-1/2"
+                          className="absolute top-1/2 end-8 -translate-y-1/2"
                           size="icon-xs"
                           variant="ghost-muted"
                         />
@@ -591,7 +591,7 @@ function RightPanelEmptyState(props: {
                   <div
                     tabIndex={0}
                     aria-disabled="true"
-                    className="flex h-8 w-full cursor-default items-center gap-2.5 rounded-(--control-radius) px-2.5 text-left text-sm opacity-50"
+                    className="flex h-8 w-full cursor-default items-center gap-2.5 rounded-(--control-radius) px-2.5 text-start text-sm opacity-50"
                   >
                     {actionIcon(action, "size-4")}
                     <span className="min-w-0 flex-1 truncate">{messages(action.label)}</span>
@@ -777,7 +777,7 @@ function SideChatTabIcon(props: { environmentId: EnvironmentId | null; threadId:
       {state === null ? null : (
         <span
           className={cn(
-            "absolute -top-0.5 -right-0.5 size-1.5 rounded-full",
+            "absolute -top-0.5 -end-0.5 size-1.5 rounded-full",
             state === "running" ? "bg-muted-foreground" : "bg-info",
           )}
           aria-hidden
@@ -1014,7 +1014,7 @@ function RightPanelTab(
         />
         {props.pending ? (
           <span
-            className="absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full bg-current"
+            className="absolute -end-0.5 -bottom-0.5 size-1.5 rounded-full bg-current"
             aria-hidden
           />
         ) : null}
@@ -1119,7 +1119,7 @@ function RightPanelTab(
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "cursor-pointer group/tab flex h-6 max-w-36 shrink-0 items-center gap-0.5 rounded-md pr-2 pl-1.5 text-xs",
+        "cursor-pointer group/tab flex h-6 max-w-36 shrink-0 items-center gap-0.5 rounded-md pe-2 ps-1.5 text-xs",
         props.ownsDesktopTitleBar && "[-webkit-app-region:no-drag]",
         props.active
           ? "bg-accent text-foreground"
@@ -1495,10 +1495,10 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     >
       <div
         className={cn(
-          "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 pl-2",
-          props.mode === "inline" && !props.layoutControls ? "pr-28" : "pr-3",
+          "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 ps-2",
+          props.mode === "inline" && !props.layoutControls ? "pe-28" : "pe-3",
           ownsDesktopTitleBar && "drag-region",
-          ownsDesktopTitleBar && "wco:pr-(--workspace-native-controls-inset)",
+          ownsDesktopTitleBar && "wco:pe-(--workspace-native-controls-inset)",
           props.mode === "inline" && props.maximized && COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
         )}
         data-right-panel-tabbar

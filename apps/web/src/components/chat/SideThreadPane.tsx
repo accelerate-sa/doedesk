@@ -145,7 +145,7 @@ export default function SideThreadPane(props: {
       className="flex h-full min-h-0 flex-col"
     >
       {isSideChat ? (
-        <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border pr-1 pl-3">
+        <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border pe-1 ps-3">
           <h2 className="min-w-0 flex-1 truncate text-xs font-medium">{title}</h2>
           <Tooltip>
             <TooltipTrigger

@@ -283,13 +283,13 @@ export function CustomModelEditor({
         </Button>
       </div>
       {descriptor.type === "select" ? (
-        <div className="flex flex-col gap-1.5 pl-16">
+        <div className="flex flex-col gap-1.5 ps-16">
           {descriptor.choices.map((choice) => renderChoice(descriptor, choice))}
           <Button
             type="button"
             size="xs"
             variant="ghost-muted"
-            className="-ml-2 self-start"
+            className="-ms-2 self-start"
             onClick={() =>
               updateDescriptor(descriptor.key, {
                 choices: [...descriptor.choices, emptyEditorChoice()],
@@ -373,7 +373,7 @@ export function CustomModelEditor({
                 type="button"
                 size="xs"
                 variant="ghost-muted"
-                className={cn("-ml-2 first:ml-0")}
+                className={cn("-ms-2 first:ms-0")}
                 onClick={() => addDescriptor(descriptorFromPreset(preset))}
               >
                 <PlusIcon className="size-3" />

@@ -3119,7 +3119,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             className={
                               index === 0
                                 ? "flex"
-                                : "-ml-1 flex rounded-[25%] bg-sidebar ring-2 ring-sidebar"
+                                : "-ms-1 flex rounded-[25%] bg-sidebar ring-2 ring-sidebar"
                             }
                           >
                             <ProjectFavicon project={project} className="size-3.5" />
@@ -3259,7 +3259,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               />
                             ) : (
                               // Keeps "All projects" as tall as the project rows.
-                              <span className="ml-auto size-7 shrink-0 sm:size-6" />
+                              <span className="ms-auto size-7 shrink-0 sm:size-6" />
                             )}
                           </ComboboxItem>
                         );

@@ -3520,9 +3520,9 @@ export default function ChatView(props: ChatViewProps) {
                     "drag-region flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center px-3 sm:px-5",
                     reserveTitleBarControlInset &&
                       !inlineRightPanelOwnsTitleBar &&
-                      "wco:pr-(--workspace-native-controls-inset)",
+                      "wco:pe-(--workspace-native-controls-inset)",
                   )
-                : "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center pl-(--workspace-gutter-start) pr-(--workspace-gutter-end)",
+                : "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center ps-(--workspace-gutter-start) pe-(--workspace-gutter-end)",
               COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
             )}
           >
@@ -4177,7 +4177,7 @@ export default function ChatView(props: ChatViewProps) {
           maximized={rightPanelMaximized}
           layoutControls={
             rightPanelOpen ? (
-              <div className="mr-px flex items-center gap-1">
+              <div className="me-px flex items-center gap-1">
                 <RightPanelMaximizeControl
                   maximized={rightPanelMaximized}
                   onToggle={toggleRightPanelMaximizedStable}

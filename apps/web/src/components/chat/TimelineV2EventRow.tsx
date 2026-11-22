@@ -104,7 +104,7 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
           aria-label={label}
           aria-description={statusSummary}
           className={cn(
-            "flex w-full min-w-0 items-center gap-2.5 py-2 pr-3.25 text-left transition-opacity hover:opacity-100",
+            "flex w-full min-w-0 items-center gap-2.5 py-2 pe-3.25 text-start transition-opacity hover:opacity-100",
             expanded || summary.active
               ? "text-foreground opacity-100"
               : "text-muted-foreground opacity-55",

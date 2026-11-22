@@ -515,7 +515,7 @@ export function UsageProviderChart({
 
       <div
         aria-hidden
-        className="flex justify-between pl-16 text-3xs text-muted-foreground uppercase"
+        className="flex justify-between ps-16 text-3xs text-muted-foreground uppercase"
       >
         <span>{periods[0] === undefined ? "" : formatPeriod(periods[0])}</span>
         <span>

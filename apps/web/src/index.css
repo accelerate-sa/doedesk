@@ -170,7 +170,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
    default stacks are mirrored in `appearanceFonts.ts`. */
 @theme {
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
+    "Noto Naskh Arabic", -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui,
+    sans-serif;
   --font-mono:
     ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
   /* The brand serif: reading is long text (answers, documents), display is titles.
@@ -602,6 +603,11 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     100% calc(var(--workspace-titlebar-scroll-fade-height) + 1px),
     100% calc(100% - var(--workspace-titlebar-scroll-fade-height)),
     var(--app-scrollbar-width) 100%;
+
+  &:dir(rtl) {
+    -webkit-mask-position: top, bottom, left;
+    mask-position: top, bottom, left;
+  }
 }
 
 /* Virtualizers own their native scroll element, so they cannot use ScrollArea's
@@ -620,6 +626,11 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   mask-size:
     calc(100% - var(--app-scrollbar-width)) 100%,
     var(--app-scrollbar-width) 100%;
+
+  &:dir(rtl) {
+    -webkit-mask-position: right, left;
+    mask-position: right, left;
+  }
 }
 
 /* Stage-channel art needs a mask and pseudo-element gradient, so keep the
@@ -703,8 +714,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 @utility live-activity-focus {
   --live-activity-focus-width: 4.5rem;
 
-  right: auto;
-  left: calc(-1 * var(--live-activity-focus-width));
+  inset-inline-end: auto;
+  inset-inline-start: calc(-1 * var(--live-activity-focus-width));
   width: calc(100% + var(--live-activity-focus-width) + var(--live-activity-focus-width));
   -webkit-mask-image: linear-gradient(
     to right,
@@ -1178,6 +1189,42 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 /* Safe-area inset utilities for surfaces that opt into edge-to-edge rendering.
    Insets resolve to 0 when the browser already constrains the layout viewport
    to the safe area. */
+/* Arabic UI needs generous line height so marks do not clip, and zero tracking
+   so joined cursive letters are never pulled apart. */
+html[lang="ar"] {
+  --tracking-tighter: 0em;
+  --tracking-tight: 0em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0em;
+  --tracking-wider: 0em;
+  --tracking-widest: 0em;
+  --leading-none: 1.35;
+  --leading-tight: 1.45;
+  --leading-snug: 1.55;
+  --leading-normal: 1.65;
+  --text-xs--line-height: calc(1.2 / 0.75);
+  --text-sm--line-height: calc(1.45 / 0.875);
+  --text-base--line-height: calc(1.65 / 1);
+  --text-2xs--line-height: calc(1.15 / 0.6875);
+  --text-3xs--line-height: calc(1 / 0.625);
+}
+
+html[lang="ar"] body {
+  line-height: 1.65;
+}
+
+@utility ps-safe {
+  padding-inline-start: max(env(safe-area-inset-left), 0px);
+}
+@utility pe-safe {
+  padding-inline-end: max(env(safe-area-inset-right), 0px);
+}
+html[dir="rtl"] .ps-safe {
+  padding-inline-start: max(env(safe-area-inset-right), 0px);
+}
+html[dir="rtl"] .pe-safe {
+  padding-inline-end: max(env(safe-area-inset-left), 0px);
+}
 @utility pt-safe {
   padding-top: max(env(safe-area-inset-top), 0px);
 }
@@ -2258,6 +2305,22 @@ code {
   padding: 0.1em 0.35em;
   color: var(--contrast-foreground);
   font-size: 0.85em;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Code blocks and diffs always run left-to-right with bidi isolation. */
+.chat-markdown pre,
+.chat-markdown-codeblock,
+.chat-markdown-shiki,
+.diffs,
+diffs-container {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir="rtl"] code {
+  unicode-bidi: isolate;
 }
 
 .chat-markdown.user-message-markdown :not(pre) > code {

@@ -350,7 +350,7 @@ function ThemeLibraryCard({
                           : gt("Use {label} theme", { label: theme.label })
                     }
                     aria-pressed={isActive}
-                    className="min-w-0 cursor-pointer truncate rounded-sm text-left text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                    className="min-w-0 cursor-pointer truncate rounded-sm text-start text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation();

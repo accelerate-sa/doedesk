@@ -916,7 +916,7 @@ function FleetCanvas({
                   $context: "how many machines a search by name found",
                 })}
         </p>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ms-auto flex items-center gap-2">
           {selected.size > 0 ? (
             <span className="flex items-center gap-1 text-2xs text-foreground">
               <span role="status" className="tabular-nums">
@@ -978,7 +978,7 @@ function FleetCanvas({
               }
             />
             <PopoverPopup align="end" width="sm" padding="compact">
-              <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+              <ul className="list-disc space-y-1 ps-4 text-xs text-muted-foreground">
                 <li>{gt("Select a machine to manage it.")}</li>
                 {sources.length === 0 ? null : (
                   <>
@@ -1501,7 +1501,7 @@ const FleetScene = memo(function FleetScene({
   });
   const nodeClass = (id: string) =>
     cn(
-      "absolute flex cursor-pointer items-center text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-inset forced-colors:focus-visible:outline-2 forced-colors:aria-pressed:outline-2",
+      "absolute flex cursor-pointer items-center text-start outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-inset forced-colors:focus-visible:outline-2 forced-colors:aria-pressed:outline-2",
       fade(nodeDimmed(id)),
       linkDrag?.overId === id && "ring-2 ring-primary ring-inset",
     );
@@ -1886,7 +1886,7 @@ const FleetScene = memo(function FleetScene({
                 holdsSelection(stack) && "ring-2 ring-primary ring-inset forced-colors:outline-2",
               )}
             >
-              <span className="flex min-h-0 min-w-0 flex-1 flex-col justify-center px-2.5 pr-8">
+              <span className="flex min-h-0 min-w-0 flex-1 flex-col justify-center px-2.5 pe-8">
                 <span className="flex items-center gap-1.5">
                   <span className="truncate text-xs leading-4 font-semibold text-foreground">
                     {group ?? range}
@@ -2195,7 +2195,7 @@ const FleetScene = memo(function FleetScene({
                   )}
                 />
               </span>
-              <span className={cn("min-w-0 flex-1 pr-1.5", dimmed && "opacity-70")}>
+              <span className={cn("min-w-0 flex-1 pe-1.5", dimmed && "opacity-70")}>
                 <span className="line-clamp-2 text-xs leading-4 font-semibold [overflow-wrap:anywhere]">
                   {node.label}
                 </span>

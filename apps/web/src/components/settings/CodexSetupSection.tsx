@@ -1216,7 +1216,7 @@ function CodexSignInDescription({
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1.5 rounded-sm text-left leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className="inline-flex items-center gap-1.5 rounded-sm text-start leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       aria-label={gt("Having trouble signing in?")}
       aria-expanded={expanded}
       aria-controls={controls}
@@ -1258,7 +1258,7 @@ function CodexWelcomeCard({
         ) : null}
       </div>
       {footer.length > 0 ? (
-        <div className="ml-8 mt-2 flex flex-wrap items-center gap-2">{footer}</div>
+        <div className="ms-8 mt-2 flex flex-wrap items-center gap-2">{footer}</div>
       ) : null}
     </div>
   );

@@ -336,7 +336,7 @@ function RemoteSubagentRow(props: {
             status={status}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-left text-sm font-medium leading-4 text-foreground/85">
+            <span className="block truncate text-start text-sm font-medium leading-4 text-foreground/85">
               {title}
             </span>
           </span>
@@ -438,7 +438,7 @@ function DelegatedFromRow(props: {
             status={null}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-left text-sm font-medium leading-4 text-foreground/85">
+            <span className="block truncate text-start text-sm font-medium leading-4 text-foreground/85">
               {title}
             </span>
           </span>
@@ -886,7 +886,7 @@ export function ThreadRelationshipsPanel(props: {
           status={rowStatus}
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-left text-sm font-medium leading-4 text-foreground/85">
+          <span className="block truncate text-start text-sm font-medium leading-4 text-foreground/85">
             {threadTitle}
           </span>
         </span>

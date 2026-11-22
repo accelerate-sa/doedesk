@@ -221,7 +221,7 @@ function UserMessagePreviewAnnotationDetails(props: {
                       {element.selector || `<${element.tagName}>`}
                     </code>
                     {sourceLabel ? (
-                      <span className="ml-auto shrink-0 text-secondary-label">{sourceLabel}</span>
+                      <span className="ms-auto shrink-0 text-secondary-label">{sourceLabel}</span>
                     ) : null}
                   </div>
                   {element.htmlPreview?.trim() ? (
@@ -261,7 +261,7 @@ function UserMessageElementDetails({
             {record.selector || `<${record.tagName}>`}
           </code>
           {sourceLabel ? (
-            <span className="ml-auto shrink-0 text-secondary-label">{sourceLabel}</span>
+            <span className="ms-auto shrink-0 text-secondary-label">{sourceLabel}</span>
           ) : null}
         </div>
         {record.htmlPreview?.trim() ? (

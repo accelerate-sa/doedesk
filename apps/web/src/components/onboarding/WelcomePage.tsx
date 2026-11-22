@@ -2282,7 +2282,7 @@ function ImportCandidateList({
               }
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-start">
-              <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
+              <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform rtl:rotate-180 group-data-panel-open:rotate-90" />
               <span className="truncate text-sm text-muted-foreground">
                 {t(gt("Other folders"), "مجلدات أخرى")}
               </span>
@@ -2347,7 +2347,7 @@ function ImportRepositoryGroup({
           onCheckedChange={(checked) => onToggle(keys, checked === true)}
         />
         <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-start">
-          <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
+          <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform rtl:rotate-180 group-data-panel-open:rotate-90" />
           <span className="truncate text-sm font-medium">{group.label}</span>
           <ImportRowMeta
             sources={[...new Set(group.candidates.flatMap((c) => c.sources))]}

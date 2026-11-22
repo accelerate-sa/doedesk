@@ -64,12 +64,12 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   return (
     <div
       className={cn(
-        "relative flex h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center gap-2 pr-3",
+        "relative flex h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center gap-2 pe-3",
         isElectron && "drag-region",
       )}
     >
       {backdropVariant ? <SidebarStageBackdrop variant={backdropVariant} /> : null}
-      <div className="relative top-[calc(var(--workspace-controls-top)-env(safe-area-inset-top))] z-10 ml-[calc(var(--workspace-controls-left)+1px-env(safe-area-inset-left))] flex shrink-0 items-center md:hidden">
+      <div className="relative top-[calc(var(--workspace-controls-top)-env(safe-area-inset-top))] z-10 ms-[calc(var(--workspace-controls-left)+1px-env(safe-area-inset-left))] flex shrink-0 items-center md:hidden">
         <SidebarTrigger
           variant={backdropVariant ? "media-navigation" : "ghost"}
           className="relative top-auto translate-y-0"
@@ -87,7 +87,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
           ) : null}
         </div>
         {pillLabel ? (
-          <div className="ml-1 flex h-7 items-center">
+          <div className="ms-1 flex h-7 items-center">
             <Badge data-environment-identification="pill" size="sm" variant="secondary">
               {pillLabel}
             </Badge>
@@ -114,10 +114,10 @@ export function SidebarBrandWidthProbe({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none invisible fixed top-0 left-0 flex w-max border-r border-transparent pr-3"
+      className="pointer-events-none invisible fixed top-0 start-0 flex w-max border-e border-transparent pe-3"
       ref={observeWidth}
     >
-      <div className="ml-[var(--workspace-titlebar-content-left)] flex gap-1">
+      <div className="ms-[var(--workspace-titlebar-content-left)] flex gap-1">
         <SidebarBrandMark onBackdrop={false} />
         {isElectron ? <div className="w-[calc(2*var(--workspace-titlebar-control-size))]" /> : null}
       </div>
@@ -158,7 +158,7 @@ function HistoryNavigationButton({
           />
         }
       >
-        <Icon className="size-3.5" />
+        <Icon className="size-3.5 rtl:rotate-180" />
       </TooltipTrigger>
       <TooltipPopup side="bottom">
         {label}
@@ -174,7 +174,7 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     <Link
       aria-label={gt("DoeDesk home")}
       className={cn(
-        "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
+        "relative z-10 ms-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
         onBackdrop ? "text-white" : "text-foreground",
       )}
       to="/"
@@ -186,7 +186,10 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
 
 function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
-    <span className="brand-wordmark inline-flex min-w-0 items-center gap-1.5 text-lg leading-none">
+    <span
+      dir="ltr"
+      className="brand-wordmark inline-flex min-w-0 items-center gap-1.5 text-lg leading-none"
+    >
       <BrandMark aria-hidden className="h-4 w-auto shrink-0" />
       <span className={cn("truncate pt-px", onBackdrop ? "text-white" : "text-foreground")}>
         DoeDesk
@@ -271,7 +274,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
       {isOnUtilityPage ? (
         <SidebarMenuItem className="min-w-0 flex-1">
           <SidebarMenuButton onClick={handleBackClick}>
-            <ArrowLeftIcon />
+            <ArrowLeftIcon className="rtl:rotate-180" />
             <span>
               <T>Back</T>
             </span>

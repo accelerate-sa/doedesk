@@ -187,7 +187,7 @@ function DiffFileCollapseToggle({
         }
       >
         {collapsed ? (
-          <ChevronRightIcon className="size-4 text-muted-foreground/80" />
+          <ChevronRightIcon className="size-4 text-muted-foreground/80 rtl:rotate-180" />
         ) : (
           <ChevronDownIcon className="size-4 text-muted-foreground/80" />
         )}
@@ -1061,7 +1061,7 @@ export default function DiffPanel({
                               Turn <Var>{turnCount}</Var>
                             </T>
                           </span>
-                          <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                          <span className="ms-auto text-xs tabular-nums text-muted-foreground">
                             {formatShortTimestamp(summary.completedAt, settings.timestampFormat)}
                           </span>
                         </span>
@@ -1238,7 +1238,7 @@ export default function DiffPanel({
                     <span className="flex min-w-0 items-center gap-3">
                       <span className="min-w-0 truncate">{section.name}</span>
                       {section.relativePath !== "" && section.relativePath !== section.name ? (
-                        <span className="ml-auto min-w-0 truncate text-xs text-muted-foreground">
+                        <span className="ms-auto min-w-0 truncate text-xs text-muted-foreground">
                           {section.relativePath}
                         </span>
                       ) : null}
@@ -1266,7 +1266,7 @@ export default function DiffPanel({
                 }
               >
                 <span className="min-w-0 max-w-48 truncate">{comparisonHeadRef}</span>
-                <ArrowRightIcon className="size-3.5 shrink-0 opacity-70" />
+                <ArrowRightIcon className="size-3.5 shrink-0 opacity-70 rtl:rotate-180" />
               </TooltipTrigger>
               <TooltipPopup side="top">
                 {`${comparisonHeadRef} → ${comparisonBaseRef}`}
@@ -1319,7 +1319,7 @@ export default function DiffPanel({
                     <span>
                       <T context="git branch">Branch</T>
                     </span>
-                    <span className="text-right">
+                    <span className="text-end">
                       <T context="git remote">Remote</T>
                     </span>
                   </div>
@@ -1407,7 +1407,7 @@ export default function DiffPanel({
             <DiffStatLabel
               additions={diffLineStat.additions}
               deletions={diffLineStat.deletions}
-              className="mr-1 text-2xs"
+              className="me-1 text-2xs"
               layout="inline"
             />
           </span>

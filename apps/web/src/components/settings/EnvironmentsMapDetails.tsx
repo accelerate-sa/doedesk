@@ -287,7 +287,7 @@ function LinkButton({
     <li>
       <button
         type="button"
-        className="grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-1.5 py-1 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:grid-cols-[auto_minmax(0,10rem)_minmax(0,10rem)_minmax(0,1fr)_auto]"
+        className="grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-1.5 py-1 text-start outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:grid-cols-[auto_minmax(0,10rem)_minmax(0,10rem)_minmax(0,1fr)_auto]"
         onClick={() => onSelect({ kind: "edge", id: edge.id })}
       >
         <AccessMeter access={edge.link.access} className="text-foreground/80" />
@@ -497,7 +497,7 @@ function MemberButton({
     <button
       type="button"
       style={{ height: MEMBER_ROW_HEIGHT }}
-      className="grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-1.5 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:grid-cols-[minmax(0,12rem)_minmax(0,10rem)_minmax(0,1fr)_auto]"
+      className="grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-1.5 text-start outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:grid-cols-[minmax(0,12rem)_minmax(0,10rem)_minmax(0,1fr)_auto]"
       onClick={() => onSelect({ kind: "node", id: member.id })}
     >
       <span className="truncate font-medium text-foreground">{member.label}</span>

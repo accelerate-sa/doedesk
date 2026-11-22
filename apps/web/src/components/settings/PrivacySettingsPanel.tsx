@@ -96,7 +96,10 @@ function ActivitySection() {
               >
                 <span className="min-w-0 truncate text-foreground">
                   {OUTCOME_LABELS[entry.outcome]}
-                  <span className="text-muted-foreground"> · {entry.host}</span>
+                  <span className="text-muted-foreground">
+                    {" · "}
+                    <bdi dir="ltr">{entry.host}</bdi>
+                  </span>
                 </span>
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {entry.outcome === "masked"
@@ -153,7 +156,9 @@ function VaultSection() {
                   <span className="min-w-0 truncate text-foreground" dir="auto">
                     {entry.value}
                   </span>
-                  <code className="shrink-0 text-xs text-muted-foreground">{entry.token}</code>
+                  <code dir="ltr" className="shrink-0 text-xs text-muted-foreground">
+                    {entry.token}
+                  </code>
                 </li>
               ))}
             </ul>

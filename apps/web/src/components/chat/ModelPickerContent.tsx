@@ -298,7 +298,7 @@ function ModelPickerList({
   return (
     <div
       className={cn(
-        "relative min-h-0 overflow-hidden pr-px",
+        "relative min-h-0 overflow-hidden pe-px",
         itemKeys.length > 0 ? "flex-1" : "h-0",
       )}
     >
@@ -312,7 +312,7 @@ function ModelPickerList({
           estimatedItemSize={MODEL_LIST_ESTIMATED_ITEM_SIZE}
           drawDistance={480}
           recycleItems
-          contentContainerClassName="pl-2 pr-px"
+          contentContainerClassName="ps-2 pe-px"
           ItemSeparatorComponent={ModelListSeparator}
           onLayout={updateScrollFades}
           onScroll={updateScrollFades}
@@ -1045,7 +1045,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
           <div
             className={cn(
               "flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40",
-              showSidebar && "border-l border-border/70",
+              showSidebar && "border-s border-border/70",
             )}
           >
             <ComboboxSearchInput
@@ -1174,7 +1174,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                       aria-expanded={unavailable ? undefined : subProviderSection.isExpanded}
                       className="group w-full cursor-pointer"
                     >
-                      <div className="min-w-0 flex-1 text-left">
+                      <div className="min-w-0 flex-1 text-start">
                         <div className="flex min-w-0 items-center gap-2">
                           <div className="min-w-0 truncate text-sm font-normal leading-snug">
                             {subProviderSection.name}

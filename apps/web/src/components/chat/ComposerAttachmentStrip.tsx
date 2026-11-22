@@ -490,7 +490,7 @@ export function ComposerAttachmentFileList({
             <button
               type="button"
               disabled={needsReattach}
-              className="min-w-0 flex-1 truncate text-left hover:underline focus-visible:outline-2"
+              className="min-w-0 flex-1 truncate text-start hover:underline focus-visible:outline-2"
               onClick={() => onPreviewFile(file.id)}
             >
               {file.name}

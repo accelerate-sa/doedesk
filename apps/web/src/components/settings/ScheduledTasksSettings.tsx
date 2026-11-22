@@ -1085,7 +1085,7 @@ function WebhookDeliveriesDialog({
                 <li key={delivery.id}>
                   <button
                     type="button"
-                    className="flex w-full flex-wrap items-center gap-2 py-2 text-left text-sm hover:bg-accent/40"
+                    className="flex w-full flex-wrap items-center gap-2 py-2 text-start text-sm hover:bg-accent/40"
                     onClick={() => setSelectedId(delivery.id)}
                   >
                     <Badge
@@ -1423,7 +1423,7 @@ function ScheduledTaskDestination({
             className="w-full justify-between"
           >
             <MessageSquareIcon className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate text-left">{currentLabel}</span>
+            <span className="min-w-0 flex-1 truncate text-start">{currentLabel}</span>
             <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
           </ComboboxTrigger>
           <ComboboxPopup align="start" side="bottom" className="w-80">

@@ -863,7 +863,7 @@ export const BranchToolbar = memo(function BranchToolbar({
       {!showGitControls ? null : !showBranchControls ? (
         startsNewWorktree ? (
           <span
-            className="min-w-0 flex-initial truncate px-1.75 @xl/composer-surface:ml-auto"
+            className="min-w-0 flex-initial truncate px-1.75 @xl/composer-surface:ms-auto"
             data-composer-context-control
           >
             {plainProjectBaseBranch === ""
@@ -879,7 +879,7 @@ export const BranchToolbar = memo(function BranchToolbar({
         <BranchToolbarBranchSelector
           forceNewWorktree={forceNewWorktree}
           ref={branchSelectorRef}
-          className="min-w-0 flex-initial justify-end @xl/composer-surface:ml-auto"
+          className="min-w-0 flex-initial justify-end @xl/composer-surface:ms-auto"
           environmentId={environmentId}
           threadId={threadId}
           {...(draftId ? { draftId } : {})}

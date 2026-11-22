@@ -193,7 +193,7 @@ function SwipeIndicator({ direction, progress, y, bounds, tracking }: SwipeIndic
       <div
         className={cn(
           "absolute flex size-14 items-center rounded-full bg-muted text-foreground dark:bg-black dark:text-white",
-          direction === "back" ? "left-0 justify-end pr-2" : "right-0 justify-start pl-2",
+          direction === "back" ? "left-0 justify-end pe-2" : "right-0 justify-start ps-2",
           !tracking && "transition-[opacity,transform] duration-200 ease-out",
         )}
         style={{

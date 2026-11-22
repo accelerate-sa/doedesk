@@ -121,7 +121,7 @@ function BreadcrumbMenuContent(props: {
       {canGoBack && parentPath !== null ? (
         <>
           <MenuItem closeOnClick={false} onClick={() => props.onDirectoryChange(parentPath)}>
-            <ArrowLeftIcon />
+            <ArrowLeftIcon className="rtl:rotate-180" />
             <span className="truncate">
               <T>
                 Back to <Var>{pathLabel(parentPath, props.projectName)}</Var>
@@ -180,7 +180,7 @@ function BreadcrumbMenuContent(props: {
                     >
                       {entry.label}
                     </TooltipTrigger>
-                    <TooltipPopup side="right">{entry.path}</TooltipPopup>
+                    <TooltipPopup side="inline-end">{entry.path}</TooltipPopup>
                   </Tooltip>
                 </>
               );
@@ -191,7 +191,7 @@ function BreadcrumbMenuContent(props: {
                   onClick={() => props.onDirectoryChange(entry.path)}
                 >
                   {row}
-                  <ChevronRightIcon />
+                  <ChevronRightIcon className="rtl:rotate-180" />
                 </MenuItem>
               ) : (
                 <MenuRadioItem
@@ -258,7 +258,7 @@ function FolderContentsMenu(props: FileBreadcrumbsProps & { readonly crumb: File
           />
         }
       >
-        <ChevronRightIcon className="size-3.5" />
+        <ChevronRightIcon className="size-3.5 rtl:rotate-180" />
       </MenuTrigger>
       {open ? (
         <BreadcrumbMenuContent
@@ -293,7 +293,7 @@ function FolderBreadcrumb(props: {
             type="button"
             onClick={() => props.onNavigate(props.crumb.path)}
             className={cn(
-              "relative block max-w-40 cursor-pointer rounded-sm px-0.5 text-left outline-none pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+              "relative block max-w-40 cursor-pointer rounded-sm px-0.5 text-start outline-none pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-3 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
               props.descendant ? "text-muted-foreground/70" : "text-muted-foreground",
             )}
           />
@@ -347,7 +347,7 @@ export function FileBreadcrumbs(props: FileBreadcrumbsProps) {
               {index === breadcrumbs.length - 1 ? null : hostPath ? (
                 <ChevronRightIcon
                   aria-hidden
-                  className="mx-1 size-3.5 shrink-0 text-muted-foreground/60"
+                  className="mx-1 size-3.5 shrink-0 text-muted-foreground/60 rtl:rotate-180"
                 />
               ) : (
                 <FolderContentsMenu {...props} crumb={crumb} />

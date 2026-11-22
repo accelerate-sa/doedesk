@@ -370,7 +370,7 @@ export function SettingInheritance({
                         <Button
                           variant="ghost"
                           size="sm-multiline"
-                          className="w-full justify-start text-left"
+                          className="w-full justify-start text-start"
                         />
                       }
                     >

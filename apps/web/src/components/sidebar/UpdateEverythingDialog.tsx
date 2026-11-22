@@ -214,7 +214,7 @@ function UpdateEverythingDialogContent({
                     </Fragment>
                   ))}
                 </span>
-                <span role="cell" className="text-right">
+                <span role="cell" className="text-end">
                   {row.environmentId !== null && restarting.has(row.environmentId) ? (
                     <RunningThreads environmentId={row.environmentId} />
                   ) : null}
@@ -248,11 +248,11 @@ function UpdateEverythingDialogContent({
       </ScrollArea>
       <AlertDialogFooter>
         {disabledReason !== null ? (
-          <p className="self-center text-sm max-sm:order-1 max-sm:text-center sm:mr-auto">
+          <p className="self-center text-sm max-sm:order-1 max-sm:text-center sm:me-auto">
             {disabledReason}
           </p>
         ) : running > 0 ? (
-          <p className="self-center text-muted-foreground text-sm max-sm:order-1 max-sm:text-center sm:mr-auto">
+          <p className="self-center text-muted-foreground text-sm max-sm:order-1 max-sm:text-center sm:me-auto">
             {stopped === 0
               ? gt(
                   "{count, plural, one {{count} running chat will be interrupted and can resume after the restart.} other {{count} running chats will be interrupted and can resume after the restart.}}",

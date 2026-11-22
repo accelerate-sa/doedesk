@@ -32,7 +32,7 @@ export function TerminalContextInlineChip(props: TerminalContextInlineChipProps)
             <span className="min-w-0 truncate text-sm font-medium text-foreground">
               {terminalLabel}
             </span>
-            <span className="ml-auto shrink-0 text-secondary-label text-xs">
+            <span className="ms-auto shrink-0 text-secondary-label text-xs">
               {lineStart === lineEnd
                 ? gt("Line {lineStart}", { lineStart })
                 : gt("Lines {lineStart}–{lineEnd}", { lineStart, lineEnd })}

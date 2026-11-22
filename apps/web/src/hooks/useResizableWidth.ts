@@ -78,9 +78,11 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
     // switches keys before the pointer is released.
     const startStorageKey = storageKey;
     const startWidth = clampedWidth;
+    const isRtl = host ? getComputedStyle(host).direction === "rtl" : false;
+    const resolvedEdge = isRtl ? (edge === "left" ? "right" : "left") : edge;
     return {
       width: startWidth,
-      edge,
+      edge: resolvedEdge,
       bounds: { min: minWidth, max: maxWidth },
       resize(nextWidth) {
         host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${nextWidth}px`);

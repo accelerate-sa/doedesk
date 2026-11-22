@@ -166,7 +166,7 @@ function DiagnosticsTable({
       className="w-full max-w-full"
     >
       <table
-        className={cn("w-full text-left text-xs", minTableWidth, columnWidths && "table-fixed")}
+        className={cn("w-full text-start text-xs", minTableWidth, columnWidths && "table-fixed")}
       >
         {columnWidths ? (
           <colgroup>
@@ -181,7 +181,7 @@ function DiagnosticsTable({
               <th
                 key={header}
                 className={cn(
-                  "whitespace-nowrap px-4 py-2.5 font-semibold first:sm:pl-5 last:sm:pr-5",
+                  "whitespace-nowrap px-4 py-2.5 font-semibold first:sm:ps-5 last:sm:pe-5",
                   !columnWidths && index === headers.length - 1 && "w-px",
                 )}
               >

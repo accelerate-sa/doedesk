@@ -407,6 +407,96 @@
           document.documentElement.style.backgroundColor = fallbackColor;
           setThemeColor(fallbackColor);
         }
+
+        // Apply the saved UI language and reading direction before first paint so Arabic
+        // starts right to left without a flash. Mirrors `resolveBootLocale` in client-runtime.
+        try {
+          const SUPPORTED_LOCALES = [
+            "en",
+            "ar",
+            "de",
+            "es",
+            "fr",
+            "ja",
+            "ko",
+            "pt-BR",
+            "ru",
+            "sv",
+            "zh",
+          ];
+          const RTL_SUBTAGS = new Set([
+            "ar",
+            "ckb",
+            "dv",
+            "fa",
+            "he",
+            "iw",
+            "ps",
+            "sd",
+            "ug",
+            "ur",
+            "yi",
+          ]);
+          const TRADITIONAL_CHINESE = /^zh[-_](hant|tw|hk|mo)\b/;
+          const matchSupported = (tag) => {
+            const normalized = String(tag).trim().toLowerCase();
+            const lang = normalized.split(/[-_]/)[0];
+            const exact = SUPPORTED_LOCALES.find((l) => l.toLowerCase() === normalized);
+            if (exact || TRADITIONAL_CHINESE.test(normalized)) return exact;
+            return SUPPORTED_LOCALES.find((l) => l.toLowerCase() === lang);
+          };
+          const desktopLanguages = window.desktopBridge?.getPreferredSystemLanguages?.() ?? [];
+          const systemLanguages =
+            Array.isArray(desktopLanguages) && desktopLanguages.length > 0
+              ? desktopLanguages
+              : navigator.languages || [];
+          const prefersArabic =
+            typeof systemLanguages[0] === "string" &&
+            systemLanguages[0].trim().toLowerCase().split(/[-_]/)[0] === "ar";
+          let storedLanguage = window.localStorage.getItem("t3code:language")?.trim() || null;
+          let freshSetup = false;
+          if (storedLanguage === null) {
+            const rawSettings = window.localStorage.getItem("t3code:client-settings:v1");
+            if (rawSettings) {
+              try {
+                const parsed = JSON.parse(rawSettings);
+                if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                  if (typeof parsed.language === "string" && parsed.language.trim().length > 0) {
+                    storedLanguage = parsed.language.trim();
+                  }
+                  const progress =
+                    parsed.onboardingProgress && typeof parsed.onboardingProgress === "object"
+                      ? parsed.onboardingProgress
+                      : null;
+                  if (parsed.onboardingCompletedAt == null && progress?.locale == null) {
+                    freshSetup = true;
+                  }
+                }
+              } catch {}
+            } else {
+              freshSetup = true;
+            }
+          }
+          let bootLocale = "en";
+          if (freshSetup && (storedLanguage === null || storedLanguage === "en") && prefersArabic) {
+            bootLocale = "ar";
+          } else if (storedLanguage !== null) {
+            if (SUPPORTED_LOCALES.includes(storedLanguage)) {
+              bootLocale = storedLanguage;
+            } else {
+              for (const tag of systemLanguages) {
+                const match = matchSupported(tag);
+                if (match) {
+                  bootLocale = match;
+                  break;
+                }
+              }
+            }
+          }
+          const subtag = bootLocale.toLowerCase().split(/[-_]/)[0];
+          document.documentElement.lang = bootLocale;
+          document.documentElement.dir = RTL_SUBTAGS.has(subtag) ? "rtl" : "ltr";
+        } catch {}
       })();
     </script>
     <style>
@@ -422,7 +512,13 @@
         background: #ffffff;
         color: #262626;
         font-family:
-          -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
+          "Noto Naskh Arabic",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Inter Variable",
+          "Segoe UI",
+          system-ui,
+          sans-serif;
       }
 
       html.dark body {
@@ -603,6 +699,10 @@
         transform: rotate(-45deg);
       }
 
+      html[dir="rtl"] #boot-error summary::before {
+        transform: rotate(135deg);
+      }
+
       #boot-error details[open] summary::before {
         transform: rotate(45deg);
       }
@@ -633,7 +733,9 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 4px 4px 4px 10px;
+        padding-block: 4px;
+        padding-inline-start: 10px;
+        padding-inline-end: 4px;
         border: 1px solid var(--boot-error-line);
         border-radius: 6px;
       }
@@ -642,6 +744,8 @@
         flex: 1;
         min-width: 0;
         opacity: 0.8;
+        direction: ltr;
+        unicode-bidi: isolate;
       }
 
       #boot-error .boot-error-icon {

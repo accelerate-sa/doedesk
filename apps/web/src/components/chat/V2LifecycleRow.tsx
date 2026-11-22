@@ -539,13 +539,13 @@ function SubagentTimelineLink(props: {
       {open !== null ? (
         <ChevronRightIcon
           aria-hidden
-          className="size-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover/subagent:text-foreground"
+          className="size-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover/subagent:text-foreground rtl:rotate-180"
         />
       ) : null}
     </>
   );
   const className =
-    "group/subagent flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left";
+    "group/subagent flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-start";
   return (
     <Tooltip>
       <TooltipTrigger
@@ -702,14 +702,14 @@ export function HandoffRow(props: {
                 model={endpoint.model}
               />
               {index < fromEndpoints.length - 1 ? (
-                <span aria-hidden="true" className="ml-0.5">
+                <span aria-hidden="true" className="ms-0.5">
                   ,
                 </span>
               ) : null}
             </span>
           ))}
           {fromEndpoints.length > 0 ? (
-            <ArrowRightIcon aria-hidden="true" className="size-3 shrink-0" />
+            <ArrowRightIcon aria-hidden="true" className="size-3 shrink-0 rtl:rotate-180" />
           ) : null}
           <HandoffEndpoint entries={entries} instanceId={to.instanceId} model={to.model} />
         </span>

@@ -222,7 +222,7 @@ export default function ProjectScriptsControl({
             <span className="relative ms-auto flex h-6 min-w-6 items-center justify-end">
               {shortcutLabel &&
                 (presentation === "menu" ? (
-                  <MenuShortcut className="ms-0 mr-7">{shortcutLabel}</MenuShortcut>
+                  <MenuShortcut className="ms-0 me-7">{shortcutLabel}</MenuShortcut>
                 ) : (
                   <span className="transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0">
                     <MenuShortcut className="ms-0">{shortcutLabel}</MenuShortcut>
@@ -341,8 +341,8 @@ export default function ProjectScriptsControl({
               />
               <span
                 className={cn(
-                  "sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5",
-                  isPanel && cn("not-sr-only ml-0 truncate", THREAD_DETAILS_PANEL_LABEL_CLASS),
+                  "sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ms-0.5",
+                  isPanel && cn("not-sr-only ms-0 truncate", THREAD_DETAILS_PANEL_LABEL_CLASS),
                 )}
               >
                 {primaryScript.name}
@@ -456,7 +456,7 @@ export default function ProjectScriptsControl({
               render={<Button size="xs" variant="outline" aria-label={gt("Folder actions")} />}
             >
               <WrenchIcon className="size-3.5" />
-              <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
+              <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ms-0.5">
                 <T context="project actions menu">Actions</T>
               </span>
               <ChevronDownIcon className="size-3.5" />
@@ -483,8 +483,8 @@ export default function ProjectScriptsControl({
             <PlusIcon className="size-3.5" />
             <span
               className={cn(
-                "sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5",
-                isPanel && cn("not-sr-only ml-0.5", THREAD_DETAILS_PANEL_LABEL_CLASS),
+                "sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ms-0.5",
+                isPanel && cn("not-sr-only ms-0.5", THREAD_DETAILS_PANEL_LABEL_CLASS),
               )}
             >
               {isPanel ? gt("Add folder script") : gt("Add action")}

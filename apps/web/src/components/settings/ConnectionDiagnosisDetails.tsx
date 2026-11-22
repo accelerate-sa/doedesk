@@ -184,7 +184,7 @@ export function ConnectionDiagnosisPanel({
         <p className="font-medium text-foreground">
           <T>What to try</T>
         </p>
-        <ol className="list-decimal pl-4 text-muted-foreground">
+        <ol className="list-decimal ps-4 text-muted-foreground">
           {diagnosis.steps.map((step) => (
             <li key={step}>{step}</li>
           ))}

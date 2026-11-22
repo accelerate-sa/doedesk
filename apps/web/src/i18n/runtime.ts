@@ -1,14 +1,23 @@
-import { resolveLocale } from "@t3tools/client-runtime/locales";
+import {
+  localeDirection,
+  prefersArabicLanguage,
+  resolveLocale,
+} from "@t3tools/client-runtime/locales";
 import { getTranslationsSnapshot } from "gt-react";
 
 import {
+  ensureClientSettingsHydrated,
   getClientSettings,
+  isClientSettingsHydrated,
   subscribeClientSettings,
   updateClientSettings,
 } from "../hooks/useSettings";
 import { initializeI18n } from "./initializeI18n";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./locales";
 import { setActiveLocale } from "./messages";
+
+/** Mirrored for the inline boot script in `index.html`, which runs before IPC hydration. */
+const LANGUAGE_BOOT_STORAGE_KEY = "t3code:language";
 
 type LocaleTranslations = Awaited<ReturnType<typeof getTranslationsSnapshot>>;
 
@@ -22,6 +31,45 @@ const pendingLoads = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
 let snapshot: I18nSnapshot = { locale: DEFAULT_LOCALE, translations: { ...loadedTranslations } };
 let requestedLocale = DEFAULT_LOCALE;
+
+function getPreferredSystemLanguages(): ReadonlyArray<string> {
+  if (typeof window !== "undefined") {
+    const desktopLanguages = window.desktopBridge?.getPreferredSystemLanguages?.() ?? [];
+    if (desktopLanguages.length > 0) return desktopLanguages;
+  }
+  return typeof navigator !== "undefined" ? navigator.languages : [];
+}
+
+function mirrorBootLanguage(language: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LANGUAGE_BOOT_STORAGE_KEY, language);
+  } catch {
+    // Ignore storage quota or privacy-mode failures; client settings remain authoritative.
+  }
+}
+
+function applyDocumentLocale(locale: string): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.lang = locale;
+  document.documentElement.dir = localeDirection(locale);
+}
+
+function resolveActiveLocale(): string {
+  const settings = getClientSettings();
+  const systemLanguages = getPreferredSystemLanguages();
+  const isFreshSetup =
+    settings.onboardingCompletedAt === null && settings.onboardingProgress?.locale == null;
+  if (
+    isFreshSetup &&
+    settings.language === DEFAULT_LOCALE &&
+    SUPPORTED_LOCALES.includes("ar") &&
+    prefersArabicLanguage(systemLanguages)
+  ) {
+    return "ar";
+  }
+  return resolveLocale(settings.language, systemLanguages, SUPPORTED_LOCALES, DEFAULT_LOCALE);
+}
 
 function loadLocale(locale: string): Promise<void> {
   if (locale in loadedTranslations) return Promise.resolve();
@@ -43,28 +91,31 @@ function loadLocale(locale: string): Promise<void> {
 
 function activateLocale(locale: string): void {
   if (requestedLocale !== locale) return;
+  applyDocumentLocale(locale);
   if (snapshot.locale === locale && snapshot.translations[locale] === loadedTranslations[locale]) {
     return;
   }
   snapshot = { locale, translations: { ...loadedTranslations } };
   setActiveLocale(locale);
-  document.documentElement.lang = locale;
   for (const listener of listeners) listener();
 }
 
 function applyLanguageSetting(): void {
-  // Not desktopBridge.getSystemLocale(): that is the regional/time locale, not the UI language.
-  requestedLocale = resolveLocale(
-    getClientSettings().language,
-    navigator.languages,
-    SUPPORTED_LOCALES,
-    DEFAULT_LOCALE,
-  );
-  void whenLocaleReady();
+  const settings = getClientSettings();
+  requestedLocale = resolveActiveLocale();
+  if (isClientSettingsHydrated()) {
+    const isFreshSetup =
+      settings.onboardingCompletedAt === null && settings.onboardingProgress?.locale == null;
+    if (!isFreshSetup || settings.language !== DEFAULT_LOCALE) {
+      mirrorBootLanguage(settings.language);
+    }
+  }
+  void loadLocale(requestedLocale).then(() => activateLocale(requestedLocale));
 }
 
 /** GT's own locale setters write the saved setting, which stays the only source of truth. */
 export function persistGTLocale(locale: string): void {
+  mirrorBootLanguage(locale);
   void updateClientSettings({ language: locale });
 }
 
@@ -74,10 +125,15 @@ export function startI18n(): void {
   applyLanguageSetting();
 }
 
-/** Resolves once the requested locale's translations are ready; immediate for English. */
+/** Resolves once client settings hydrate and the active locale's translations are ready. */
 export function whenLocaleReady(): Promise<void> {
-  const locale = requestedLocale;
-  return loadLocale(locale).then(() => activateLocale(locale));
+  return ensureClientSettingsHydrated()
+    .catch(() => undefined)
+    .then(() => {
+      applyLanguageSetting();
+      const locale = requestedLocale;
+      return loadLocale(locale).then(() => activateLocale(locale));
+    });
 }
 
 export function subscribeI18n(listener: () => void): () => void {
