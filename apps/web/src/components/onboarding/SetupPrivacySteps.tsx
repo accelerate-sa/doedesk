@@ -160,8 +160,8 @@ export function MaskingStep({
           selected={selected === "account"}
           title={t("Use a DoeDesk account", "استخدام حساب DoeDesk")}
           detail={t(
-            "Recommended. Text and files are checked by DoeDesk Cloud and are not stored. Sign in or create an account in the next step.",
-            "الخيار الموصى به. تفحص خدمة DoeDesk Cloud النصوص والملفات دون تخزينها. سجّل الدخول أو أنشئ حسابًا في الخطوة التالية.",
+            "Recommended. Text and files are checked on DoeDesk's server in Saudi Arabia and are not stored. Sign in or create an account in the next step.",
+            "الخيار الموصى به. يفحص خادم DoeDesk داخل المملكة النصوص والملفات دون تخزينها. سجّل الدخول أو أنشئ حسابًا في الخطوة التالية.",
           )}
           onSelect={() => onChoice("account")}
         />
