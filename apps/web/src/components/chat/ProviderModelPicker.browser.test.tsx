@@ -233,7 +233,10 @@ it("lists a model reported twice by one provider once, with contiguous jump shor
         .elements()
         .map((row) => [
           row.textContent?.match(/Model [A-Z]/)?.[0],
-          row.querySelector("kbd")?.textContent?.slice(-1),
+          row
+            .querySelector("kbd")
+            ?.textContent?.replace(/[\u2066-\u2069]/g, "")
+            .slice(-1),
         ]),
     ).toEqual([
       ["Model A", "1"],
