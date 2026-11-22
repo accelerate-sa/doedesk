@@ -2323,7 +2323,9 @@ function ScheduledTaskEditorForm({
                     setDraft((current) => ({ ...current, intervalMinutes: event.target.value }))
                   }
                 />
-                <span className="text-xs text-muted-foreground">minutes</span>
+                <span className="text-xs text-muted-foreground">
+                  {gt("minutes", { $context: "unit after the scheduled task interval" })}
+                </span>
               </div>
             )}
           </div>
