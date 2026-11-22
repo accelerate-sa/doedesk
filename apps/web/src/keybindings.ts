@@ -18,6 +18,8 @@ import {
   type ShortcutEventLike as SharedShortcutEventLike,
   type ShortcutModifierStateLike,
 } from "@t3tools/shared/keybindings";
+import { isolateLeftToRight } from "@t3tools/shared/textDirection";
+
 import { isElectron } from "./env";
 import { isEditableFocused } from "./lib/editableFocus";
 import { projectScriptIdFromCommand } from "./projectScripts";
@@ -230,10 +232,15 @@ export function formatShortcutKeyLabel(key: string): string {
   return key.slice(0, 1).toUpperCase() + key.slice(1);
 }
 
+/** Isolated left to right, so the chord keeps its order inside right-to-left text. */
 export function formatShortcutLabel(
   shortcut: KeybindingShortcut,
   platform = navigator.platform,
 ): string {
+  return isolateLeftToRight(formatShortcutChord(shortcut, platform));
+}
+
+function formatShortcutChord(shortcut: KeybindingShortcut, platform: string): string {
   const keyLabel = formatShortcutKeyLabel(shortcut.key);
   const useMetaForMod = isMacPlatform(platform);
   const showMeta = shortcut.metaKey || (shortcut.modKey && useMetaForMod);

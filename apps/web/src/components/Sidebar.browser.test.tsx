@@ -13,6 +13,7 @@ import {
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { isMacPlatform } from "@t3tools/shared/keybindings";
+import { isolateLeftToRight as ltr } from "@t3tools/shared/textDirection";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
@@ -173,9 +174,9 @@ describe("sidebar numbered jumps", () => {
     await expect.element(draftRow).toBeInTheDocument();
     await expect.element(screen.getByText("Thread 0").first()).toBeInTheDocument();
     await userEvent.keyboard("{Control>}");
-    await expect.element(screen.getByText("Ctrl+1")).toBeVisible();
-    await expect.element(draftRow.getByText("Ctrl+1")).toBeVisible();
-    await expect.element(screen.getByText("Ctrl+2")).toBeVisible();
+    await expect.element(screen.getByText(ltr("Ctrl+1"))).toBeVisible();
+    await expect.element(draftRow.getByText(ltr("Ctrl+1"))).toBeVisible();
+    await expect.element(screen.getByText(ltr("Ctrl+2"))).toBeVisible();
     await userEvent.keyboard("{/Control}");
 
     // Previous thread from the open thread steps up to the draft above it.

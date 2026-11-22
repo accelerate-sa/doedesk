@@ -4,6 +4,7 @@ import {
   compileResolvedKeybindingsConfig,
   parseKeybindingShortcut,
 } from "@t3tools/shared/keybindings";
+import { isolateLeftToRight as ltr } from "@t3tools/shared/textDirection";
 
 import { resolveShortcutCommand } from "../../keybindings";
 
@@ -97,9 +98,9 @@ describe("KeybindingsSettings.logic", () => {
       const binding = compileResolvedKeybindingsConfig([{ command, key: "mod+enter" }]);
       const labels = (mode: "enter" | "mod-enter" | "mod-enter-multiline") =>
         buildKeybindingRows(binding, "Win32", mode)[0]?.previewLabels;
-      expect(labels("enter")).toEqual(["Ctrl+Enter"]);
-      expect(labels("mod-enter")).toEqual(["Ctrl+Shift+Enter"]);
-      expect(labels("mod-enter-multiline")).toEqual(["Ctrl+Enter", "Ctrl+Shift+Enter"]);
+      expect(labels("enter")).toEqual([ltr("Ctrl+Enter")]);
+      expect(labels("mod-enter")).toEqual([ltr("Ctrl+Shift+Enter")]);
+      expect(labels("mod-enter-multiline")).toEqual([ltr("Ctrl+Enter"), ltr("Ctrl+Shift+Enter")]);
     }
     const shiftedBindings = compileResolvedKeybindingsConfig([
       { command: "chat.new", key: "mod+shift+enter" },

@@ -620,7 +620,7 @@ export function OwnServiceForm({
       />
       <div className="mt-1">
         <Button type="submit" disabled={busy}>
-          {busy ? gt("Checking…") : gt("Connect")}
+          {busy ? gt("Checking…", { $context: "verifying the sign-in code" }) : gt("Connect")}
         </Button>
       </div>
     </form>

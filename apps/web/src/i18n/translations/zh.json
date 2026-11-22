@@ -6150,6 +6150,7 @@
   "724334404586e113": "Could not save the program path for {agent}",
   "463b987e6d956447": "Installed AI programs",
   "f21a6ca69dc1bf35": "DoeDesk checked your system PATH, standard install folders, and installed apps for AI programs.",
+  "8101f5975f7f5246": "Checking…",
   "96d99967005dbe48": "Could not finish checking for programs. Try again.",
   "ebfd4c0b1d818d33": "No AI programs were found in the usual locations.",
   "6348f8f0436f2973": "Search other drives",
@@ -6178,7 +6179,7 @@
   "422316643cdc8472": "Stopped at the folder limit; some folders were skipped.",
   "4de9b78c356a45fc": "The drive search stopped due to an error. Try again.",
   "614e5ad58a795fb5": "Stop",
-  "ee3e8bd8b7918aec": "搜索",
+  "ec596eeb1fc607da": "Search",
   "7c937dd45db5105a": "{count, plural, one {Search {count} drive} other {Search {count} drives}}",
   "76a34fd1d30bea1d": "Could not check that path. Try again.",
   "7ac3871a3a093ed4": "Enter the full path to the program or its folder.",
@@ -6202,8 +6203,9 @@
   "0064ac6e341f9842": "Accept the updated Terms of Use to continue.",
   "d8b1c4c9f5f01042": "Terms of Use accepted",
   "a2e5ff36cca30aa1": "To switch accounts, sign out in Settings → Privacy.",
-  "7dcb88d47fbe469a": [
-    "Signed in as ",
+  "d4bbb5e94fff4da3": [
+    "Signed in as",
+    " ",
     {
       "t": "bdi",
       "i": 1,
@@ -6309,8 +6311,9 @@
     },
     "."
   ],
-  "14282ef36ce1ff26": [
-    "Checking for AI tools on ",
+  "f76cfb8ab70798e5": [
+    "Checking for AI tools on",
+    " ",
     {
       "t": "bdi",
       "i": 1,
@@ -6593,6 +6596,7 @@
   "0b4d64bbaf4e609d": "Service address",
   "8f6976097de6cd25": "Access token (optional)",
   "4e388dbb31065fa0": "访问 token",
+  "da3cfbe032cbac1c": "Checking…",
   "8c4f4ec4de08ed72": "连接",
   "b45151a781c66845": "What field do you work in?",
   "5a01fbc84ffb9263": "Describe your field",
@@ -10544,6 +10548,7 @@
   ],
   "a8c2b705bbb43a80": "没有匹配结果。",
   "425f7ce2f24cb248": "设置分类",
+  "ee3e8bd8b7918aec": "搜索",
   "858561b97fdd72f2": "搜索设置",
   "fed2d32de2b0c566": "清除设置搜索",
   "833639e235c97484": "设置搜索结果",

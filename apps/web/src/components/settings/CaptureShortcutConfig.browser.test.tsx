@@ -3,6 +3,7 @@ import {
   type DesktopCaptureConfigPreview,
   type DesktopSnapShotState,
 } from "@t3tools/contracts";
+import { isolateLeftToRight as ltr } from "@t3tools/shared/textDirection";
 import { userEvent } from "vite-plus/test/browser";
 import { expect, it, vi } from "vite-plus/test";
 
@@ -89,13 +90,13 @@ it.each(["niri", "hyprland"] as const)(
     using _env = setup();
     await using screen = await renderConfig(desktop);
     expect(screen.recorder().getAttribute("aria-label")).toBe(
-      "Record snapshot shortcut, currently Ctrl+Shift+2",
+      `Record snapshot shortcut, currently ${ltr("Ctrl+Shift+2")}`,
     );
     expect(screen.advanced().textContent).toContain("manual binding");
     expect(bridge.previewSnapShotConfig).not.toHaveBeenCalled();
     await screen.click("Review changes");
     expect(screen.recorder().getAttribute("aria-label")).toBe(
-      "Record snapshot shortcut, currently Ctrl+Shift+2",
+      `Record snapshot shortcut, currently ${ltr("Ctrl+Shift+2")}`,
     );
     expect(bridge.applySnapShotConfig).not.toHaveBeenCalled();
     expect(screen.diff()).not.toBeNull();

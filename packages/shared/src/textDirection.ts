@@ -23,6 +23,14 @@ function majority(
   return rtl > ltr ? "rtl" : "ltr";
 }
 
+/**
+ * Wraps text that must read left to right (key chords, paths, ids) in a Unicode isolate, so
+ * right-to-left text around it cannot reorder its neutral glyphs: "⌘P" would show as "P⌘".
+ */
+export function isolateLeftToRight(text: string): string {
+  return `\u2066${text}\u2069`;
+}
+
 export function hasRightToLeftLetter(text: string): boolean {
   return RTL_LETTER.test(text);
 }

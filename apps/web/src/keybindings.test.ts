@@ -4,6 +4,7 @@ import {
   DEFAULT_RESOLVED_KEYBINDINGS,
   mergeWithDefaultKeybindings,
 } from "@t3tools/shared/keybindings";
+import { isolateLeftToRight as ltr } from "@t3tools/shared/textDirection";
 
 import {
   type KeybindingCommand,
@@ -303,6 +304,14 @@ describe("split/new/close terminal shortcuts", () => {
 });
 
 describe("shortcutLabelForCommand", () => {
+  it("isolates the chord so right-to-left text around it cannot reverse it", () => {
+    const bindings = compile([{ shortcut: modShortcut("p"), command: "commandPalette.toggle" }]);
+    assert.strictEqual(
+      shortcutLabelForCommand(bindings, "commandPalette.toggle", "MacIntel"),
+      "\u2066⌘P\u2069",
+    );
+  });
+
   it("returns null for commands shadowed by a later conflicting shortcut", () => {
     const bindings = compile([
       { shortcut: modShortcut("1", { shiftKey: true }), command: "thread.jump.1" },
@@ -310,7 +319,7 @@ describe("shortcutLabelForCommand", () => {
     ]);
 
     assert.isNull(shortcutLabelForCommand(bindings, "thread.jump.1", "MacIntel"));
-    assert.strictEqual(shortcutLabelForCommand(bindings, "thread.jump.7", "MacIntel"), "⇧⌘1");
+    assert.strictEqual(shortcutLabelForCommand(bindings, "thread.jump.7", "MacIntel"), ltr("⇧⌘1"));
   });
 
   it("respects when-context while resolving labels", () => {
@@ -328,7 +337,7 @@ describe("shortcutLabelForCommand", () => {
         platform: "Linux",
         context: { terminalFocus: false },
       }),
-      "Ctrl+D",
+      ltr("Ctrl+D"),
     );
     assert.isNull(
       shortcutLabelForCommand(bindings, "diff.toggle", {
@@ -341,7 +350,7 @@ describe("shortcutLabelForCommand", () => {
         platform: "Linux",
         context: { terminalFocus: true },
       }),
-      "Ctrl+D",
+      ltr("Ctrl+D"),
     );
   });
 });

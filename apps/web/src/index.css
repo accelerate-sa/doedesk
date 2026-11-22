@@ -2319,8 +2319,16 @@ diffs-container {
   unicode-bidi: isolate;
 }
 
-html[dir="rtl"] code {
+/* Code, key chords and sample output read left to right inside Arabic text. Monospace runs
+   (paths, ids, commands, stand-ins) take their direction from their own first letter, so a
+   leading "--" or "./" stays put without flipping the layout of flex rows. */
+html[dir="rtl"] :is(code, kbd, samp) {
+  direction: ltr;
   unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .font-mono {
+  unicode-bidi: plaintext;
 }
 
 .chat-markdown.user-message-markdown :not(pre) > code {

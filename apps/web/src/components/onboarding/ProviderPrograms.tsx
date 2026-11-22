@@ -146,7 +146,7 @@ export function ProviderPrograms({
       {automatic === null && !scanFailed ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner size="sm" tone="muted" />
-          {gt("Checking…")}
+          {gt("Checking…", { $context: "looking for AI programs on this computer" })}
         </p>
       ) : null}
       {scanFailed ? (
@@ -440,7 +440,7 @@ function DriveSearch({
             onClick={() => onSearch(tickedOffered.map((volume) => volume.path))}
           >
             {tickedOffered.length <= 1
-              ? gt("Search")
+              ? gt("Search", { $context: "button that starts the drive search" })
               : gt("{count, plural, one {Search {count} drive} other {Search {count} drives}}", {
                   count: tickedOffered.length,
                 })}

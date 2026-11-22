@@ -211,6 +211,7 @@ function CommandItem({
 function CommandShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
   return (
     <kbd
+      dir="ltr"
       className={cn(
         "ms-auto font-medium font-sans text-secondary-label text-xs tracking-widest",
         className,
