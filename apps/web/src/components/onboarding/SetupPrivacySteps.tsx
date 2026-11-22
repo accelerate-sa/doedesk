@@ -4,12 +4,12 @@ import type {
   PrivacyStatus,
   UsageDataStatus,
 } from "@t3tools/contracts";
+import { T, useGT, Var } from "gt-react";
 import { CheckIcon } from "lucide-react";
 import { useState } from "react";
 
 import { NOT_WORKED, UNREACHABLE, usePrivacyMessage } from "~/doedesk/privacyMessages";
 import type { MaskingChoice, SetupLocale } from "~/onboarding/onboardingSteps.logic";
-import { useSetupText } from "~/onboarding/setupLocale";
 import {
   configurePrivacy,
   isPrivacyDecided,
@@ -77,20 +77,15 @@ export function LanguageStep({
   readonly locale: SetupLocale;
   readonly onLocale: (locale: SetupLocale) => void;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
   return (
     <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
-        {t(
-          "Choose a language for setup. It takes a few steps, and you can go back at any time.",
-          "اختر لغة الإعداد. لن يستغرق الأمر سوى خطوات قليلة، ويمكنك الرجوع إلى أي خطوة متى شئت.",
+        {gt(
+          "Choose your language for DoeDesk. Setup takes a few steps, and you can change this later in Settings.",
         )}
       </p>
-      <div
-        role="radiogroup"
-        aria-label={t("Setup language", "لغة الإعداد")}
-        className="grid gap-2 sm:max-w-sm"
-      >
+      <div role="radiogroup" aria-label={gt("App language")} className="grid gap-2 sm:max-w-sm">
         <ChoiceCard
           selected={locale === "en"}
           title="English"
@@ -122,7 +117,7 @@ export function MaskingStep({
   readonly choice: MaskingChoice | null;
   readonly onChoice: (choice: MaskingChoice) => void;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
   const m = usePrivacyMessage();
   const options = useSignInOptions();
   const [busy, setBusy] = useState(false);
@@ -151,36 +146,29 @@ export function MaskingStep({
 
   return (
     <div className="grid gap-4">
-      <div
-        role="radiogroup"
-        aria-label={t("Detection service", "خدمة الكشف")}
-        className="grid gap-2"
-      >
+      <div role="radiogroup" aria-label={gt("Detection service")} className="grid gap-2">
         <ChoiceCard
           selected={selected === "account"}
-          title={t("Use a DoeDesk account", "استخدام حساب DoeDesk")}
-          detail={t(
+          title={gt("Use a DoeDesk account")}
+          detail={gt(
             "Recommended. Text and files are checked on DoeDesk's server in Saudi Arabia and are not stored. Sign in or create an account in the next step.",
-            "الخيار الموصى به. يفحص خادم DoeDesk داخل المملكة النصوص والملفات دون تخزينها. سجّل الدخول أو أنشئ حسابًا في الخطوة التالية.",
           )}
           onSelect={() => onChoice("account")}
         />
         <ChoiceCard
           selected={selected === "ownService"}
-          title={t("Use my own detection service", "استخدام خدمة كشف خاصة بي")}
-          detail={t(
+          title={gt("Use my own detection service")}
+          detail={gt(
             "For teams or organizations that host their own detection server. Text and files are sent only to the address you enter.",
-            "للفرق والجهات التي تشغّل خادم الكشف الخاص بها. يقتصر إرسال النصوص والملفات للفحص على العنوان الذي تحدده.",
           )}
           onSelect={() => onChoice("ownService")}
         />
         {refused ? (
           <ChoiceCard
             selected={selected === "off"}
-            title={t("Continue without masking", "المتابعة دون إخفاء البيانات")}
-            detail={t(
+            title={gt("Continue without masking")}
+            detail={gt(
               "Everything you send, including messages and files, reaches the AI as written.",
-              "تصل جميع رسائلك وملفاتك إلى الذكاء الاصطناعي كما هي، دون إخفاء أي بيانات.",
             )}
             onSelect={() => onChoice("off")}
           />
@@ -190,7 +178,7 @@ export function MaskingStep({
       {selected === "off" ? (
         <div>
           <Button size="sm" disabled={busy} onClick={() => void configure({ mode: "off" })}>
-            {t("Use DoeDesk without masking", "استخدام DoeDesk دون إخفاء البيانات")}
+            {gt("Use DoeDesk without masking")}
           </Button>
         </div>
       ) : null}
@@ -204,17 +192,14 @@ export function MaskingStep({
 }
 
 function PrivacyUnavailable() {
-  const t = useSetupText();
+  const gt = useGT();
   return (
     <div className="flex flex-wrap items-center gap-3">
       <p className="text-sm text-destructive">
-        {t(
-          "Could not reach the DoeDesk service on this computer.",
-          "تعذّر الاتصال بخدمة DoeDesk على هذا الجهاز.",
-        )}
+        {gt("Could not reach the DoeDesk service on this computer.")}
       </p>
       <Button variant="outline" size="sm" onClick={refreshPrivacyStatus}>
-        {t("Try again", "أعد المحاولة")}
+        {gt("Try again")}
       </Button>
     </div>
   );
@@ -225,7 +210,7 @@ function PrivacyUnavailable() {
  * going back, so once signed in the step shows where the account stands instead of the form.
  */
 export function AccountStep({ status }: { readonly status: PrivacyStatus | null }) {
-  const t = useSetupText();
+  const gt = useGT();
   const options = useSignInOptions();
   if (status === null) return <PrivacyUnavailable />;
   if (status.mode !== "cloud") {
@@ -244,27 +229,26 @@ export function AccountStep({ status }: { readonly status: PrivacyStatus | null 
       <p className="flex items-center gap-2 text-sm text-foreground">
         <CheckIcon className="size-4 shrink-0 text-success-foreground" />
         <span>
-          {t("Signed in as", "سجّلت الدخول بحساب")} <bdi>{status.accountLabel ?? ""}</bdi>
+          <T>
+            Signed in as{" "}
+            <bdi>
+              <Var>{status.accountLabel ?? ""}</Var>
+            </bdi>
+          </T>
         </span>
       </p>
       {outstanding ? (
         <p className="text-sm text-muted-foreground">
-          {t(
-            "Accept the updated Terms of Use to continue.",
-            "وافق على شروط الاستخدام المحدّثة للمتابعة.",
-          )}
+          {gt("Accept the updated Terms of Use to continue.")}
         </p>
       ) : (
         <p className="flex items-center gap-2 text-sm text-foreground">
           <CheckIcon className="size-4 shrink-0 text-success-foreground" />
-          {t("Terms of Use accepted", "وافقت على شروط الاستخدام")}
+          {gt("Terms of Use accepted")}
         </p>
       )}
       <p className="text-xs text-muted-foreground">
-        {t(
-          "To switch accounts, sign out in Settings → Privacy.",
-          "للتبديل إلى حساب آخر، سجّل الخروج من الإعدادات، قسم الخصوصية.",
-        )}
+        {gt("To switch accounts, sign out in Settings → Privacy.")}
       </p>
     </div>
   );

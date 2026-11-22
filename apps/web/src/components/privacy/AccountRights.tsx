@@ -152,7 +152,9 @@ export function AccountRightsSection({ status }: { readonly status: PrivacyStatu
           <SettingsRow
             {...searchableSetting("account-answers")}
             title={gt("Your answers")}
-            description={answersSummary(status.profile ?? null) ?? gt("DoeDesk Cloud stores none.")}
+            description={
+              answersSummary(status.profile ?? null, m) ?? gt("DoeDesk Cloud stores none.")
+            }
             control={
               <Button size="sm" variant="outline" onClick={() => setEditingAnswers(true)}>
                 {gt("Change")}

@@ -7,7 +7,9 @@ import {
   type ServerProvider,
   type ServerSettings,
 } from "@t3tools/contracts";
+import { isRtlLocale } from "@t3tools/client-runtime/locales";
 import { resolveProviderInstanceDisplayName as agentName } from "@t3tools/client-runtime/state/provider-instance-display";
+import { useGT, useLocale } from "gt-react";
 import { CheckIcon, FolderSearchIcon, HardDriveIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
@@ -18,7 +20,6 @@ import {
   type ProviderPrograms,
   volumesToOffer,
 } from "../../onboarding/providerPrograms.logic";
-import { useSetupArabic, useSetupText } from "../../onboarding/setupLocale";
 import { cn } from "../../lib/utils";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
@@ -32,21 +33,6 @@ import { toastManager } from "../ui/toast";
 
 const COMMAND_OPTIONS = { reportFailure: false, reportDefect: false } as const;
 const SEARCH_LIMIT_MINUTES = 2;
-const ARABIC_PLURAL_RULES = new Intl.PluralRules("ar");
-
-const formatArabicDrives = (count: number) => {
-  const formatted = count.toLocaleString("ar");
-  switch (ARABIC_PLURAL_RULES.select(count)) {
-    case "two":
-      return "قرصين";
-    case "few":
-      return `${formatted} أقراص`;
-    case "many":
-      return `${formatted} قرصًا`;
-    default:
-      return `${formatted} قرص`;
-  }
-};
 
 /**
  * Where each AI's program is on this computer. The usual places are checked on their own; other
@@ -63,7 +49,7 @@ export function ProviderPrograms({
   readonly providers: ReadonlyArray<ServerProvider>;
   readonly settings: Pick<ServerSettings, "providerInstances"> | null | undefined;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
   const canManage = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const scan = useAtomCommand(serverEnvironment.scanProviderPrograms, COMMAND_OPTIONS);
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, COMMAND_OPTIONS);
@@ -120,10 +106,7 @@ export function ProviderPrograms({
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: t(
-          `Could not save the program path for ${agentName(provider)}`,
-          `تعذّر حفظ مسار برنامج ${agentName(provider)}`,
-        ),
+        title: gt("Could not save the program path for {agent}", { agent: agentName(provider) }),
       });
       return;
     }
@@ -141,9 +124,7 @@ export function ProviderPrograms({
   return (
     <section className="mt-6 grid grid-cols-1 gap-3 border-t border-border/60 pt-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-medium text-foreground">
-          {t("Installed AI programs", "برامج الذكاء الاصطناعي المثبّتة")}
-        </h3>
+        <h3 className="text-sm font-medium text-foreground">{gt("Installed AI programs")}</h3>
         <Button
           size="xs"
           variant="ghost-muted"
@@ -154,35 +135,28 @@ export function ProviderPrograms({
             void runScan();
           }}
         >
-          {t("Check again", "إعادة الفحص")}
+          {gt("Check again")}
         </Button>
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        {t(
+        {gt(
           "DoeDesk checked your system PATH, standard install folders, and installed apps for AI programs.",
-          "بحث DoeDesk في مسارات النظام المعتادة ومجلدات التثبيت والتطبيقات عن برامج الذكاء الاصطناعي.",
         )}
       </p>
       {automatic === null && !scanFailed ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner size="sm" tone="muted" />
-          {t("Checking…", "جارٍ البحث…")}
+          {gt("Checking…")}
         </p>
       ) : null}
       {scanFailed ? (
         <p role="alert" className="text-sm text-destructive">
-          {t(
-            "Could not finish checking for programs. Try again.",
-            "تعذّر إكمال الفحص عن البرامج. أعد المحاولة.",
-          )}
+          {gt("Could not finish checking for programs. Try again.")}
         </p>
       ) : null}
       {automatic !== null && groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {t(
-            "No AI programs were found in the usual locations.",
-            "لم يجد DoeDesk برامج ذكاء اصطناعي في المواقع المعتادة.",
-          )}
+          {gt("No AI programs were found in the usual locations.")}
         </p>
       ) : null}
       {groups.map((group) => (
@@ -201,7 +175,7 @@ export function ProviderPrograms({
           onClick={() => setDrivesOpen((open) => !open)}
         >
           <HardDriveIcon className="size-3.5" />
-          {t("Search other drives", "البحث في أقراص أخرى")}
+          {gt("Search other drives")}
         </Button>
         <Button
           size="xs"
@@ -210,7 +184,7 @@ export function ProviderPrograms({
           onClick={() => setManualOpen((open) => !open)}
         >
           <FolderSearchIcon className="size-3.5" />
-          {t("Choose a program manually", "تحديد برنامج يدويًا")}
+          {gt("Choose a program manually")}
         </Button>
       </div>
       {drivesOpen ? (
@@ -241,18 +215,18 @@ export function ProviderPrograms({
   );
 }
 
-function sourceLabel(find: ProviderFind, t: ReturnType<typeof useSetupText>): string {
+function sourceLabel(find: ProviderFind, gt: ReturnType<typeof useGT>): string {
   switch (find.source) {
     case "path":
-      return t("System PATH", "مسار النظام (PATH)");
+      return gt("System PATH");
     case "knownLocation":
-      return t("Install folder", "مجلد تثبيت");
+      return gt("Install folder");
     case "appBundle":
-      return t(`Inside ${find.app ?? "an app"}`, `داخل ${find.app ?? "تطبيق"}`);
+      return find.app ? gt("Inside {app}", { app: find.app }) : gt("Inside an app");
     case "volume":
-      return t("Another drive", "قرص آخر");
+      return gt("Another drive");
     case "manual":
-      return t("Selected manually", "محدّد يدويًا");
+      return gt("Selected manually");
   }
 }
 
@@ -265,9 +239,9 @@ function ProgramGroup({
   readonly saving: string | null;
   readonly onChoose: (path: string) => void;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
   // Paths run left to right in both languages, but sit on the side the page reads from.
-  const arabic = useSetupArabic();
+  const rtl = isRtlLocale(useLocale());
   return (
     <div className="grid grid-cols-1 gap-1">
       <p className="text-sm text-foreground">{agentName(group.provider)}</p>
@@ -285,25 +259,21 @@ function ProgramGroup({
                   dir="ltr"
                   className={cn(
                     "truncate font-mono text-xs text-foreground",
-                    arabic ? "text-right" : "text-left",
+                    rtl ? "text-right" : "text-left",
                   )}
                 >
                   {find.path}
                 </p>
                 <p className="text-2xs text-muted-foreground">
-                  {sourceLabel(find, t)}
+                  {sourceLabel(find, gt)}
                   {" · "}
-                  {find.version === null ? (
-                    t("version unknown", "الإصدار غير معروف")
-                  ) : (
-                    <bdi>{find.version}</bdi>
-                  )}
+                  {find.version === null ? gt("version unknown") : <bdi>{find.version}</bdi>}
                 </p>
               </div>
               {inUse ? (
                 <span className="inline-flex shrink-0 items-center gap-1 text-xs text-success-foreground">
                   <CheckIcon className="size-3.5" />
-                  {t("In use", "قيد الاستخدام")}
+                  {gt("In use")}
                 </span>
               ) : (
                 <Button
@@ -311,13 +281,13 @@ function ProgramGroup({
                   variant="outline"
                   className="shrink-0"
                   disabled={saving !== null}
-                  aria-label={t(
-                    `Use ${find.path} for ${agentName(group.provider)}`,
-                    `استخدم ${find.path} مع ${agentName(group.provider)}`,
-                  )}
+                  aria-label={gt("Use {path} for {agent}", {
+                    path: find.path,
+                    agent: agentName(group.provider),
+                  })}
                   onClick={() => onChoose(find.path)}
                 >
-                  {t("Use", "استخدم")}
+                  {gt("Use")}
                 </Button>
               )}
             </li>
@@ -346,7 +316,8 @@ function DriveSearch({
   readonly onStop: () => void;
   readonly onClose: () => void;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
+  const locale = useLocale();
   const listVolumes = useAtomCommand(serverEnvironment.listProviderVolumes, COMMAND_OPTIONS);
   const [volumes, setVolumes] = useState<ReadonlyArray<ProviderVolume> | null>(null);
   const [supported, setSupported] = useState(true);
@@ -374,33 +345,27 @@ function DriveSearch({
   return (
     <div className="grid grid-cols-1 gap-3 rounded-lg border border-border/70 p-3">
       <p className="text-xs leading-relaxed text-muted-foreground">
-        {t(
+        {gt(
           "DoeDesk checks only file and folder names on the drives you select, never the contents of your files. Everything stays on this computer.",
-          "يفحص DoeDesk أسماء الملفات والمجلدات فقط في الأقراص التي تحددها، ولا يقرأ محتوى ملفاتك أبدًا. وتبقى جميع النتائج على جهازك.",
         )}
       </p>
       {listFailed ? (
         <p role="alert" className="text-sm text-destructive">
-          {t("Could not list the drives.", "تعذّر عرض الأقراص.")}
+          {gt("Could not list the drives.")}
         </p>
       ) : volumes === null ? (
         <Spinner size="sm" tone="muted" />
       ) : !supported ? (
         <p className="text-sm text-muted-foreground">
-          {t(
+          {gt(
             "Drive search is not available on this operating system. Choose a program manually instead.",
-            "البحث في الأقراص غير متاح على نظام التشغيل هذا. يمكنك تحديد البرنامج يدويًا.",
           )}
         </p>
       ) : (
         <fieldset className="grid gap-1.5" disabled={searching}>
-          <legend className="pb-1 text-sm text-foreground">
-            {t("Select drives to search", "اختر الأقراص للبحث فيها")}
-          </legend>
+          <legend className="pb-1 text-sm text-foreground">{gt("Select drives to search")}</legend>
           {offered.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t("No other drives are connected.", "لا توجد أقراص أخرى متصلة بهذا الجهاز.")}
-            </p>
+            <p className="text-sm text-muted-foreground">{gt("No other drives are connected.")}</p>
           ) : null}
           {offered.map((volume) => (
             <label key={volume.path} className="flex items-center gap-2.5 text-sm">
@@ -419,9 +384,7 @@ function DriveSearch({
               <bdi className="text-foreground">{volume.name}</bdi>
               {volume.kind !== "local" ? (
                 <span className="text-xs text-muted-foreground">
-                  {volume.kind === "network"
-                    ? t("network drive", "قرص شبكي")
-                    : t("disk image", "صورة قرص")}
+                  {volume.kind === "network" ? gt("network drive") : gt("disk image")}
                 </span>
               ) : null}
             </label>
@@ -432,7 +395,7 @@ function DriveSearch({
                 checked={showAll}
                 onCheckedChange={(checked) => setShowAll(checked === true)}
               />
-              {t("Show network drives and disk images", "إظهار أقراص الشبكة وصور الأقراص")}
+              {gt("Show network drives and disk images")}
             </label>
           ) : null}
         </fieldset>
@@ -441,41 +404,34 @@ function DriveSearch({
         <p className="text-xs text-muted-foreground" role="status">
           {progress.state === "searching" ? (
             <>
-              {t("Searching", "جارٍ البحث في")}{" "}
+              {gt("Searching")}{" "}
               <bdi>{progress.volume?.slice(progress.volume.lastIndexOf("/") + 1) ?? ""}</bdi>
               {" · "}
             </>
           ) : null}
-          {t(
-            `Checked ${progress.foldersChecked.toLocaleString()} folders, ${progress.finds.length} found.`,
-            `تم فحص ${progress.foldersChecked.toLocaleString("ar")} مجلد، والعثور على ${progress.finds.length.toLocaleString("ar")}.`,
-          )}
+          {gt("Checked {folders} folders, {found} found.", {
+            folders: progress.foldersChecked.toLocaleString(locale),
+            found: progress.finds.length.toLocaleString(locale),
+          })}
           {progress.stoppedBy === "time"
-            ? t(
-                ` Stopped after ${SEARCH_LIMIT_MINUTES} minutes; some folders were skipped.`,
-                ` توقّف البحث بعد دقيقتين، ولم يشمل بقية المجلدات.`,
-              )
+            ? ` ${gt("Stopped after {minutes} minutes; some folders were skipped.", {
+                minutes: SEARCH_LIMIT_MINUTES,
+              })}`
             : progress.stoppedBy === "folders"
-              ? t(
-                  " Stopped at the folder limit; some folders were skipped.",
-                  " توقّف البحث عند الحد الأقصى للمجلدات، ولم يشمل بقية المجلدات.",
-                )
+              ? ` ${gt("Stopped at the folder limit; some folders were skipped.")}`
               : null}
         </p>
       ) : null}
       {failed ? (
         <p role="alert" className="text-sm text-destructive">
-          {t(
-            "The drive search stopped due to an error. Try again.",
-            "توقّف البحث في الأقراص بسبب خطأ. أعد المحاولة.",
-          )}
+          {gt("The drive search stopped due to an error. Try again.")}
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
         {searching ? (
           <Button size="xs" variant="outline" onClick={onStop}>
             <Spinner size="sm" tone="muted" />
-            {t("Stop", "إيقاف")}
+            {gt("Stop")}
           </Button>
         ) : (
           <Button
@@ -484,15 +440,14 @@ function DriveSearch({
             onClick={() => onSearch(tickedOffered.map((volume) => volume.path))}
           >
             {tickedOffered.length <= 1
-              ? t("Search", "بدء البحث")
-              : t(
-                  `Search ${tickedOffered.length} drives`,
-                  `ابحث في ${formatArabicDrives(tickedOffered.length)}`,
-                )}
+              ? gt("Search")
+              : gt("{count, plural, one {Search {count} drive} other {Search {count} drives}}", {
+                  count: tickedOffered.length,
+                })}
           </Button>
         )}
         <Button size="xs" variant="ghost-muted" onClick={onClose}>
-          {t("Close", "إغلاق")}
+          {gt("Close")}
         </Button>
       </div>
     </div>
@@ -508,7 +463,7 @@ function ManualProgram({
   readonly providers: ReadonlyArray<ServerProvider>;
   readonly onFound: (find: ProviderFind) => void;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
   const inspect = useAtomCommand(serverEnvironment.inspectProviderProgram, COMMAND_OPTIONS);
   const drivers = [...new Map(providers.map((provider) => [provider.driver, provider])).values()];
   const [driver, setDriver] = useState(drivers[0]?.driver ?? null);
@@ -525,7 +480,7 @@ function ManualProgram({
     const result = await inspect({ environmentId, input: { driver, path: value.trim() } });
     setBusy(false);
     if (result._tag === "Failure") {
-      setProblem(t("Could not check that path. Try again.", "تعذّر فحص هذا المسار. أعد المحاولة."));
+      setProblem(gt("Could not check that path. Try again."));
       return;
     }
     if (result.value.ok) {
@@ -535,16 +490,10 @@ function ManualProgram({
     }
     setProblem(
       result.value.reason === "notAbsolute"
-        ? t(
-            "Enter the full path to the program or its folder.",
-            "أدخل المسار الكامل للبرنامج أو المجلد.",
-          )
+        ? gt("Enter the full path to the program or its folder.")
         : result.value.reason === "notFound"
-          ? t(
-              "No runnable program was found at that path.",
-              "لم نجد برنامجًا قابلًا للتشغيل في هذا المسار.",
-            )
-          : t("That file is not an executable program.", "هذا الملف ليس برنامجًا قابلًا للتشغيل."),
+          ? gt("No runnable program was found at that path.")
+          : gt("That file is not an executable program."),
     );
   };
 
@@ -558,7 +507,7 @@ function ManualProgram({
       }}
     >
       <label htmlFor={selectId} className="text-sm text-foreground">
-        {t("AI tool", "أداة الذكاء الاصطناعي")}
+        {gt("AI tool")}
       </label>
       <select
         id={selectId}
@@ -577,13 +526,13 @@ function ManualProgram({
       <Input
         dir="ltr"
         placeholder="/Volumes/work/tools/bin/claude"
-        aria-label={t("Program path", "مسار البرنامج")}
+        aria-label={gt("Program path")}
         value={path}
         onChange={(event) => setPath(event.target.value)}
       />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="xs" disabled={busy || path.trim().length === 0}>
-          {t("Check", "تحقّق")}
+          {gt("Check")}
         </Button>
         {canPick ? (
           <Button
@@ -599,7 +548,7 @@ function ManualProgram({
                 })
             }
           >
-            {t("Choose a folder…", "اختر مجلدًا…")}
+            {gt("Choose a folder…")}
           </Button>
         ) : null}
       </div>

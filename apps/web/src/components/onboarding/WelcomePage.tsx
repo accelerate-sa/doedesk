@@ -19,7 +19,7 @@ import {
   type OnboardingStep,
   type SetupLocale,
 } from "~/onboarding/onboardingSteps.logic";
-import { SetupLocaleContext, useSetupArabic, useSetupText } from "~/onboarding/setupLocale";
+import { InSetupContext } from "~/onboarding/setupLocale";
 import { useAtomValue } from "@effect/atom-react";
 import type {
   AgentSessionProjectCandidate,
@@ -153,39 +153,6 @@ import {
 
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
 const SCAN_LIMIT_MESSAGE = msg("Scan limit reached. Some folders or chats may not be listed.");
-const SCAN_LIMIT_MESSAGE_AR = "وصل الفحص إلى الحد الأقصى، وقد لا تظهر جميع المجلدات أو المحادثات.";
-
-const ARABIC_PLURAL_RULES = new Intl.PluralRules("ar");
-
-const formatArabicFolders = (count: number, nominative = false) => {
-  switch (ARABIC_PLURAL_RULES.select(count)) {
-    case "one":
-      return "مجلد واحد";
-    case "two":
-      return nominative ? "مجلدان" : "مجلدين";
-    case "few":
-      return `${count} مجلدات`;
-    case "many":
-      return `${count} مجلدًا`;
-    default:
-      return `${count} مجلد`;
-  }
-};
-
-const formatArabicChats = (count: number) => {
-  switch (ARABIC_PLURAL_RULES.select(count)) {
-    case "one":
-      return "محادثة واحدة";
-    case "two":
-      return "محادثتين";
-    case "few":
-      return `${count} محادثات`;
-    case "many":
-      return `${count} محادثة`;
-    default:
-      return `${count} محادثة`;
-  }
-};
 
 /** Stored progress for first-run setup, read and written through the client settings. */
 function useOnboardingState() {
@@ -247,11 +214,11 @@ export function WelcomePage({
     setImportSelectionState(next);
     storeSelection(next);
   };
+  const appLocale = useLocale();
   const [consentLocale, setConsentLocale] = useConsentLocale();
   const [state, saveState] = useOnboardingState();
-  // Arabic when the system's language is, until the person picks on the first step.
-  const locale: SetupLocale = state.locale ?? consentLocale;
-  const t = (english: string, arabic: string) => (locale === "ar" ? arabic : english);
+  // Arabic when the app or system started in Arabic, until the person picks on the first step.
+  const locale: SetupLocale = state.locale ?? (appLocale === "ar" ? "ar" : consentLocale);
   const [isImporting, setIsImporting] = useState(false);
   // True from Start until the landing; leaving earlier would drop the import or the landing.
   const holdPageRef = useRef(false);
@@ -261,11 +228,8 @@ export function WelcomePage({
       toastManager.add({
         id: "welcome-finishing",
         type: "info",
-        title: t(gt("Finishing setup"), "جارٍ إنهاء الإعداد"),
-        description: t(
-          gt("Wait a moment while DoeDesk saves your setup."),
-          "لحظة واحدة بينما يحفظ DoeDesk إعداداتك.",
-        ),
+        title: gt("Finishing setup"),
+        description: gt("Wait a moment while DoeDesk saves your setup."),
       });
       return true;
     },
@@ -301,21 +265,18 @@ export function WelcomePage({
         if (importWarning) {
           toastManager.add({
             type: "warning",
-            title: t(
-              gt("Some chat history could not be imported"),
-              "تعذّر استيراد جزء من سجل المحادثات",
-            ),
+            title: gt("Some chat history could not be imported"),
             description: importWarning,
             timeout: 0,
           });
         } else if (importedThreadCount > 0) {
           toastManager.add({
             type: "success",
-            title: t(
-              gt("{count, plural, one {Imported {count} chat} other {Imported {count} chats}}", {
+            title: gt(
+              "{count, plural, one {Imported {count} chat} other {Imported {count} chats}}",
+              {
                 count: importedThreadCount,
-              }),
-              `تم استيراد ${formatArabicChats(importedThreadCount)}`,
+              },
             ),
           });
         }
@@ -325,11 +286,8 @@ export function WelcomePage({
         holdPageRef.current = false;
         const errorToast = {
           type: "error",
-          title: t(gt("Could not finish setup"), "تعذّر إنهاء الإعداد"),
-          description: t(
-            gt("DoeDesk could not save your settings. Try again."),
-            "تعذّر حفظ إعداداتك. أعد المحاولة.",
-          ),
+          title: gt("Could not finish setup"),
+          description: gt("DoeDesk could not save your settings. Try again."),
         } as const;
         if (completionErrorToastIdRef.current === null) {
           completionErrorToastIdRef.current = toastManager.add(errorToast);
@@ -353,7 +311,6 @@ export function WelcomePage({
     isImporting,
     setIsImporting,
     holdPageRef,
-    locale,
     onDone: finish,
   });
   // Without import permission, starting simply skips the projects.
@@ -428,29 +385,44 @@ export function WelcomePage({
       return;
     }
     const base = view.step === "welcome" ? { ...state, locale } : state;
-    saveState(goForward(base, facts, options));
+    const nextState = goForward(base, facts, options);
+    if (view.step === "welcome") {
+      // Lock the chosen (or Arabic-OS default) language into app settings for all later launches.
+      void updateClientSettings({
+        language: locale,
+        onboardingProgress: {
+          step: nextState.step,
+          seen: [...nextState.seen],
+          locale: nextState.locale,
+          masking: nextState.masking,
+        },
+      }).catch(() => undefined);
+    } else {
+      saveState(nextState);
+    }
   };
 
   const chooseLocale = (next: SetupLocale) => {
     setConsentLocale(next);
-    saveState({ ...state, locale: next });
+    void updateClientSettings({
+      language: next,
+      onboardingProgress: {
+        step: state.step,
+        seen: [...state.seen],
+        locale: next,
+        masking: state.masking,
+      },
+    }).catch(() => undefined);
   };
 
   return (
-    <SetupLocaleContext value={locale}>
+    <InSetupContext value={true}>
       <SidebarInset
         {...workspaceAreaProps("home", 1, "Welcome")}
         role="main"
         className="h-dvh min-h-0 overflow-hidden overscroll-y-none"
       >
-        <div
-          dir={locale === "ar" ? "rtl" : "ltr"}
-          lang={locale}
-          className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col bg-background",
-            locale === "ar" && "font-reading",
-          )}
-        >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
           {/* The desktop window only moves where CSS opts in, so keep a titlebar strip. */}
           {isElectron ? <WorkspacePageHeader electron /> : null}
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-both">
@@ -510,18 +482,15 @@ export function WelcomePage({
                 startLabel={
                   isImporting
                     ? selected.length > 0
-                      ? t(gt("Importing…"), "جارٍ الاستيراد…")
-                      : t(gt("Starting…"), "جارٍ البدء…")
+                      ? gt("Importing…")
+                      : gt("Starting…")
                     : newCount > 0
-                      ? t(
-                          gt(
-                            "{count, plural, one {Import {count} folder and start} other {Import {count} folders and start}}",
-                            { count: newCount },
-                          ),
-                          `استيراد ${formatArabicFolders(newCount)} والبدء`,
+                      ? gt(
+                          "{count, plural, one {Import {count} folder and start} other {Import {count} folders and start}}",
+                          { count: newCount },
                         )
                       : selected.length > 0
-                        ? t(gt("Import chats and start"), "استيراد المحادثات والبدء")
+                        ? gt("Import chats and start")
                         : null
                 }
                 onBack={() => saveState(goBack(state, facts))}
@@ -533,30 +502,30 @@ export function WelcomePage({
           </div>
         </div>
       </SidebarInset>
-    </SetupLocaleContext>
+    </InSetupContext>
   );
 }
+
+const STEP_HINTS = {
+  masking: msg("Complete your choice above to continue."),
+  terms: msg("Accept the Terms of Use to continue."),
+  signIn: msg("Sign in to continue."),
+  agents: msg("Connect at least one AI tool to continue, or skip this step for now."),
+} as const;
 
 function stepHint(
   step: OnboardingStep,
   canContinue: boolean,
   facts: OnboardingFacts,
-): readonly [english: string, arabic: string] | null {
+): string | null {
   if (canContinue) return null;
   switch (step) {
     case "masking":
-      return facts.privacyMode === null
-        ? null
-        : ["Complete your choice above to continue.", "أكمل إعداد اختيارك أعلاه للمتابعة."];
+      return facts.privacyMode === null ? null : STEP_HINTS.masking;
     case "account":
-      return facts.termsOutstanding
-        ? ["Accept the Terms of Use to continue.", "وافق على شروط الاستخدام للمتابعة."]
-        : ["Sign in to continue.", "سجّل الدخول للمتابعة."];
+      return facts.termsOutstanding ? STEP_HINTS.terms : STEP_HINTS.signIn;
     case "agents":
-      return [
-        "Connect at least one AI tool to continue, or skip this step for now.",
-        "اربط أداة ذكاء اصطناعي واحدة على الأقل للمتابعة، أو يمكنك التخطي الآن.",
-      ];
+      return STEP_HINTS.agents;
     default:
       return null;
   }
@@ -564,18 +533,18 @@ function stepHint(
 
 /** "Step 2 of 6", with one bar per step. Bars fill from the reading start in either language. */
 function StepProgress({ position, count }: { readonly position: number; readonly count: number }) {
-  const t = useSetupText();
+  const gt = useGT();
   return (
     <div className="grid gap-2">
       <p className="text-xs text-muted-foreground tabular-nums">
-        {t(`Step ${position} of ${count}`, `الخطوة ${position} من ${count}`)}
+        {gt("Step {position} of {count}", { position, count })}
       </p>
       <div
         role="progressbar"
         aria-valuemin={1}
         aria-valuemax={count}
         aria-valuenow={position}
-        aria-label={t("Setup progress", "تقدّم الإعداد")}
+        aria-label={gt("Setup progress")}
         className="flex gap-1"
       >
         {Array.from({ length: count }, (_, index) => (
@@ -589,57 +558,41 @@ function StepProgress({ position, count }: { readonly position: number; readonly
   );
 }
 
-const STEP_TITLES: Readonly<
-  Record<
-    OnboardingStep,
-    readonly [title: readonly [string, string], lead: readonly [string, string] | null]
-  >
-> = {
-  welcome: [
-    ["Welcome to DoeDesk", "أهلًا بك في DoeDesk"],
-    [
-      "Use your AI tools on confidential work. DoeDesk replaces personal details it finds with stand-ins before they reach the AI, then restores them in the replies.",
-      "استخدم أدوات الذكاء الاصطناعي في أعمالك السرّية. يستبدل DoeDesk ما يرصده من بيانات شخصية برموز بديلة قبل أن تصل إلى الذكاء الاصطناعي، ثم يعيدها إلى أصلها في الردود.",
+const STEP_TITLES: Readonly<Record<OnboardingStep, readonly [title: string, lead: string | null]>> =
+  {
+    welcome: [
+      msg("Welcome to DoeDesk"),
+      msg(
+        "Use your AI tools on confidential work. DoeDesk replaces personal details it finds with stand-ins before they reach the AI, then restores them in the replies.",
+      ),
     ],
-  ],
-  masking: [
-    ["Choose how personal details are detected", "اختر طريقة كشف البيانات الشخصية"],
-    [
-      "Details with fixed formats (phone numbers, IDs, IBANs, emails) are checked on this computer. Names, organizations, and addresses need a detection service. The list linking stand-ins to your real details never leaves this computer.",
-      "يفحص DoeDesk على جهازك البيانات ذات الصيغ الثابتة مثل أرقام الجوال والهوية والآيبان والبريد الإلكتروني. أما الأسماء والجهات والعناوين فتحتاج إلى خدمة كشف. ولا تغادر القائمة التي تربط الرموز البديلة ببياناتك الحقيقية هذا الجهاز.",
+    masking: [
+      msg("Choose how personal details are detected"),
+      msg(
+        "Details with fixed formats (phone numbers, IDs, IBANs, emails) are checked on this computer. Names, organizations, and addresses need a detection service. The list linking stand-ins to your real details never leaves this computer.",
+      ),
     ],
-  ],
-  account: [
-    ["Sign in to DoeDesk", "سجّل الدخول إلى DoeDesk"],
-    [
-      "Sign in to an existing account, or create a new one below.",
-      "سجّل الدخول بحسابك الحالي، أو أنشئ حسابًا جديدًا أدناه.",
+    account: [
+      msg("Sign in to DoeDesk"),
+      msg("Sign in to an existing account, or create a new one below."),
     ],
-  ],
-  profile: [["About your work", "عن عملك"], null],
-  usageData: [["Usage data", "بيانات الاستخدام"], null],
-  agents: [
-    ["Connect an AI tool", "ربط أداة ذكاء اصطناعي"],
-    [
-      "DoeDesk works with your own AI subscription. Connect an AI tool already on this computer, or set one up below.",
-      "يعمل DoeDesk باشتراكك الخاص في أدوات الذكاء الاصطناعي. اربط أداة مثبّتة على هذا الجهاز أو أضف واحدة أدناه.",
+    profile: [msg("About your work"), null],
+    usageData: [msg("Usage data"), null],
+    agents: [
+      msg("Connect an AI tool"),
+      msg(
+        "DoeDesk works with your own AI subscription. Connect an AI tool already on this computer, or set one up below.",
+      ),
     ],
-  ],
-  folders: [
-    ["Import folders", "استيراد المجلدات"],
-    [
-      "Bring in recent folders and chats from your existing AI tools.",
-      "استورد المجلدات والمحادثات الأخيرة من أدوات الذكاء الاصطناعي المثبّتة لديك.",
+    folders: [
+      msg("Import folders"),
+      msg("Bring in recent folders and chats from your existing AI tools."),
     ],
-  ],
-  phone: [
-    ["Connect your phone", "ربط الجوال"],
-    [
-      "Optional. Control DoeDesk on this computer from the mobile app.",
-      "اختياري. تابع أعمالك على هذا الجهاز وتحكّم فيها من تطبيق الجوال.",
+    phone: [
+      msg("Connect your phone"),
+      msg("Optional. Control DoeDesk on this computer from the mobile app."),
     ],
-  ],
-};
+  };
 
 function StepHeading({
   step,
@@ -648,7 +601,7 @@ function StepHeading({
   readonly step: OnboardingStep;
   readonly label: string | undefined;
 }) {
-  const t = useSetupText();
+  const m = useMessages();
   const [title, lead] = STEP_TITLES[step];
   return (
     <header className="mt-8">
@@ -659,10 +612,10 @@ function StepHeading({
         tabIndex={-1}
         className="font-display text-3xl tracking-tight text-foreground outline-none sm:text-4xl"
       >
-        {t(...title)}
+        {m(title)}
       </h1>
       {lead !== null ? (
-        <p className="mt-2 font-reading text-lg text-muted-foreground">{t(...lead)}</p>
+        <p className="mt-2 font-reading text-lg text-muted-foreground">{m(lead)}</p>
       ) : null}
       {step === "agents" && label !== undefined ? (
         <p className="mt-1 text-xs text-muted-foreground">
@@ -688,35 +641,34 @@ function StepFooter({
   readonly isLast: boolean;
   readonly canContinue: boolean;
   readonly canSkip: boolean;
-  readonly hint: readonly [string, string] | null;
+  readonly hint: string | null;
   /** The last step's button while folders are picked or the import runs. */
   readonly startLabel: string | null;
   readonly onBack: () => void;
   readonly onContinue: () => void;
   readonly onSkip: () => void;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
+  const m = useMessages();
   return (
     <footer className="mt-10 grid gap-3 border-t border-border/60 pt-5">
-      {hint !== null ? <p className="text-xs text-muted-foreground">{t(...hint)}</p> : null}
+      {hint !== null ? <p className="text-xs text-muted-foreground">{m(hint)}</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {isFirst ? (
           <span />
         ) : (
           <Button variant="ghost" onClick={onBack}>
-            {t("Back", "رجوع")}
+            {gt("Back")}
           </Button>
         )}
         <div className="flex flex-wrap items-center gap-2">
           {canSkip ? (
             <Button variant="ghost-muted" onClick={onSkip}>
-              {isLast
-                ? t("Start without an AI tool", "ابدأ دون أداة ذكاء اصطناعي")
-                : t("Skip for now", "تخطي الآن")}
+              {isLast ? gt("Start without an AI tool") : gt("Skip for now")}
             </Button>
           ) : null}
           <Button disabled={!canContinue} onClick={onContinue}>
-            {isLast ? (startLabel ?? t("Start", "ابدأ")) : t("Continue", "متابعة")}
+            {isLast ? (startLabel ?? gt("Start")) : gt("Continue")}
           </Button>
         </div>
       </div>
@@ -726,41 +678,24 @@ function StepFooter({
 
 // Where an organization's policy turns usage data off, the page says so instead of asking.
 function TelemetryNotice({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const t = useSetupText();
-  const arabic = useSetupArabic();
   const messages = useMessages();
   const telemetryOff = managedTelemetryOffMessage(useManagedPolicy(environmentId), messages);
   if (telemetryOff === undefined) return null;
   return (
     <p className="mt-auto pt-12 text-2xs leading-relaxed text-muted-foreground/70">
       {telemetryOff}{" "}
-      {arabic ? (
-        <>
-          {t("See the", "اطّلع على")}{" "}
-          <a
-            className="underline decoration-current/40 underline-offset-2 hover:text-muted-foreground"
-            href={PRIVACY_POLICY_URL}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            {t("privacy policy", "سياسة الخصوصية")}
-          </a>
-          .
-        </>
-      ) : (
-        <T>
-          See the{" "}
-          <a
-            className="underline decoration-current/40 underline-offset-2 hover:text-muted-foreground"
-            href={PRIVACY_POLICY_URL}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            privacy policy
-          </a>
-          .
-        </T>
-      )}
+      <T>
+        See the{" "}
+        <a
+          className="underline decoration-current/40 underline-offset-2 hover:text-muted-foreground"
+          href={PRIVACY_POLICY_URL}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          privacy policy
+        </a>
+        .
+      </T>
     </p>
   );
 }
@@ -840,7 +775,6 @@ function AgentsSection({
   // The project scan only reads agents that are on, so turning one on can find more history.
   readonly onImportSourceEnabled: () => void;
 }) {
-  const t = useSetupText();
   const developerMode = useDeveloperMode();
   const { providers, serverConfig, checking, found, available } = useWelcomeAgents(environmentId);
   const gt = useGT();
@@ -946,10 +880,7 @@ function AgentsSection({
         const cause = squashAtomCommandFailure(result);
         toastManager.add({
           type: "error",
-          title: t(
-            gt("Could not turn on {agent}", { agent: agentName(provider) }),
-            `تعذّر تفعيل ${agentName(provider)}`,
-          ),
+          title: gt("Could not turn on {agent}", { agent: agentName(provider) }),
           ...(cause instanceof Error ? { description: cause.message } : {}),
         });
       }
@@ -983,27 +914,27 @@ function AgentsSection({
         <Button
           size="xs"
           variant="outline"
-          aria-label={`${t("Turn on", "تفعيل")}: ${name}`}
+          aria-label={gt("{action}: {agent}", { action: gt("Turn on"), agent: name })}
           disabled={!canManageProviders || serverConfig === null}
           onClick={() => void turnOn(provider)}
         >
-          {t("Turn on", "تفعيل")}
+          {gt("Turn on")}
         </Button>
       );
     }
     // Settings updates a broken CLI the way it was installed, including a custom binary path.
-    if (isBrokenVersion(provider)) return settingsAction(t("Update", "تحديث"));
+    if (isBrokenVersion(provider)) return settingsAction(gt("Update"));
     if (serverConfig !== null && codexNeedsSetup(provider, serverConfig.settings)) {
       const open = codexSetupId === provider.instanceId;
       return (
         <Button
           size="xs"
           variant="outline"
-          aria-label={`${t("Set up", "إعداد")}: ${name}`}
+          aria-label={gt("{action}: {agent}", { action: gt("Set up"), agent: name })}
           aria-expanded={open}
           onClick={() => setCodexSetupId(open ? null : provider.instanceId)}
         >
-          {t("Set up", "إعداد")}
+          {gt("Set up")}
         </Button>
       );
     }
@@ -1022,11 +953,7 @@ function AgentsSection({
       );
     }
     return settingsAction(
-      state === "signIn"
-        ? t("Sign in", "تسجيل الدخول")
-        : state === "attention"
-          ? t("Details", "التفاصيل")
-          : t("Set up", "إعداد"),
+      state === "signIn" ? gt("Sign in") : state === "attention" ? gt("Details") : gt("Set up"),
     );
   };
 
@@ -1036,10 +963,7 @@ function AgentsSection({
       (provider) =>
         needsInstallOrSignIn(provider) || codexNeedsSetup(provider, serverConfig?.settings),
     )
-      ? t(
-          "This connection does not have permission to open terminals.",
-          "لا يملك هذا الاتصال صلاحية فتح الطرفية.",
-        )
+      ? gt("This connection does not have permission to open terminals.")
       : null,
     !canManageProviders &&
     (acpAllowed ||
@@ -1047,15 +971,12 @@ function AgentsSection({
         (provider) =>
           stateOf(provider) === "disabled" || codexNeedsSetup(provider, serverConfig?.settings),
       ))
-      ? t(
-          "This connection does not have permission to manage AI tools.",
-          "لا يملك هذا الاتصال صلاحية إدارة أدوات الذكاء الاصطناعي.",
-        )
+      ? gt("This connection does not have permission to manage AI tools.")
       : null,
   ].filter((note) => note !== null);
 
   return (
-    <WelcomeSection title={t("AI tools", "أدوات الذكاء الاصطناعي")}>
+    <WelcomeSection title={gt("AI tools")}>
       {found.map((provider) => (
         <AgentRow
           key={provider.instanceId}
@@ -1066,8 +987,13 @@ function AgentsSection({
       ))}
       {checking && found.length === 0 ? (
         <p className="text-sm leading-10 text-muted-foreground">
-          {t("Checking for AI tools on", "جارٍ البحث عن أدوات الذكاء الاصطناعي على")}{" "}
-          <bdi>{label ?? t("this computer", "هذا الجهاز")}</bdi>…
+          <T>
+            Checking for AI tools on{" "}
+            <bdi>
+              <Var>{label ?? gt("this computer")}</Var>
+            </bdi>
+            …
+          </T>
         </p>
       ) : null}
       {notes.map((note) => (
@@ -1086,9 +1012,7 @@ function AgentsSection({
               found.length > 0 ? "text-muted-foreground" : "text-foreground",
             )}
           >
-            {found.length > 0
-              ? t("Add another AI tool", "إضافة أداة أخرى")
-              : t("Set up an AI tool", "إعداد أداة ذكاء اصطناعي")}
+            {found.length > 0 ? gt("Add another AI tool") : gt("Set up an AI tool")}
           </span>
           {showMore ? null : <AgentLogoStack providers={available} acp={acpAllowed} />}
           <ChevronDownIcon className="ms-auto size-4 text-muted-foreground group-data-panel-open:rotate-180" />
@@ -1111,7 +1035,7 @@ function AgentsSection({
                 <ACPRegistryIcon className="size-4" />
               </RowIcon>
               <span className="min-w-0 flex-1 text-sm text-muted-foreground">
-                {t("More AI tools in the ACP Registry", "أدوات أخرى في سجل ACP")}
+                {gt("More AI tools in the ACP Registry")}
               </span>
               <Button
                 size="xs"
@@ -1119,7 +1043,7 @@ function AgentsSection({
                 disabled={!canManageProviders}
                 onClick={() => setAddingProvider(true)}
               >
-                {t("Browse", "تصفّح")}
+                {gt("Browse")}
               </Button>
             </div>
           ) : null}
@@ -1158,7 +1082,7 @@ function AgentsSection({
         <AddProviderInstanceDialog
           open
           environmentId={environmentId}
-          environmentLabel={label ?? t("this computer", "هذا الجهاز")}
+          environmentLabel={label ?? gt("this computer")}
           showMoreProviders
           onOpenChange={setAddingProvider}
           onCreated={(_instanceId, driver) => {
@@ -1205,7 +1129,6 @@ function ProjectsSection({
   readonly projectImport: ReturnType<typeof useProjectImport>;
   readonly isImporting: boolean;
 }) {
-  const t = useSetupText();
   const gt = useGT();
   const m = useMessages();
   const importSourcesLabel = useImportSourcesLabel();
@@ -1223,30 +1146,27 @@ function ProjectsSection({
   if (scan === undefined) return null;
   if (scan.isPending && candidates.length === 0) {
     return (
-      <WelcomeSection title={t(gt("Folders"), "المجلدات")}>
+      <WelcomeSection title={gt("Folders")}>
         <p className="text-sm leading-10 text-muted-foreground">
-          {t(
-            gt("Looking for folders in your {sources} history…", { sources: importSourcesLabel }),
-            `جارٍ البحث عن المجلدات في سجلّ ${IMPORT_SOURCES_LABEL_AR}…`,
-          )}
+          {gt("Looking for folders in your {sources} history…", { sources: importSourcesLabel })}
         </p>
       </WelcomeSection>
     );
   }
   const retry = (
     <Button variant="ghost" size="sm" onClick={scan.refresh}>
-      {t(gt("Try again"), "أعد المحاولة")}
+      {gt("Try again")}
     </Button>
   );
   if (scan.error !== null && candidates.length === 0) {
     return (
-      <WelcomeSection title={t(gt("Folders"), "المجلدات")}>
+      <WelcomeSection title={gt("Folders")}>
         <div
           role="alert"
           className="flex min-h-10 items-center justify-between gap-3 text-sm text-muted-foreground"
         >
           <span>
-            {t(gt("Could not scan folders."), "تعذّر فحص المجلدات.")} {scan.error}
+            {gt("Could not scan folders.")} {scan.error}
           </span>
           {retry}
         </div>
@@ -1255,9 +1175,9 @@ function ProjectsSection({
   }
   if (candidates.length === 0) {
     return scan.data?.truncated ? (
-      <WelcomeSection title={t(gt("Folders"), "المجلدات")}>
+      <WelcomeSection title={gt("Folders")}>
         <p className="text-xs leading-10 text-muted-foreground" role="status">
-          {t(m(SCAN_LIMIT_MESSAGE), SCAN_LIMIT_MESSAGE_AR)}
+          {m(SCAN_LIMIT_MESSAGE)}
         </p>
       </WelcomeSection>
     ) : null;
@@ -1274,7 +1194,7 @@ function ProjectsSection({
     selected.length < candidates.length &&
     !(selected.length === defaultKeys.length && defaultKeys.every((key) => selectedKeys.has(key)));
   return (
-    <WelcomeSection title={t(gt("Folders"), "المجلدات")}>
+    <WelcomeSection title={gt("Folders")}>
       <div className="flex min-h-10 items-center gap-3 py-1">
         <label className="flex min-w-0 flex-1 items-center gap-3">
           <RowIcon>
@@ -1290,24 +1210,14 @@ function ProjectsSection({
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-foreground">
               {canWrite && selected.length > 0
-                ? t(
-                    gt(
-                      "{count, plural, one {Import {count} folder and its chats} other {Import {count} folders and their chats}}",
-                      { count: selected.length },
-                    ),
-                    selected.length === 1
-                      ? "استيراد مجلد واحد ومحادثاته"
-                      : selected.length === 2
-                        ? "استيراد مجلدين ومحادثاتهما"
-                        : `استيراد ${formatArabicFolders(selected.length)} ومحادثاتها`,
+                ? gt(
+                    "{count, plural, one {Import {count} folder and its chats} other {Import {count} folders and their chats}}",
+                    { count: selected.length },
                   )
-                : t(gt("Import folders and their chats"), "استيراد المجلدات ومحادثاتها")}
+                : gt("Import folders and their chats")}
             </span>
             <span className="block text-xs text-muted-foreground">
-              {t(
-                gt("From your {sources} history", { sources: importSourcesLabel }),
-                `من سجلّ ${IMPORT_SOURCES_LABEL_AR}`,
-              )}
+              {gt("From your {sources} history", { sources: importSourcesLabel })}
             </span>
           </span>
         </label>
@@ -1319,13 +1229,10 @@ function ProjectsSection({
             onClick={() => setReviewing((open) => !open)}
           >
             {reviewing
-              ? t(gt("Hide"), "إخفاء")
-              : t(
-                  gt("{count, plural, one {Review all {count}} other {Review all {count}}}", {
-                    count: candidates.length,
-                  }),
-                  `مراجعة الكل (${candidates.length})`,
-                )}
+              ? gt("Hide")
+              : gt("{count, plural, one {Review all {count}} other {Review all {count}}}", {
+                  count: candidates.length,
+                })}
             <ChevronDownIcon className={cn("size-3.5", reviewing && "rotate-180")} />
           </Button>
         ) : null}
@@ -1335,12 +1242,9 @@ function ProjectsSection({
         <fieldset className="-mx-1.5 mt-1 min-w-0" disabled={isImporting}>
           <div className="flex items-center justify-between gap-3 px-2 text-xs text-muted-foreground">
             <span role="status">
-              {t(
-                gt(
-                  "{selected, plural, one {{selected} of {total} selected} other {{selected} of {total} selected}}",
-                  { selected: selected.length, total: candidates.length },
-                ),
-                `تم تحديد ${selected.length} من ${candidates.length}`,
+              {gt(
+                "{selected, plural, one {{selected} of {total} selected} other {{selected} of {total} selected}}",
+                { selected: selected.length, total: candidates.length },
               )}
             </span>
             <div className="flex items-center gap-1">
@@ -1350,7 +1254,7 @@ function ProjectsSection({
                 disabled={selected.length === candidates.length}
                 onClick={() => setSelectedKeys(new Set(allKeys))}
               >
-                {t(gt("Select all"), "تحديد الكل")}
+                {gt("Select all")}
               </Button>
               <Button
                 variant="ghost"
@@ -1358,7 +1262,7 @@ function ProjectsSection({
                 disabled={selected.length === 0}
                 onClick={() => setSelectedKeys(new Set())}
               >
-                {t(gt("Select none"), "إلغاء التحديد")}
+                {gt("Select none")}
               </Button>
             </div>
           </div>
@@ -1375,7 +1279,7 @@ function ProjectsSection({
       ) : null}
       {scan.data?.truncated ? (
         <p className="ps-8 text-xs text-muted-foreground" role="status">
-          {t(m(SCAN_LIMIT_MESSAGE), SCAN_LIMIT_MESSAGE_AR)}
+          {m(SCAN_LIMIT_MESSAGE)}
         </p>
       ) : null}
       {scan.error !== null ? (
@@ -1384,7 +1288,7 @@ function ProjectsSection({
           className="flex items-center justify-between gap-3 ps-8 text-sm text-muted-foreground"
         >
           <span>
-            {t(gt("Could not rescan folders."), "تعذّرت إعادة فحص المجلدات.")} {scan.error}
+            {gt("Could not rescan folders.")} {scan.error}
           </span>
           {retry}
         </div>
@@ -1397,21 +1301,20 @@ function ProjectsSection({
 }
 
 function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const t = useSetupText();
   const gt = useGT();
   const [open, setOpen] = useState(false);
   return (
-    <WelcomeSection title={t(gt("Phone"), "الجوال")}>
+    <WelcomeSection title={gt("Phone")}>
       <Collapsible open={open} onOpenChange={setOpen}>
         <div className="flex min-h-10 items-center gap-3 py-1">
           <RowIcon>
             <SmartphoneIcon className="size-4" />
           </RowIcon>
           <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
-            {t(gt("Use DoeDesk on your phone"), "استخدام DoeDesk على جوالك")}
+            {gt("Use DoeDesk on your phone")}
           </span>
           <CollapsibleTrigger render={<Button variant="ghost-muted" size="xs" />}>
-            {open ? t(gt("Hide"), "إخفاء") : t(gt("Set up"), "إعداد")}
+            {open ? gt("Hide") : gt("Set up")}
             <ChevronDownIcon className={cn("size-3.5", open && "rotate-180")} />
           </CollapsibleTrigger>
         </div>
@@ -1420,10 +1323,7 @@ function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId
             <ol className="min-w-0 flex-1 space-y-5">
               <PhoneStep step={1}>
                 <p className="text-sm text-foreground">
-                  {t(
-                    gt("Scan this code with your phone to install the app."),
-                    "امسح هذا الرمز بجوالك لتثبيت التطبيق.",
-                  )}
+                  {gt("Scan this code with your phone to install the app.")}
                 </p>
               </PhoneStep>
               <PhoneStep step={2}>
@@ -1437,10 +1337,7 @@ function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId
                 size={124}
                 level="M"
                 marginSize={2}
-                title={t(
-                  gt("DoeDesk app for iPhone and Android"),
-                  "تطبيق DoeDesk لأجهزة iPhone وAndroid",
-                )}
+                title={gt("DoeDesk app for iPhone and Android")}
               />
             </div>
           </div>
@@ -1460,7 +1357,6 @@ function PhoneStep({ step, children }: { readonly step: number; readonly childre
 }
 
 function PhoneConnectLink({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const t = useSetupText();
   const { isLoaded, isSignedIn, userId } = useAuth({ treatPendingAsSignedOut: false });
   const gt = useGT();
   const loadFailed = useClerkLoadFailed();
@@ -1489,19 +1385,13 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
     </Button>
   );
   if (isSignedIn && link === null && linkState.isPending) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {t(gt("Checking T3 Connect…"), "جارٍ فحص T3 Connect…")}
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">{gt("Checking T3 Connect…")}</p>;
   }
   if (isSignedIn && linkState.error !== null) {
     return (
       <>
-        <p className="text-sm text-foreground">
-          {t(gt("Could not check T3 Connect."), "تعذّر فحص حالة T3 Connect.")}
-        </p>
-        {settingsLink(t(gt("Check T3 Connect"), "فحص T3 Connect"))}
+        <p className="text-sm text-foreground">{gt("Could not check T3 Connect.")}</p>
+        {settingsLink(gt("Check T3 Connect"))}
       </>
     );
   }
@@ -1509,24 +1399,14 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
     return (
       <p className="flex gap-1.5 text-sm text-foreground">
         <CheckIcon className="mt-0.5 size-4 shrink-0 text-success-foreground" />
-        {t(
-          gt(
-            "Your phone can reach this computer. Sign in to the mobile app with the same account.",
-          ),
-          "يمكن لجوالك الوصول إلى هذا الجهاز. سجّل الدخول في تطبيق الجوال بالحساب نفسه.",
-        )}
+        {gt("Your phone can reach this computer. Sign in to the mobile app with the same account.")}
       </p>
     );
   }
   if (isSignedIn && shared && reachability === undefined) {
     return (
       <p className="text-sm text-foreground">
-        {t(
-          gt(
-            "T3 Connect is on for this computer. Sign in to the mobile app with the same account.",
-          ),
-          "تم تفعيل T3 Connect على هذا الجهاز. سجّل الدخول في تطبيق الجوال بالحساب نفسه.",
-        )}
+        {gt("T3 Connect is on for this computer. Sign in to the mobile app with the same account.")}
       </p>
     );
   }
@@ -1536,38 +1416,25 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
       <>
         <p className="text-sm text-foreground">
           {shared
-            ? t(
-                gt("T3 Connect is on, but the mobile app cannot reach this computer."),
-                "تم تفعيل T3 Connect، لكن يتعذّر على تطبيق الجوال الوصول إلى هذا الجهاز.",
-              )
-            : t(
-                gt("Signed in. Share this computer so the mobile app can reach it."),
-                "تم تسجيل الدخول. شارك هذا الجهاز ليتمكّن تطبيق الجوال من الوصول إليه.",
-              )}
+            ? gt("T3 Connect is on, but the mobile app cannot reach this computer.")
+            : gt("Signed in. Share this computer so the mobile app can reach it.")}
         </p>
-        {settingsLink(
-          shared
-            ? t(gt("Check T3 Connect"), "فحص T3 Connect")
-            : t(gt("Set up T3 Connect"), "إعداد T3 Connect"),
-        )}
+        {settingsLink(shared ? gt("Check T3 Connect") : gt("Set up T3 Connect"))}
       </>
     );
   }
   return (
     <>
       <p className="text-sm text-foreground">
-        {t(
-          gt("Sign in to T3 Connect here, then sign in to the mobile app with the same account."),
-          "سجّل الدخول إلى T3 Connect هنا، ثم سجّل الدخول في تطبيق الجوال بالحساب نفسه.",
-        )}
+        {gt("Sign in to T3 Connect here, then sign in to the mobile app with the same account.")}
       </p>
       {loadFailed ? (
         <Button variant="outline" size="xs" onClick={retryClerkLoad}>
-          {t(gt("Retry sign-in"), "إعادة محاولة تسجيل الدخول")}
+          {gt("Retry sign-in")}
         </Button>
       ) : (
         <Button variant="outline" size="xs" disabled={!isLoaded} onClick={openAuthPrompt}>
-          {t(gt("Sign in to T3 Connect"), "تسجيل الدخول إلى T3 Connect")}
+          {gt("Sign in to T3 Connect")}
         </Button>
       )}
     </>
@@ -1587,7 +1454,6 @@ function OnboardingCodexSetup({
   // True asks for the CLI's install or sign-in terminal once Codex has checked the CLI.
   readonly onUseCliChange: (useCli: boolean) => void;
 }) {
-  const t = useSetupText();
   const gt = useGT();
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
@@ -1617,7 +1483,7 @@ function OnboardingCodexSetup({
           const cause = squashAtomCommandFailure(result);
           toastManager.add({
             type: "error",
-            title: t(gt("Could not save Codex setup"), "تعذّر حفظ إعدادات Codex"),
+            title: gt("Could not save Codex setup"),
             ...(cause instanceof Error ? { description: cause.message } : {}),
           });
         }
@@ -1651,9 +1517,8 @@ function TerminalAction({
   readonly disabled: boolean;
   readonly onClick: () => void;
 }) {
-  const t = useSetupText();
   const gt = useGT();
-  const label = signIn ? t("Sign in", "تسجيل الدخول") : t("Install", "تثبيت");
+  const label = signIn ? gt("Sign in") : gt("Install");
   return (
     <Button
       size="xs"
@@ -1680,7 +1545,7 @@ function AgentRow({
   // A row in the "Add more" grid: the button carries the state, so no detail line.
   readonly compact?: boolean;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
   const name = agentName(provider);
   const messages = useMessages();
   // Claude Code and Codex tiles show Install or Set up; other agents that are on say why not.
@@ -1691,7 +1556,7 @@ function AgentRow({
     state === "install"
       ? isInstallableDriver(provider.driver)
         ? null
-        : t("Not installed", "غير مثبّت")
+        : gt("Not installed")
       : compact || state === "ready" || state === "checking"
         ? null
         : state === "attention"
@@ -1723,10 +1588,10 @@ function AgentRow({
         {state === "ready" ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
             <CheckIcon className="size-3.5" />
-            {t("Ready", "جاهز")}
+            {gt("Ready")}
           </span>
         ) : state === "checking" ? (
-          <span className="text-xs text-muted-foreground">{t("Checking…", "جارٍ الفحص…")}</span>
+          <span className="text-xs text-muted-foreground">{gt("Checking…")}</span>
         ) : (
           action
         )}
@@ -1744,8 +1609,6 @@ function AgentInstallTerminal({
   readonly onCommandFinished: () => void;
   readonly onClose: () => void;
 }) {
-  const t = useSetupText();
-  const arabic = useSetupArabic();
   const { command, cwd, driver, environmentId, keybindings, providerInstanceId } = session;
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const gt = useGT();
@@ -1862,37 +1725,21 @@ function AgentInstallTerminal({
       <div className="flex items-center justify-between border-b border-border/60 bg-background/60 px-3 py-1.5">
         <span className="text-2xs font-medium text-muted-foreground">
           {!canOperateTerminal ? (
-            t(
-              gt("This connection does not have permission to open terminals."),
-              "لا يملك هذا الاتصال صلاحية فتح الطرفية.",
-            )
+            gt("This connection does not have permission to open terminals.")
           ) : setupState === "writeFailed" ? (
-            arabic ? (
-              <>
-                {t("Run", "شغّل الأمر")}{" "}
-                <code className="rounded bg-muted px-1 font-mono" dir="ltr">
-                  {command}
-                </code>{" "}
-                {t("in the terminal below.", "في الطرفية أدناه.")}
-              </>
-            ) : (
-              <T>
-                Run{" "}
-                <code className="rounded bg-muted px-1 font-mono" dir="ltr">
-                  <Var>{command}</Var>
-                </code>{" "}
-                in the terminal below.
-              </T>
-            )
+            <T>
+              Run{" "}
+              <code className="rounded bg-muted px-1 font-mono" dir="ltr">
+                <Var>{command}</Var>
+              </code>{" "}
+              in the terminal below.
+            </T>
           ) : setupState === "ready" ? (
-            t(
-              gt("Review the command below, then press Enter to run it."),
-              "راجع الأمر أدناه، ثم اضغط Enter لتشغيله.",
-            )
+            gt("Review the command below, then press Enter to run it.")
           ) : setupState === "openFailed" ? (
-            t(gt("Could not open the setup terminal."), "تعذّر فتح طرفية الإعداد.")
+            gt("Could not open the setup terminal.")
           ) : (
-            t(gt("Preparing command…"), "جارٍ تجهيز الأمر…")
+            gt("Preparing command…")
           )}
         </span>
         <div className="flex items-center gap-1">
@@ -1907,11 +1754,11 @@ function AgentInstallTerminal({
                 }
               }}
             >
-              {t(gt("Try again"), "أعد المحاولة")}
+              {gt("Try again")}
             </Button>
           ) : null}
           <Button size="xs" variant="ghost-muted" onClick={onClose}>
-            {t(gt("Close"), "إغلاق")}
+            {gt("Close")}
           </Button>
         </div>
       </div>
@@ -1939,7 +1786,6 @@ function AgentInstallTerminal({
 const IMPORT_PERMISSION_MESSAGE = msg(
   "This connection does not have permission to import folders or chat history.",
 );
-const IMPORT_PERMISSION_MESSAGE_AR = "لا يملك هذا الاتصال صلاحية استيراد المجلدات أو سجل المحادثات.";
 
 // Creates the selected projects, then imports each one's agent history. Owns retry state so a
 // second Start resumes instead of recreating projects.
@@ -1950,7 +1796,6 @@ function useProjectImport({
   isImporting,
   setIsImporting,
   holdPageRef,
-  locale,
   onDone,
 }: {
   readonly scans: ReturnType<typeof useProjectScans>;
@@ -1960,14 +1805,12 @@ function useProjectImport({
   readonly setIsImporting: (value: boolean) => void;
   // Blocks leaving the page; onDone releases it before landing.
   readonly holdPageRef: { current: boolean };
-  readonly locale: SetupLocale;
   readonly onDone: (
     projectRef?: ScopedProjectRef,
     importWarning?: string,
     importedThreadCount?: number,
   ) => Promise<boolean>;
 }) {
-  const t = (english: string, arabic: string) => (locale === "ar" ? arabic : english);
   const writableEnvironments = useEnvironmentsWithScope(scans, AuthOrchestrationOperateScope);
   const gt = useGT();
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
@@ -2028,8 +1871,7 @@ function useProjectImport({
   const canImport = selected.every((candidate) =>
     writableEnvironments.has(candidate.environmentId),
   );
-  const visibleImportError =
-    canWrite && canImport ? "" : t(IMPORT_PERMISSION_MESSAGE, IMPORT_PERMISSION_MESSAGE_AR);
+  const visibleImportError = canWrite && canImport ? "" : IMPORT_PERMISSION_MESSAGE;
 
   const importedThreadTotal = () =>
     lastImportSelectionRef.current.reduce(
@@ -2182,36 +2024,25 @@ function useProjectImport({
     const importedThreadCount = importedThreadTotal();
     if (importedProjectsCount < selection.length) {
       if (importedThreadCount > 0 && skippedThreadCount > 0) {
-        importWarningRef.current = t(
-          `${gt("{count, plural, one {Imported {count} chat.} other {Imported {count} chats.}}", {
-            count: importedThreadCount,
-          })} ${gt(
-            "{count, plural, one {{count} chat could not be imported.} other {{count} chats could not be imported.}}",
-            { count: skippedThreadCount },
-          )}`,
-          `تم استيراد ${formatArabicChats(importedThreadCount)}، وتعذّر استيراد ${formatArabicChats(skippedThreadCount)}.`,
-        );
+        importWarningRef.current = `${gt(
+          "{count, plural, one {Imported {count} chat.} other {Imported {count} chats.}}",
+          { count: importedThreadCount },
+        )} ${gt(
+          "{count, plural, one {{count} chat could not be imported.} other {{count} chats could not be imported.}}",
+          { count: skippedThreadCount },
+        )}`;
       } else if (skippedThreadCount > 0) {
-        importWarningRef.current = t(
-          gt(
-            "{count, plural, one {{count} chat could not be imported.} other {{count} chats could not be imported.}}",
-            { count: skippedThreadCount },
-          ),
-          `تعذّر استيراد ${formatArabicChats(skippedThreadCount)}.`,
+        importWarningRef.current = gt(
+          "{count, plural, one {{count} chat could not be imported.} other {{count} chats could not be imported.}}",
+          { count: skippedThreadCount },
         );
       } else if (importedThreadCount > 0) {
-        importWarningRef.current = t(
-          gt(
-            "{count, plural, one {Imported {count} chat. Some chat history could not be imported.} other {Imported {count} chats. Some chat history could not be imported.}}",
-            { count: importedThreadCount },
-          ),
-          `تم استيراد ${formatArabicChats(importedThreadCount)}، وتعذّر استيراد جزء من سجل المحادثات.`,
+        importWarningRef.current = gt(
+          "{count, plural, one {Imported {count} chat. Some chat history could not be imported.} other {Imported {count} chats. Some chat history could not be imported.}}",
+          { count: importedThreadCount },
         );
       } else {
-        importWarningRef.current = t(
-          gt("Could not import chat history."),
-          "تعذّر استيراد سجل المحادثات.",
-        );
+        importWarningRef.current = gt("Could not import chat history.");
       }
     }
     finishAfterImport();
@@ -2245,7 +2076,6 @@ function ImportCandidateList({
   readonly selectedKeys: ReadonlySet<string>;
   readonly onSelectionChange: (next: ReadonlySet<string>) => void;
 }) {
-  const t = useSetupText();
   const { repositories, other } = groupOnboardingProjects(candidates);
   const setKeys = (keys: ReadonlyArray<string>, checked: boolean) => {
     const next = new Set(selectedKeys);
@@ -2283,16 +2113,11 @@ function ImportCandidateList({
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-start">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform rtl:rotate-180 group-data-panel-open:rotate-90" />
-              <span className="truncate text-sm text-muted-foreground">
-                {t(gt("Other folders"), "مجلدات أخرى")}
-              </span>
+              <span className="truncate text-sm text-muted-foreground">{gt("Other folders")}</span>
               <span className="ms-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-                {t(
-                  gt("{count, plural, one {{count} folder} other {{count} folders}}", {
-                    count: other.length,
-                  }),
-                  formatArabicFolders(other.length, true),
-                )}
+                {gt("{count, plural, one {{count} folder} other {{count} folders}}", {
+                  count: other.length,
+                })}
               </span>
             </CollapsibleTrigger>
           </div>
@@ -2446,9 +2271,6 @@ function useImportSourcesLabel() {
     AgentSessionSource.literals.map((source) => IMPORT_SOURCE_NAMES[source]),
   );
 }
-const IMPORT_SOURCES_LABEL_AR = new Intl.ListFormat("ar", { type: "conjunction" }).format(
-  AgentSessionSource.literals.map((source) => IMPORT_SOURCE_NAMES[source]),
-);
 
 function ImportRowMeta({
   sources,
@@ -2492,8 +2314,6 @@ function ImportRowMeta({
 
 /** The desktop app links `t3` on a fresh install; this puts its folder on PATH when it is not. */
 function CliPathSetup() {
-  const t = useSetupText();
-  const arabic = useSetupArabic();
   const gt = useGT();
   const { state, busy, run } = useDesktopCliCommand();
   const setup = state?.pathSetup;
@@ -2505,37 +2325,17 @@ function CliPathSetup() {
       </RowIcon>
       <p className="min-w-0 flex-1 text-sm text-muted-foreground">
         {setup.added ? (
-          arabic ? (
-            <>
-              {t("Added to", "تمت الإضافة إلى")} <bdi>{setup.file}</bdi>.{" "}
-              {t("Open a new terminal to use", "افتح طرفية جديدة لاستخدام الأمر")}{" "}
-              <code className="font-mono" dir="ltr">
-                t3
-              </code>
-              .
-            </>
-          ) : (
-            <T>
-              Added to{" "}
-              <bdi>
-                <Var>{setup.file}</Var>
-              </bdi>
-              . Open a new terminal to use{" "}
-              <code className="font-mono" dir="ltr">
-                t3
-              </code>
-              .
-            </T>
-          )
-        ) : arabic ? (
-          <>
-            {t("Use", "استخدم الأمر")}{" "}
+          <T>
+            Added to{" "}
+            <bdi>
+              <Var>{setup.file}</Var>
+            </bdi>
+            . Open a new terminal to use{" "}
             <code className="font-mono" dir="ltr">
               t3
-            </code>{" "}
-            {t("from any terminal by adding one line to", "من أي طرفية بإضافة سطر واحد إلى")}{" "}
-            <bdi>{setup.file}</bdi>.
-          </>
+            </code>
+            .
+          </T>
         ) : (
           <T>
             Use{" "}
@@ -2552,7 +2352,7 @@ function CliPathSetup() {
       </p>
       {setup.added ? null : (
         <Button size="xs" variant="outline" disabled={busy} onClick={() => run("addToPath")}>
-          {t(gt("Add to PATH"), "إضافة إلى PATH")}
+          {gt("Add to PATH")}
         </Button>
       )}
     </div>

@@ -5,8 +5,6 @@
  */
 import { msg, useMessages } from "gt-react";
 
-import { useSetupArabic } from "~/onboarding/setupLocale";
-
 export const UNREACHABLE = msg("Could not reach the DoeDesk service on this computer. Try again.");
 export const NOT_WORKED = msg("Something went wrong. Try again.");
 
@@ -40,50 +38,7 @@ export const CLOUD_MESSAGES: Readonly<Record<string, string>> = {
   ),
 };
 
-const ARABIC: ReadonlyMap<string, string> = new Map([
-  [UNREACHABLE, "تعذّر الاتصال بخدمة DoeDesk على هذا الجهاز. أعد المحاولة."],
-  [NOT_WORKED, "تعذّر إتمام الطلب. أعد المحاولة."],
-  [
-    SIGN_UP_UNAVAILABLE,
-    "إنشاء حسابات جديدة في DoeDesk Cloud غير متاح في بلدك حاليًا. إن كان لديك حساب بالفعل، يمكنك تسجيل الدخول كالمعتاد.",
-  ],
-  [
-    LEGAL_UNKNOWN,
-    "تعذّر الاتصال بخدمة DoeDesk Cloud لتحميل شروط الاستخدام وسياسة الخصوصية السارية. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة.",
-  ],
-  [
-    CLOUD_MESSAGES.invalid_acceptance!,
-    "تعذّر على DoeDesk Cloud قراءة بيانات شروط الاستخدام التي أرسلها هذا التطبيق. هذا خلل في DoeDesk؛ حدّث DoeDesk إلى آخر إصدار ثم أعد المحاولة.",
-  ],
-  [
-    CLOUD_MESSAGES.terms_outdated!,
-    "تغيّرت شروط الاستخدام أثناء فتح هذه الصفحة. راجع النسخة الجديدة من الرابط أدناه، ثم حدّد مربع الموافقة وأعد المحاولة.",
-  ],
-  [
-    CLOUD_MESSAGES.too_many_requests!,
-    "تجاوزت عدد المحاولات المسموح به. انتظر بضع دقائق ثم أعد المحاولة.",
-  ],
-  [
-    CLOUD_MESSAGES.recent_sign_in_required!,
-    "لا يمكن حذف الحساب إلا خلال 10 دقائق من تسجيل الدخول. سجّل الدخول مجددًا للمتابعة.",
-  ],
-  [
-    CLOUD_MESSAGES.different_account!,
-    "هذا الرقم أو البريد الإلكتروني يعود لحساب آخر. لم يتم حذف أي شيء.",
-  ],
-  [
-    CLOUD_MESSAGES.unauthenticated!,
-    "لم يعد DoeDesk Cloud يقبل تسجيل الدخول هذا. سجّل الدخول مجددًا.",
-  ],
-  [
-    CLOUD_MESSAGES.terms_update_required!,
-    "لن يفحص DoeDesk Cloud طلبات هذا الحساب قبل موافقتك على شروط الاستخدام الحالية.",
-  ],
-]);
-
-/** Reads one of these messages in the app's language, or in Arabic inside setup shown in Arabic. */
+/** Reads one of these messages in the app's active language. */
 export function usePrivacyMessage(): (message: string) => string {
-  const m = useMessages();
-  const arabic = useSetupArabic();
-  return (message) => (arabic ? (ARABIC.get(message) ?? m(message)) : m(message));
+  return useMessages();
 }

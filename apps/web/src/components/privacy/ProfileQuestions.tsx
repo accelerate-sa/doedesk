@@ -4,14 +4,13 @@ import type {
   PrivacyProfileWorkplace,
   PrivacyStatus,
 } from "@t3tools/contracts";
-import { useGT } from "gt-react";
+import { useGT, useMessages } from "gt-react";
 import { useState } from "react";
 
 import { CONSENT_WORDS } from "~/doedesk/consentWords";
 import { PROFILE_FIELDS, PROFILE_WORKPLACES } from "~/doedesk/profileAnswers";
 import { cn } from "~/lib/utils";
 import { savePrivacyProfile, useConsentLocale, usePrivacyStatus } from "~/privacy/privacyClient";
-import { useSetupText } from "~/onboarding/setupLocale";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ConsentBlock, ConsentSentence } from "./ConsentText";
@@ -37,7 +36,7 @@ export function ProfileQuestions({
   readonly onAnswersChange?: (answers: PrivacyProfileRequest) => void;
 }) {
   const gt = useGT();
-  const t = useSetupText();
+  const m = useMessages();
   const correcting = stored !== undefined && onAnswersChange === undefined;
   const [locale] = useConsentLocale();
   const privacy = usePrivacyStatus();
@@ -83,36 +82,36 @@ export function ProfileQuestions({
       <ConsentBlock locale={locale} className="text-sm text-muted-foreground">
         <ConsentSentence parts={CONSENT_WORDS[locale].onboarding} locale={locale} legal={legal} />
       </ConsentBlock>
-      <Question label={t(gt("What field do you work in?"), "ما مجال عملك؟")}>
+      <Question label={gt("What field do you work in?")}>
         {PROFILE_FIELDS.map((option) => (
           <Chip
             key={option.value}
             selected={field === option.value}
             onSelect={() => change({ field: option.value })}
           >
-            {t(option.label, option.labelAr)}
+            {m(option.label)}
           </Chip>
         ))}
         {field === "other" ? (
           <Input
             autoFocus
             maxLength={80}
-            placeholder={t(gt("Describe your field"), "اذكر مجال عملك")}
-            aria-label={t(gt("Describe your field"), "اذكر مجال عملك")}
+            placeholder={gt("Describe your field")}
+            aria-label={gt("Describe your field")}
             className="mt-1 sm:max-w-xs"
             value={fieldOther}
             onChange={(event) => change({ fieldOther: event.target.value })}
           />
         ) : null}
       </Question>
-      <Question label={t(gt("What kind of organization do you work in?"), "ما طبيعة جهة عملك؟")}>
+      <Question label={gt("What kind of organization do you work in?")}>
         {PROFILE_WORKPLACES.map((option) => (
           <Chip
             key={option.value}
             selected={workplace === option.value}
             onSelect={() => change({ workplace: option.value })}
           >
-            {t(option.label, option.labelAr)}
+            {m(option.label)}
           </Chip>
         ))}
       </Question>

@@ -19,6 +19,7 @@ import type {
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import { AsyncResult, Atom } from "effect/reactivity";
+import { useLocale } from "gt-react";
 
 import { prefersArabic } from "~/doedesk/consentWords";
 import { PrimaryEnvironmentHttpClient } from "~/environments/primary/httpClient";
@@ -233,21 +234,23 @@ const systemLanguages = (): ReadonlyArray<string> => {
 };
 
 /**
- * The language the Terms, the notice and the usage-data choice are shown in: Arabic when the
- * system's first language is Arabic, English otherwise, until the person switches.
+ * The language the Terms, the notice and the usage-data choice are shown in: follows the app's
+ * active language when Arabic, or English otherwise, until the person switches the consent text.
  */
 export function useConsentLocale(): readonly [
   locale: PrivacyLocale,
   setLocale: (locale: PrivacyLocale) => void,
-  /** Whether to offer the switch: only where the system's language is Arabic. */
+  /** Whether to offer the switch: whenever the app or system is in Arabic. */
   offered: boolean,
 ] {
+  const appLocale = useLocale();
   const chosen = useAtomValue(consentLocaleAtom);
   const arabicSystem = prefersArabic(systemLanguages());
+  const arabicApp = appLocale === "ar";
   return [
-    chosen ?? (arabicSystem ? "ar" : "en"),
+    chosen ?? (arabicApp ? "ar" : "en"),
     (locale) => appAtomRegistry.set(consentLocaleAtom, locale),
-    arabicSystem,
+    arabicApp || arabicSystem,
   ];
 }
 

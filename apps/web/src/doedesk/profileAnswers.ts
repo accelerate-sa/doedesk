@@ -1,54 +1,51 @@
 import type { PrivacyProfileField, PrivacyProfileWorkplace } from "@t3tools/contracts";
+import { msg } from "gt-react";
 
 /** The two onboarding questions' choices, in the order they are offered. */
 export const PROFILE_FIELDS: ReadonlyArray<{
   readonly value: PrivacyProfileField;
   readonly label: string;
-  readonly labelAr: string;
 }> = [
-  { value: "legal", label: "Legal", labelAr: "القانون" },
-  { value: "finance", label: "Finance", labelAr: "المالية" },
-  { value: "government", label: "Government services", labelAr: "الخدمات الحكومية" },
-  { value: "healthcare", label: "Healthcare", labelAr: "الرعاية الصحية" },
-  { value: "hr", label: "Human resources", labelAr: "الموارد البشرية" },
-  { value: "real_estate", label: "Real estate", labelAr: "العقار" },
-  { value: "consulting", label: "Consulting", labelAr: "الاستشارات" },
-  { value: "engineering", label: "Engineering and IT", labelAr: "الهندسة وتقنية المعلومات" },
-  { value: "research", label: "Research and education", labelAr: "البحث والتعليم" },
-  { value: "other", label: "Other", labelAr: "غير ذلك" },
+  { value: "legal", label: msg("Legal") },
+  { value: "finance", label: msg("Finance") },
+  { value: "government", label: msg("Government services") },
+  { value: "healthcare", label: msg("Healthcare") },
+  { value: "hr", label: msg("Human resources") },
+  { value: "real_estate", label: msg("Real estate") },
+  { value: "consulting", label: msg("Consulting") },
+  { value: "engineering", label: msg("Engineering and IT") },
+  { value: "research", label: msg("Research and education") },
+  { value: "other", label: msg("Other") },
 ];
 
 export const PROFILE_WORKPLACES: ReadonlyArray<{
   readonly value: PrivacyProfileWorkplace;
   readonly label: string;
-  readonly labelAr: string;
 }> = [
-  { value: "self", label: "On my own", labelAr: "أعمل لحسابي" },
-  {
-    value: "small_company",
-    label: "Company (under 50 people)",
-    labelAr: "شركة (أقل من 50 موظفًا)",
-  },
-  {
-    value: "large_company",
-    label: "Company (50 or more)",
-    labelAr: "شركة (50 موظفًا فأكثر)",
-  },
-  { value: "government", label: "Government entity", labelAr: "جهة حكومية" },
+  { value: "self", label: msg("On my own") },
+  { value: "small_company", label: msg("Company (under 50 people)") },
+  { value: "large_company", label: msg("Company (50 or more)") },
+  { value: "government", label: msg("Government entity") },
 ];
 
 const labelOf = (
   options: ReadonlyArray<{ readonly value: string; readonly label: string }>,
   value: string | null | undefined,
-): string | null => options.find((option) => option.value === value)?.label ?? value ?? null;
+  resolve: (message: string) => string,
+): string | null => {
+  const match = options.find((option) => option.value === value);
+  if (match !== undefined) return resolve(match.label);
+  return value ?? null;
+};
 
 /** The stored answers in the words the questions use. Null when there are none. */
 export const answersSummary = (
   profile: { readonly field: string | null; readonly workplace: string | null } | null | undefined,
+  resolve: (message: string) => string = (message) => message,
 ): string | null => {
   const parts = [
-    labelOf(PROFILE_FIELDS, profile?.field),
-    labelOf(PROFILE_WORKPLACES, profile?.workplace),
+    labelOf(PROFILE_FIELDS, profile?.field, resolve),
+    labelOf(PROFILE_WORKPLACES, profile?.workplace, resolve),
   ].filter((part): part is string => part !== null && part.length > 0);
   return parts.length === 0 ? null : parts.join(" · ");
 };

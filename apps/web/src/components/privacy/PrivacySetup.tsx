@@ -10,7 +10,7 @@ import type {
 } from "@t3tools/contracts";
 import { useGT } from "gt-react";
 import { MailIcon, ShieldCheckIcon, ShieldOffIcon, SmartphoneIcon } from "lucide-react";
-import { type FormEvent, useContext, useEffect, useEffectEvent, useId, useState } from "react";
+import { type FormEvent, useEffect, useEffectEvent, useId, useState } from "react";
 
 import { CONSENT_WORDS, SIGNUP_WORDING_ID } from "~/doedesk/consentWords";
 import {
@@ -21,7 +21,7 @@ import {
   UNREACHABLE,
   usePrivacyMessage,
 } from "~/doedesk/privacyMessages";
-import { SetupLocaleContext, useSetupText } from "~/onboarding/setupLocale";
+import { useInSetup } from "~/onboarding/setupLocale";
 import {
   configurePrivacy,
   refreshSignInOptions,
@@ -54,8 +54,8 @@ export function PrivacySetup({
   /** Settings offers turning masking off; the welcome page does not. */
   readonly allowTurningOff?: boolean;
 }) {
+  const gt = useGT();
   const m = usePrivacyMessage();
-  const t = useSetupText();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ownService, setOwnService] = useState(false);
@@ -83,7 +83,7 @@ export function PrivacySetup({
         <div className="flex min-w-0 items-center gap-3">
           <ShieldCheckIcon className="size-5 shrink-0 text-success" />
           <div className="min-w-0">
-            <p className="text-sm text-foreground">{t("Masking is on", "إخفاء البيانات مفعّل")}</p>
+            <p className="text-sm text-foreground">{gt("Masking is on")}</p>
             <p className="truncate text-xs text-muted-foreground">
               <bdi>{(status.mode === "cloud" ? status.accountLabel : status.endpoint) ?? ""}</bdi>
             </p>
@@ -95,7 +95,7 @@ export function PrivacySetup({
           disabled={busy}
           onClick={() => void configure({ mode: "unconfigured" })}
         >
-          {status.mode === "cloud" ? t("Sign out", "تسجيل الخروج") : t("Disconnect", "قطع الاتصال")}
+          {status.mode === "cloud" ? gt("Sign out") : gt("Disconnect")}
         </Button>
       </div>
     );
@@ -107,17 +107,14 @@ export function PrivacySetup({
         <div className="flex min-w-0 items-center gap-3">
           <ShieldOffIcon className="size-5 shrink-0 text-warning" />
           <div className="min-w-0">
-            <p className="text-sm text-foreground">{t("Masking is off", "إخفاء البيانات متوقف")}</p>
+            <p className="text-sm text-foreground">{gt("Masking is off")}</p>
             <p className="text-xs text-muted-foreground">
-              {t(
-                "Your messages and files reach the AI as written.",
-                "تصل رسائلك وملفاتك إلى الذكاء الاصطناعي كما هي، دون إخفاء.",
-              )}
+              {gt("Your messages and files reach the AI as written.")}
             </p>
           </div>
         </div>
         <Button size="sm" disabled={busy} onClick={() => void configure({ mode: "unconfigured" })}>
-          {t("Turn on", "تفعيل")}
+          {gt("Turn on")}
         </Button>
       </div>
     );
@@ -158,7 +155,6 @@ function SignedOut({
   readonly configure: (payload: PrivacyConfigureRequest) => Promise<void>;
 }) {
   const gt = useGT();
-  const t = useSetupText();
   const options = useSignInOptions();
   // Where no account can be created, masking can still be had without one, or done without.
   const refused = options?.signUpAvailable === false;
@@ -181,9 +177,7 @@ function SignedOut({
       ) : null}
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
         <button type="button" className={LINK_CLASS} onClick={() => onOwnService(!ownService)}>
-          {ownService
-            ? t(gt("Sign in to DoeDesk instead"), "تسجيل الدخول إلى DoeDesk بدلًا من ذلك")
-            : t(gt("Use my own detection service"), "استخدام خدمة كشف خاصة بي")}
+          {ownService ? gt("Sign in to DoeDesk instead") : gt("Use my own detection service")}
         </button>
         {allowTurningOff || refused ? (
           <button
@@ -192,7 +186,7 @@ function SignedOut({
             className={LINK_CLASS}
             onClick={() => void configure({ mode: "off" })}
           >
-            {t(gt("Use DoeDesk without masking"), "استخدام DoeDesk دون إخفاء البيانات")}
+            {gt("Use DoeDesk without masking")}
           </button>
         ) : null}
       </div>
@@ -229,11 +223,10 @@ export function CloudSignIn({
   readonly onDeleted?: (deleted: PrivacyAccountDeleted) => void;
 }) {
   const gt = useGT();
-  const t = useSetupText();
   const m = usePrivacyMessage();
   const checkboxId = useId();
   const [locale, setLocale, consentSwitchOffered] = useConsentLocale();
-  const inSetup = useContext(SetupLocaleContext) !== null;
+  const inSetup = useInSetup();
   // Setup chose its language on its first step, and the consent words follow that choice.
   const languageOffered = consentSwitchOffered && !inSetup;
   const words = CONSENT_WORDS[locale];
@@ -293,10 +286,7 @@ export function CloudSignIn({
     if (!result.ok) {
       setError(
         result.code == null && result.message === null
-          ? t(
-              gt("This sign-in link has expired. Request a new one."),
-              "انتهت صلاحية رابط تسجيل الدخول. اطلب رابطًا جديدًا.",
-            )
+          ? gt("This sign-in link has expired. Request a new one.")
           : messageFor(result),
       );
       setTicked(false);
@@ -322,8 +312,7 @@ export function CloudSignIn({
     };
   }, [waitingFor]);
 
-  if (options === null)
-    return <Spinner size="md" tone="muted" aria-label={t(gt("Loading"), "جارٍ التحميل")} />;
+  if (options === null) return <Spinner size="md" tone="muted" aria-label={gt("Loading")} />;
   const method = chosen ?? options.methods[0] ?? "email";
 
   // What the person agreed to is what the form showed: these versions, in this language.
@@ -381,7 +370,7 @@ export function CloudSignIn({
       <p className="text-sm text-muted-foreground">{m(LEGAL_UNKNOWN)}</p>
       <div>
         <Button type="button" variant="outline" size="sm" onClick={refreshSignInOptions}>
-          {t(gt("Try again"), "أعد المحاولة")}
+          {gt("Try again")}
         </Button>
       </div>
     </div>
@@ -432,7 +421,7 @@ export function CloudSignIn({
       ) : null}
       {stage.kind === "enter" && options.methods.length > 1 ? (
         <ToggleGroup
-          aria-label={t(gt("Sign in with"), "طريقة تسجيل الدخول")}
+          aria-label={gt("Sign in with")}
           value={[method]}
           onValueChange={(value) => {
             const next = value[0];
@@ -444,11 +433,11 @@ export function CloudSignIn({
         >
           <ToggleGroupItem value="phone">
             <SmartphoneIcon />
-            {t(gt("Phone"), "الجوال")}
+            {gt("Phone")}
           </ToggleGroupItem>
           <ToggleGroupItem value="email">
             <MailIcon />
-            {t(gt("Email"), "البريد الإلكتروني")}
+            {gt("Email")}
           </ToggleGroupItem>
         </ToggleGroup>
       ) : null}
@@ -462,7 +451,7 @@ export function CloudSignIn({
           }}
         >
           <p className="text-sm text-muted-foreground">
-            {t(gt("Enter the 6-digit code sent to"), "أدخل الرمز المكوّن من 6 أرقام المرسل إلى")}{" "}
+            {gt("Enter the 6-digit code sent to")}{" "}
             <bdi className="text-foreground">{stage.phone}</bdi>
           </p>
           <Input
@@ -473,7 +462,7 @@ export function CloudSignIn({
             required
             maxLength={6}
             placeholder="000000"
-            aria-label={t(gt("Verification code"), "رمز التحقّق")}
+            aria-label={gt("Verification code")}
             value={code}
             onChange={(event) => {
               const value = event.target.value.replace(/\D/g, "").slice(0, 6);
@@ -483,7 +472,7 @@ export function CloudSignIn({
           />
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={busy || code.length < 6}>
-              {t(gt("Verify"), "تحقّق")}
+              {gt("Verify")}
             </Button>
             <ResendButton
               resendAt={stage.resendAt}
@@ -491,7 +480,7 @@ export function CloudSignIn({
               onResend={() => void sendCode()}
             />
             <button type="button" className={LINK_CLASS} onClick={startOver}>
-              {t(gt("Use another number"), "استخدام رقم آخر")}
+              {gt("Use another number")}
             </button>
           </div>
         </form>
@@ -500,16 +489,12 @@ export function CloudSignIn({
           <p className="flex items-center gap-2 text-sm text-foreground">
             <Spinner size="sm" tone="muted" />
             <span>
-              {t(
-                gt("Check your inbox and open the sign-in link sent to"),
-                "افتح رابط تسجيل الدخول الذي أرسلناه إلى",
-              )}{" "}
-              <bdi>{stage.email}</bdi>
+              {gt("Check your inbox and open the sign-in link sent to")} <bdi>{stage.email}</bdi>
             </span>
           </p>
           <div>
             <button type="button" className={LINK_CLASS} onClick={startOver}>
-              {t(gt("Use another email"), "استخدام بريد آخر")}
+              {gt("Use another email")}
             </button>
           </div>
         </div>
@@ -522,14 +507,14 @@ export function CloudSignIn({
             autoComplete="tel-national"
             required
             placeholder="05X XXX XXXX"
-            aria-label={t(gt("Mobile number"), "رقم الجوال")}
+            aria-label={gt("Mobile number")}
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
           />
           {agreement}
           <div dir={controlsDir}>
             <Button type="submit" disabled={busy || blocked || unavailable}>
-              {submitLabel(words.sendCode, t(gt("Send code"), "إرسال الرمز"))}
+              {submitLabel(words.sendCode, gt("Send code"))}
             </Button>
           </div>
         </form>
@@ -541,14 +526,14 @@ export function CloudSignIn({
             autoComplete="email"
             required
             placeholder="you@company.com"
-            aria-label={t(gt("Email"), "البريد الإلكتروني")}
+            aria-label={gt("Email")}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
           {agreement}
           <div dir={controlsDir}>
             <Button type="submit" disabled={busy || blocked || unavailable}>
-              {submitLabel(words.sendLink, t(gt("Send link"), "إرسال الرابط"))}
+              {submitLabel(words.sendLink, gt("Send link"))}
             </Button>
           </div>
         </form>
@@ -573,7 +558,6 @@ function ResendButton({
   readonly onResend: () => void;
 }) {
   const gt = useGT();
-  const t = useSetupText();
   const [now, setNow] = useState(() => Date.now());
   const waiting = now < resendAt;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a one-second clock for the countdown, running only while there is something to count
@@ -586,11 +570,10 @@ function ResendButton({
     <Button type="button" variant="ghost" disabled={disabled || waiting} onClick={onResend}>
       {waiting ? (
         <span className="tabular-nums">
-          {t(gt("Resend in"), "إعادة الإرسال بعد")} {Math.ceil((resendAt - now) / 1000)}
-          {t("s", " ث")}
+          {gt("Resend in {seconds}s", { seconds: Math.ceil((resendAt - now) / 1000) })}
         </span>
       ) : (
-        t(gt("Resend code"), "إعادة إرسال الرمز")
+        gt("Resend code")
       )}
     </Button>
   );
@@ -603,7 +586,7 @@ export function OwnServiceForm({
   readonly busy: boolean;
   readonly onSubmit: (payload: PrivacyConfigureRequest) => Promise<void>;
 }) {
-  const t = useSetupText();
+  const gt = useGT();
   const [endpoint, setEndpoint] = useState("");
   const [token, setToken] = useState("");
   return (
@@ -623,21 +606,21 @@ export function OwnServiceForm({
         type="url"
         required
         placeholder="http://localhost:8080"
-        aria-label={t("Service address", "عنوان الخدمة")}
+        aria-label={gt("Service address")}
         value={endpoint}
         onChange={(event) => setEndpoint(event.target.value)}
       />
       <Input
         type="password"
         autoComplete="off"
-        placeholder={t("Access token (optional)", "رمز الوصول (اختياري)")}
-        aria-label={t("Access token", "رمز الوصول")}
+        placeholder={gt("Access token (optional)")}
+        aria-label={gt("Access token")}
         value={token}
         onChange={(event) => setToken(event.target.value)}
       />
       <div className="mt-1">
         <Button type="submit" disabled={busy}>
-          {busy ? t("Checking…", "جارٍ التحقّق…") : t("Connect", "اتصال")}
+          {busy ? gt("Checking…") : gt("Connect")}
         </Button>
       </div>
     </form>

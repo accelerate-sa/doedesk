@@ -1,18 +1,32 @@
 import { useDirection } from "@base-ui/react/direction-provider";
 import { describe, expect, it } from "vite-plus/test";
-import { page } from "vite-plus/test/browser";
+import { page, userEvent } from "vite-plus/test/browser";
 
 import "../index.css";
+import { LanguageStep } from "../components/onboarding/SetupPrivacySteps";
 import { Dialog, DialogPopup, DialogTitle } from "../components/ui/dialog";
 import { Sidebar, SidebarInset, SidebarProvider } from "../components/ui/sidebar";
 import { render } from "../../test/render";
 import { I18nProvider } from "./I18nProvider";
 import { startI18n } from "./runtime";
-import { updateClientSettings } from "../hooks/useSettings";
+import { getClientSettings, updateClientSettings, useClientSettings } from "../hooks/useSettings";
 
 function DirectionProbe() {
   const direction = useDirection();
   return <span data-testid="base-ui-direction">{direction}</span>;
+}
+
+function LanguageStepHarness() {
+  const language = useClientSettings((settings) => settings.language);
+  const locale = language === "ar" ? "ar" : "en";
+  return (
+    <LanguageStep
+      locale={locale}
+      onLocale={(next) => {
+        void updateClientSettings({ language: next });
+      }}
+    />
+  );
 }
 
 describe("RTL layout and i18n direction", () => {
@@ -128,6 +142,42 @@ describe("RTL layout and i18n direction", () => {
       expect(closeRect.left - popupRect.left).toBeLessThan(popupRect.right - closeRect.right);
     } finally {
       document.documentElement.dir = previousDir;
+    }
+  });
+
+  it("switches app language, RTL direction, and Arabic catalog copy from setup LanguageStep", async () => {
+    const previousDir = document.documentElement.dir;
+    const previousLang = document.documentElement.lang;
+    try {
+      startI18n();
+      updateClientSettings({ language: "en" });
+      await using screen = await render(
+        <I18nProvider>
+          <LanguageStepHarness />
+        </I18nProvider>,
+        {
+          // Pure i18n/direction check without navigation.
+          router: false,
+        },
+      );
+      await expect.element(screen.getByText(/Choose your language for DoeDesk/)).toBeVisible();
+      expect(document.documentElement.dir).toBe("ltr");
+
+      await userEvent.click(screen.getByRole("radio", { name: "العربية" }));
+      await expect.element(screen.getByText(/اختر لغة DoeDesk/)).toBeVisible();
+      expect(document.documentElement.dir).toBe("rtl");
+      expect(document.documentElement.lang).toBe("ar");
+      expect(getClientSettings().language).toBe("ar");
+
+      await userEvent.click(screen.getByRole("radio", { name: "English" }));
+      await expect.element(screen.getByText(/Choose your language for DoeDesk/)).toBeVisible();
+      expect(document.documentElement.dir).toBe("ltr");
+      expect(document.documentElement.lang).toBe("en");
+      expect(getClientSettings().language).toBe("en");
+    } finally {
+      updateClientSettings({ language: "en" });
+      document.documentElement.dir = previousDir;
+      document.documentElement.lang = previousLang;
     }
   });
 });

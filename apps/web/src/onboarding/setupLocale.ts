@@ -1,21 +1,11 @@
 import { createContext, useContext } from "react";
 
-import type { SetupLocale } from "./onboardingSteps.logic";
-
 /**
- * The language first-run setup is shown in. The app's own interface has no Arabic yet, so setup
- * carries its two languages itself; screens shared with Settings read this to follow it, and
- * outside setup there is none and they keep their usual words.
+ * True while rendering inside first-run setup. Shared privacy forms read this to hide their
+ * inline consent-language toggle because step 1 of setup already chose the app language.
  */
-export const SetupLocaleContext = createContext<SetupLocale | null>(null);
+export const InSetupContext = createContext(false);
 
-/** Picks the English or Arabic words for the language setup is in. */
-export function useSetupText() {
-  const locale = useContext(SetupLocaleContext);
-  return (english: string, arabic: string) => (locale === "ar" ? arabic : english);
-}
-
-/** True inside setup shown in Arabic. */
-export function useSetupArabic(): boolean {
-  return useContext(SetupLocaleContext) === "ar";
+export function useInSetup(): boolean {
+  return useContext(InSetupContext);
 }
