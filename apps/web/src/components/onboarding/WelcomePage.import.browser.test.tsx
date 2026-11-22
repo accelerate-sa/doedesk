@@ -81,6 +81,10 @@ vi.mock(import("~/privacy/privacyClient"), async (original) => ({
     },
   }),
   useUsageData: () => state.usageData,
+  useUsageDataState: () =>
+    state.usageData === null
+      ? ({ kind: "error", status: null } as const)
+      : ({ kind: "ready", status: state.usageData } as const),
   setUsageData: (...args: unknown[]) => state.setUsageData(...args),
   useConsentLocale: () => ["en", () => {}, false] as const,
 }));

@@ -4,7 +4,7 @@ import {
   setPrivacyStatus,
   useConsentLocale,
   usePrivacyStatus,
-  useUsageData,
+  useUsageDataState,
 } from "~/privacy/privacyClient";
 import { settleUsageDataFirstRun, usageDataChoiceDue } from "../privacy/UsageData";
 import { termsAcceptanceDue } from "../privacy/TermsAcceptanceSheet";
@@ -196,11 +196,12 @@ export function WelcomePage({
   // The same access Settings → Sharing & access checks.
   const canReadRelay = useEnvironmentScope(environmentId, AuthRelayReadScope);
   const canWriteRelay = useEnvironmentScope(environmentId, AuthRelayWriteScope);
+  const managedPolicy = useManagedPolicy(environmentId);
   const showPhone = welcomeOffersPhone({
     isPrimary,
     cloud: hasCloudPublicConfig(),
     canShare: canReadRelay && canWriteRelay,
-    policy: useManagedPolicy(environmentId),
+    policy: managedPolicy,
   });
   const scans = useProjectScans([environmentId]);
   const [storedSelection, storeSelection] = useLocalStorage(
@@ -317,10 +318,13 @@ export function WelcomePage({
   const selected = developerMode && projectImport.canWrite ? projectImport.selected : [];
   const privacy = usePrivacyStatus();
   const privacyStatus = privacy.kind === "ready" ? privacy.status : null;
-  const usageData = useUsageData();
+  const usageDataState = useUsageDataState();
+  const usageData = usageDataState.status;
   // Kept as a step from the moment the choice is due, even after the person answers it.
   const [usageDataOffered, setUsageDataOffered] = useState(false);
   if (!usageDataOffered && usageDataChoiceDue(usageData)) setUsageDataOffered(true);
+  const usageDataPending =
+    usageDataState.kind === "loading" && managedTelemetryOffMessage(managedPolicy) === undefined;
   const newCount = selected.filter(projectImport.isNew).length;
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the consent texts read a shared language atom that is not stored; a resumed setup puts its stored language back into it
@@ -334,6 +338,7 @@ export function WelcomePage({
     termsOutstanding: privacyStatus !== null && termsAcceptanceDue(privacyStatus),
     profileAnswered: privacyStatus?.profileAnswered ?? false,
     usageDataDue: usageDataOffered,
+    usageDataPending,
     developerMode,
     foldersAvailable:
       scan !== undefined &&
@@ -434,12 +439,13 @@ export function WelcomePage({
                   <LanguageStep locale={locale} onLocale={chooseLocale} />
                 ) : view.step === "masking" ? (
                   <MaskingStep
-                    status={privacy.kind === "loading" ? null : privacyStatus}
+                    status={privacyStatus}
+                    loading={privacy.kind === "loading"}
                     choice={state.masking}
                     onChoice={(masking) => saveState({ ...state, masking })}
                   />
                 ) : view.step === "account" ? (
-                  <AccountStep status={privacyStatus} />
+                  <AccountStep status={privacyStatus} loading={privacy.kind === "loading"} />
                 ) : view.step === "profile" && privacyStatus !== null ? (
                   <ProfileStep
                     status={privacyStatus}

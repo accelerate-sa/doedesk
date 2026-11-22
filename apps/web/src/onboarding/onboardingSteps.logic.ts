@@ -32,6 +32,8 @@ export interface OnboardingFacts {
   readonly profileAnswered: boolean;
   /** The usage-data choice or notice has not been shown yet and can be. */
   readonly usageDataDue: boolean;
+  /** True while the server is still deciding the usage-data rule for this region. */
+  readonly usageDataPending?: boolean;
   readonly developerMode: boolean;
   readonly foldersAvailable: boolean;
   readonly phoneAvailable: boolean;
@@ -85,7 +87,12 @@ function applies(step: OnboardingStep, state: OnboardingState, facts: Onboarding
       // The answers are kept with the account, so they are asked only of one.
       return usesAccount(state, facts) && (!facts.profileAnswered || shown);
     case "usageData":
-      return facts.usageDataDue || shown;
+      return (
+        facts.usageDataDue ||
+        shown ||
+        (facts.usageDataPending === true &&
+          ONBOARDING_STEPS.indexOf(state.step) <= ONBOARDING_STEPS.indexOf("usageData"))
+      );
     case "folders":
       return facts.developerMode && facts.foldersAvailable;
     case "phone":
@@ -111,6 +118,8 @@ function canContinue(
       );
     case "account":
       return facts.privacyMode === "cloud" && !facts.termsOutstanding;
+    case "usageData":
+      return facts.usageDataDue || facts.usageDataPending !== true;
     case "agents":
       return facts.agentReady;
     default:
@@ -165,6 +174,12 @@ const withSeen = (state: OnboardingState, ...steps: ReadonlyArray<OnboardingStep
   return seen;
 };
 
+const recordableSteps = (
+  facts: OnboardingFacts,
+  ...steps: ReadonlyArray<OnboardingStep>
+): ReadonlyArray<OnboardingStep> =>
+  steps.filter((step) => step !== "usageData" || facts.usageDataDue);
+
 /** Moves to the next step that applies. Skipping is how the AI step is passed without an agent. */
 export function goForward(
   state: OnboardingState,
@@ -176,12 +191,16 @@ export function goForward(
     return state.step === view.step ? state : { ...state, step: view.step };
   }
   const next = view.steps[view.steps.indexOf(view.step) + 1]!;
-  return { ...state, step: next, seen: withSeen(state, view.step, next) };
+  return {
+    ...state,
+    step: next,
+    seen: withSeen(state, ...recordableSteps(facts, view.step, next)),
+  };
 }
 
 export function goBack(state: OnboardingState, facts: OnboardingFacts): OnboardingState {
   const view = onboardingView(state, facts);
   if (view.isFirst) return state;
   const previous = view.steps[view.steps.indexOf(view.step) - 1]!;
-  return { ...state, step: previous, seen: withSeen(state, view.step) };
+  return { ...state, step: previous, seen: withSeen(state, ...recordableSteps(facts, view.step)) };
 }

@@ -23,6 +23,7 @@ import { ProfileQuestions } from "../privacy/ProfileQuestions";
 import { termsAcceptanceDue } from "../privacy/TermsAcceptanceSheet";
 import { UsageDataChoice } from "../privacy/UsageData";
 import { Button } from "../ui/button";
+import { Spinner } from "../ui/spinner";
 
 /** One choice among a step's options, as a large radio. */
 function ChoiceCard({
@@ -112,10 +113,12 @@ export function LanguageStep({
  */
 export function MaskingStep({
   status,
+  loading = false,
   choice,
   onChoice,
 }: {
   readonly status: PrivacyStatus | null;
+  readonly loading?: boolean;
   readonly choice: MaskingChoice | null;
   readonly onChoice: (choice: MaskingChoice) => void;
 }) {
@@ -125,6 +128,7 @@ export function MaskingStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (loading) return <Spinner size="md" tone="muted" aria-label={gt("Loading")} />;
   if (status === null) return <PrivacyUnavailable />;
   if (isPrivacyDecided(status)) {
     return <PrivacySetup status={status} onStatus={setPrivacyStatus} />;
@@ -211,9 +215,16 @@ function PrivacyUnavailable() {
  * Signing in creates the account and records the Terms on the first go. Neither can be undone by
  * going back, so once signed in the step shows where the account stands instead of the form.
  */
-export function AccountStep({ status }: { readonly status: PrivacyStatus | null }) {
+export function AccountStep({
+  status,
+  loading = false,
+}: {
+  readonly status: PrivacyStatus | null;
+  readonly loading?: boolean;
+}) {
   const gt = useGT();
   const options = useSignInOptions();
+  if (loading) return <Spinner size="md" tone="muted" aria-label={gt("Loading")} />;
   if (status === null) return <PrivacyUnavailable />;
   if (status.mode !== "cloud") {
     return (
@@ -273,5 +284,14 @@ export function ProfileStep({
 }
 
 export function UsageDataStep({ status }: { readonly status: UsageDataStatus | null }) {
-  return status === null ? null : <UsageDataChoice status={status} />;
+  const gt = useGT();
+  if (status === null) {
+    return (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Spinner size="sm" tone="muted" />
+        {gt("Checking…")}
+      </p>
+    );
+  }
+  return <UsageDataChoice status={status} />;
 }

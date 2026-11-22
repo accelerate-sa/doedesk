@@ -146,4 +146,38 @@ describe("onboarding steps", () => {
       readOnboardingState({ step: "retired", seen: ["masking", "x"], locale: "fr", masking: "?" }),
     ).toEqual({ step: "welcome", seen: ["masking"], locale: null, masking: null });
   });
+
+  it("keeps the step count stable while usage-data region detection is still loading", () => {
+    const loading = facts({ usageDataDue: false, usageDataPending: true });
+    // Before the region answer arrives, step 1 already counts usageData so 1/5 never jumps to 1/6.
+    expect(onboardingView(state(), loading)).toMatchObject({
+      step: "welcome",
+      position: 1,
+      count: 6,
+    });
+    // Reaching usageData while still loading holds Continue and does not lock it into seen yet.
+    const atProfile = state({
+      step: "profile",
+      seen: ["welcome", "masking", "account", "profile"],
+      masking: "account",
+    });
+    const signedInLoading = facts({
+      privacyMode: "cloud",
+      usageDataDue: false,
+      usageDataPending: true,
+    });
+    const reachedPending = goForward(atProfile, signedInLoading);
+    expect(reachedPending.step).toBe("usageData");
+    expect(reachedPending.seen).not.toContain("usageData");
+    expect(onboardingView(reachedPending, signedInLoading).canContinue).toBe(false);
+    // If usage data turns out not to apply, setup moves on to agents cleanly instead of showing an empty step.
+    expect(
+      onboardingView(
+        reachedPending,
+        facts({ privacyMode: "cloud", usageDataDue: false, usageDataPending: false }),
+      ).step,
+    ).toBe("agents");
+    // Going back while still loading does not lock an unshown usageData step into seen either.
+    expect(goBack(reachedPending, signedInLoading).seen).not.toContain("usageData");
+  });
 });

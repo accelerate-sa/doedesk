@@ -214,12 +214,25 @@ export const setUsageData = async (
   return status;
 };
 
-/** Where usage data stands. Null while loading, and when the server could not be asked. */
-export function useUsageData(): UsageDataStatus | null {
+export type UsageDataLoadState =
+  | { readonly kind: "loading"; readonly status: null }
+  | { readonly kind: "error"; readonly status: null }
+  | { readonly kind: "ready"; readonly status: UsageDataStatus };
+
+/** Where usage data stands, distinguishing an in-flight region check from an error. */
+export function useUsageDataState(): UsageDataLoadState {
   const decided = useAtomValue(decidedUsageDataAtom);
   const changed = useAtomValue(changedUsageDataAtom);
-  if (changed !== null) return changed;
-  return AsyncResult.isSuccess(decided) ? decided.value : null;
+  if (changed !== null) return { kind: "ready", status: changed };
+  if (AsyncResult.isSuccess(decided)) return { kind: "ready", status: decided.value };
+  return AsyncResult.isFailure(decided)
+    ? { kind: "error", status: null }
+    : { kind: "loading", status: null };
+}
+
+/** Where usage data stands. Null while loading, and when the server could not be asked. */
+export function useUsageData(): UsageDataStatus | null {
+  return useUsageDataState().status;
 }
 
 // The language the consent texts are shown in. One choice for every screen that shows them.
