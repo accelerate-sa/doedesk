@@ -1,0 +1,96 @@
+DoeDesk
+Copyright (C) 2026 Accelerate Technology Establishment
+
+DoeDesk is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+DoeDesk is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+details. The full text is in the file LICENSE.
+
+
+Which licence covers what
+-------------------------
+
+1. DoeDesk as a whole, and everything Accelerate Technology Establishment
+   wrote for it, is licensed under the GNU Affero General Public License,
+   version 3 or any later version (SPDX: AGPL-3.0-or-later). This includes
+   the masking and sealed-files engine in packages/privacy-gateway. The
+   licence text is in LICENSE.
+
+2. DoeDesk is a fork of T3 Code (https://github.com/pingdotgg/t3code),
+   Copyright (c) 2026 T3 Tools Inc., which is released under the MIT licence.
+   T3 Code's copyright notice and permission notice are kept, unchanged, in
+   LICENSE.T3-Code-MIT. The code that comes from T3 Code remains available
+   under the MIT licence from T3 Code's own repository. In this repository it
+   is distributed as part of DoeDesk, under the licence in point 1.
+
+3. Versions of DoeDesk up to and including v2026.11.1 were released under the
+   MIT licence and remain available under it. The licence of each of those
+   versions is the LICENSE file at that version's tag. Nothing here withdraws
+   a licence already granted.
+
+4. A commercial licence is available from Accelerate Technology Establishment
+   for those who cannot use DoeDesk under the AGPL. See COMMERCIAL-LICENSE.md
+   or write to hello@doedesk.com.
+
+5. Third-party software, fonts, sounds and other assets included in DoeDesk
+   remain under their own licences. Their notices are listed in the app under
+   Settings, About, Open source licenses, and vendored code keeps its licence
+   file beside it.
+
+6. The name DoeDesk and the DoeDesk logo belong to Accelerate Technology
+   Establishment. As section 7(e) of the licence allows, no right to use them
+   is granted by it, except to state truthfully that a work is based on
+   DoeDesk. A changed version must not be presented as an official DoeDesk
+   release.
+
+7. DoeDesk may be conveyed together with an AI provider's own software that
+   is not free software, under the additional permission below.
+
+
+Additional permission under GNU AGPL version 3 section 7
+---------------------------------------------------------
+
+DoeDesk reaches an AI provider through that provider's own software: a
+software development kit that DoeDesk loads, or a command-line program that
+DoeDesk starts. Some of that software is not free software. So that DoeDesk
+can be conveyed with it, Accelerate Technology Establishment grants the
+following for the parts of DoeDesk it holds the copyright in.
+
+If you modify DoeDesk, or any covered work, by linking or combining it with
+a Provider Component (or a modified version of that component), the
+licensors of DoeDesk grant you additional permission to convey the
+resulting work. The Provider Component need not be licensed under the GNU
+Affero General Public License, and Corresponding Source for a non-source
+form of such a combination need not include the source code of the Provider
+Component. You must obey the GNU Affero General Public License in all
+respects for all of the code used other than the Provider Component.
+
+A "Provider Component" is a software development kit or a command-line
+program that the operator of an AI model service publishes as its own means
+of using that service or running its agent, and that DoeDesk loads or
+starts for that purpose only. When this was written they were
+@anthropic-ai/claude-agent-sdk, published by Anthropic PBC, and @cursor/sdk
+with its platform packages, published by Anysphere Inc. A component that
+adds to, changes or replaces what DoeDesk itself does is not a Provider
+Component.
+
+This permission does not change the licence of any Provider Component: you
+must meet its own terms. If you modify DoeDesk, you may extend this
+permission to your version, but you are not obliged to. As section 7
+allows, you may remove this additional permission from any copy of DoeDesk
+that you convey, or from any part of it.
+
+
+Source code
+-----------
+
+The source of DoeDesk is published at https://github.com/accelerate-sa/doedesk.
+A running copy of DoeDesk links to the source of its own version under
+Settings, About, Source code. If you change DoeDesk and let other people use
+your version over a network, section 13 of the licence requires you to offer
+them the source of your version; point that link at it (see README.md).

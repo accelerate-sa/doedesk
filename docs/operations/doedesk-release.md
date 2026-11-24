@@ -178,7 +178,7 @@ need an App Group, which has to be created in the Apple developer portal first.
 cd apps/mobile
 export DOEDESK_BRAND_FONTS_DIR=<folder with the Thmanyah files>
 APP_VARIANT=production T3CODE_IOS_PERSONAL_TEAM=1 T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID=com.doedesk.app \
-  npx expo prebuild --clean --platform ios
+  T3CODE_MOBILE_VERSION=2026.11.0 npx expo prebuild --clean --platform ios
 cd ios
 APP_VARIANT=production T3CODE_IOS_PERSONAL_TEAM=1 T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID=com.doedesk.app \
   xcodebuild -workspace DoeDesk.xcworkspace -scheme DoeDesk -configuration Release \

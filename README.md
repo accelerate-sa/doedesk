@@ -78,4 +78,30 @@ This repository does not take issues or pull requests. Write to
 
 DoeDesk is a fork of [T3 Code](https://github.com/pingdotgg/t3code) by T3 Tools Inc. The agent
 runtime, the interface and most of the code are theirs. DoeDesk adds the privacy gateway and
-removes what is only for programming. Both are MIT licensed; see [LICENSE](./LICENSE).
+removes what is only for programming.
+
+## Licence
+
+DoeDesk is free software under the
+[GNU Affero General Public License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
+
+- **DoeDesk as a whole, and what Accelerate Technology Establishment wrote for it**, including
+  `packages/privacy-gateway`, is under the AGPL.
+- **The code that comes from T3 Code** is released by T3 Tools Inc. under the MIT licence. Their
+  notice is kept in [LICENSE.T3-Code-MIT](./LICENSE.T3-Code-MIT), and that code remains available
+  under MIT from [their repository](https://github.com/pingdotgg/t3code).
+- **Versions up to and including `v2026.11.1`** were released under the MIT licence and remain
+  under it.
+- **An AI provider's own software** that DoeDesk loads or starts, such as the Claude Agent SDK
+  and the Cursor SDK, is not free software and keeps its own terms. An additional permission
+  under section 7 of the AGPL, in [NOTICE](./NOTICE), lets DoeDesk be shared together with it.
+- **A commercial licence** is available from Accelerate Technology Establishment for those who
+  cannot use the AGPL: see [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md) or write to
+  [hello@doedesk.com](mailto:hello@doedesk.com).
+
+[NOTICE](./NOTICE) states this in full.
+
+The app links to the source of the version it is running under **Settings, About, Source code**.
+If you change DoeDesk and let other people use your version over a network, the AGPL (section 13)
+requires you to offer them your source: set `SOURCE_REPOSITORY_URL` in
+`packages/shared/src/sourceCode.ts` to where you publish it.

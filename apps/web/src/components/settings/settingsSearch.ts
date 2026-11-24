@@ -1173,6 +1173,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("logs traces processes resource history failures spans cpu memory")],
   },
   {
+    id: "source-code",
+    title: msg("Source code"),
+    to: "/settings/about",
+    searchTerms: [msg("license AGPL GNU Affero free software repository")],
+  },
+  {
     id: "open-source-licenses",
     title: msg("Open source licenses"),
     to: "/settings/about",

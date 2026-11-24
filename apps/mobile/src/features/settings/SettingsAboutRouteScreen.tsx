@@ -4,6 +4,7 @@ import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScroll
 import * as Application from "expo-application";
 import Constants from "expo-constants";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
+import { sourceCodeUrl } from "@t3tools/shared/sourceCode";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/ui/AppText";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { useDeadlinePassed } from "../../lib/clock";
+import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import {
   type AppUpdateCheckState,
   isAppUpdateCheckAvailable,
@@ -139,6 +141,13 @@ function AppSettingsSection() {
         icon="doc.on.doc"
         label={gt("Open source licenses")}
         target="SettingsOpenSourceLicenses"
+      />
+      <SettingsRow
+        icon="chevron.left.forwardslash.chevron.right"
+        label={gt("Source code")}
+        value={gt("Free software under the GNU AGPL, version 3 or later")}
+        valuePosition="below"
+        onPress={() => void tryOpenExternalUrl(sourceCodeUrl(version))}
       />
       <SettingsRow icon="doc.text" label={gt("Legal")} fullScreenTarget="SettingsLegal" />
       {updateCheckAvailable ? (

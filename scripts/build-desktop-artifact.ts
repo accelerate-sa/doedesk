@@ -3003,6 +3003,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       fpm: [
         `${path.join(repoRoot, "apps/desktop/resources/linux/com.t3tools.t3code.metainfo.xml")}=/usr/share/metainfo/com.t3tools.t3code.metainfo.xml`,
         `${path.join(repoRoot, "LICENSE")}=/usr/share/doc/t3code/copyright`,
+        `${path.join(repoRoot, "NOTICE")}=/usr/share/doc/t3code/NOTICE`,
+        `${path.join(repoRoot, "LICENSE.T3-Code-MIT")}=/usr/share/doc/t3code/LICENSE.T3-Code-MIT`,
       ],
       // Debian 13 and Ubuntu 24.04 use 64-bit-time names; retain old-name fallbacks.
       depends: [
@@ -3996,7 +3998,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     packageManager: rootPackageJson.packageManager,
     description:
       "DoeDesk is an open-source desk for AI agents and confidential work. Personal data is masked on your machine before any model sees it.",
-    license: "MIT",
+    license: "AGPL-3.0-or-later",
     homepage: "https://doedesk.com",
     author: "DoeDesk",
     main: "apps/desktop/dist-electron/boot.cjs",

@@ -235,6 +235,10 @@
       "types": "./src/qrCode.ts",
       "import": "./src/qrCode.ts"
     },
+    "./sourceCode": {
+      "types": "./src/sourceCode.ts",
+      "import": "./src/sourceCode.ts"
+    },
     "./cliArgs": {
       "types": "./src/cliArgs.ts",
       "import": "./src/cliArgs.ts"

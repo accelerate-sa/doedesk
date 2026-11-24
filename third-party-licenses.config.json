@@ -1,6 +1,20 @@
 {
   "customNotices": [
     {
+      "bundles": ["desktop", "mobile", "web"],
+      "license": "AGPL-3.0-or-later",
+      "name": "DoeDesk",
+      "sourceUrl": "https://github.com/accelerate-sa/doedesk",
+      "noticeFiles": ["NOTICE", "LICENSE"]
+    },
+    {
+      "bundles": ["desktop", "mobile", "web"],
+      "license": "MIT",
+      "name": "T3 Code",
+      "sourceUrl": "https://github.com/pingdotgg/t3code",
+      "noticeFile": "LICENSE.T3-Code-MIT"
+    },
+    {
       "bundles": ["desktop", "mobile"],
       "license": "MIT",
       "name": "Apple Speech engine (adapted from @react-native-ai/apple)",

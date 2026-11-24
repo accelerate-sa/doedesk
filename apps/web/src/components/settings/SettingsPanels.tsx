@@ -34,6 +34,7 @@ import {
 import { desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
 import { createModelSelection, pickModelSelection } from "@t3tools/shared/model";
 import { resolvePastedPath } from "@t3tools/shared/path";
+import { sourceCodeUrl } from "@t3tools/shared/sourceCode";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
@@ -2607,6 +2608,23 @@ export function AboutSettingsPanel() {
               variant="outline"
             >
               <T>View policy</T>
+            </Button>
+          }
+        />
+        <SettingsRow
+          {...setting("source-code")}
+          description={gt(
+            "DoeDesk is free software under the GNU Affero General Public License, version 3 or later. This link opens the source of the version you are using.",
+          )}
+          control={
+            <Button
+              render={
+                <a href={sourceCodeUrl(APP_VERSION)} target="_blank" rel="noreferrer noopener" />
+              }
+              size="sm"
+              variant="outline"
+            >
+              <T>View source</T>
             </Button>
           }
         />
