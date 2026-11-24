@@ -948,7 +948,7 @@ function OpenCommandPaletteDialog(props: {
           kind: "action" as const,
           value: NEW_THREAD_NO_PROJECT_VALUE,
           searchTerms: ["no project", "without folder", "none"],
-          title: gt("No project"),
+          title: gt("No folder", { $context: "a chat that is not in any folder" }),
           icon: <MessageSquareDashedIcon className={ITEM_ICON_CLASS} />,
           shortcutCommand: "chat.newWithoutProject" as const,
           run: () => startScratchThread(scratchTargetEnvironmentId),
@@ -1123,7 +1123,9 @@ function OpenCommandPaletteDialog(props: {
         value: `action:add-project:${environmentId}:new`,
         searchTerms: ["new folder", "create", "empty", "repository", "git init"],
         title: gt("New folder"),
-        description: gt("Start a new Git repository from a name"),
+        description: developerMode
+          ? gt("Start a new Git repository from a name")
+          : gt("Create a new folder from a name"),
         icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
         keepOpen: true,
         run: async () => {

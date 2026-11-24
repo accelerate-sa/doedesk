@@ -994,6 +994,9 @@ function preserveRunRecordedFields(
       : {}),
     // Only a submission sets the output; a lifecycle write carries it as it was when read.
     ...(current.output !== undefined ? { output: current.output } : {}),
+    ...(next.privacy === undefined && current.privacy !== undefined
+      ? { privacy: current.privacy }
+      : {}),
   };
 }
 
@@ -1123,6 +1126,13 @@ export function applyToProjection(
         ...base,
         runs: base.runs.map((run) =>
           run.id === event.payload.runId ? { ...run, output: event.payload.output } : run,
+        ),
+      };
+    case "run.privacy-recorded":
+      return {
+        ...base,
+        runs: base.runs.map((run) =>
+          run.id === event.payload.runId ? { ...run, privacy: event.payload.privacy } : run,
         ),
       };
     case "run-attempt.created":
@@ -1363,6 +1373,9 @@ const encodeRestartCancelledBackgroundWork = Schema.encodeEffect(
 );
 const encodeRunOutput = Schema.encodeEffect(
   Schema.fromJsonString(OrchestrationV2RunJsonSchema.fields.output),
+);
+const encodeRunPrivacy = Schema.encodeEffect(
+  Schema.fromJsonString(OrchestrationV2RunJsonSchema.fields.privacy),
 );
 const encodeRunAttemptPayload = Schema.encodeEffect(
   Schema.fromJsonString(OrchestrationV2RunAttemptJsonSchema),
@@ -2617,8 +2630,11 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 completed_at = excluded.completed_at,
                 payload_json = ${keepRecordedRunOutput(
                   keepRecordedRunField(
-                    keepRecordedRunField(sql`excluded.payload_json`, "$.delegatedCompletion"),
-                    "$.restartCancelledBackgroundWork",
+                    keepRecordedRunField(
+                      keepRecordedRunField(sql`excluded.payload_json`, "$.delegatedCompletion"),
+                      "$.restartCancelledBackgroundWork",
+                    ),
+                    "$.privacy",
                   ),
                 )}
             `;
@@ -2646,6 +2662,15 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
               yield* sql`
               UPDATE orchestration_v2_projection_runs
               SET payload_json = json_set(payload_json, '$.output', json(${outputJson}))
+              WHERE run_id = ${event.payload.runId} AND thread_id = ${event.threadId}
+            `;
+              break;
+            }
+            case "run.privacy-recorded": {
+              const privacyJson = yield* encodeRunPrivacy(event.payload.privacy);
+              yield* sql`
+              UPDATE orchestration_v2_projection_runs
+              SET payload_json = json_set(payload_json, '$.privacy', json(${privacyJson}))
               WHERE run_id = ${event.payload.runId} AND thread_id = ${event.threadId}
             `;
               break;

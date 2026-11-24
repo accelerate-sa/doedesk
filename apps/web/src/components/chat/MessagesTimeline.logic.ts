@@ -68,6 +68,7 @@ import {
 } from "@t3tools/contracts";
 import type { ThreadRunSummary } from "@t3tools/client-runtime/state/shell";
 import type { ToolCallVisibility } from "@t3tools/contracts/settings";
+import { sealedToolTitle } from "@t3tools/shared/serverSentencesCopy";
 import { resolveT3McpToolDefinition } from "@t3tools/shared/t3McpToolPresentation";
 import { compactDynamicToolOutput } from "@t3tools/shared/toolOutput";
 import { htmlRenderReferencesEqual, type HtmlRenderReference } from "@t3tools/shared/htmlRender";
@@ -207,7 +208,9 @@ export function workEntryDisplayLabel(
     return resolve(msg("Read file"));
   }
   const heading = normalizeCompactToolLabel(entry.toolTitle || entry.label);
-  return `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`;
+  return (
+    sealedToolTitle(heading, resolve) ?? `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`
+  );
 }
 
 export function threadReadTargetId(entry: Pick<WorkLogEntry, "structuredPayload">) {

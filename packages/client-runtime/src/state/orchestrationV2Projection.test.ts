@@ -220,6 +220,27 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
     expect(next?.visibleTurnItems[0]).toBe(visibleTurnItems[0]);
   });
 
+  it("keeps a run's privacy record through a later lifecycle update that lacks it", () => {
+    const privacy = { state: "unmasked", reason: "off" } as const;
+    const recorded = applyOrchestrationV2ProjectionEvent({ ...emptyProjection, runs: [run] }, {
+      id: "event-run-privacy",
+      type: "run.privacy-recorded",
+      threadId,
+      runId,
+      occurredAt: now,
+      payload: { runId, privacy },
+    } as OrchestrationV2DomainEvent);
+    const next = applyOrchestrationV2ProjectionEvent(recorded, {
+      id: "event-run-update",
+      type: "run.updated",
+      threadId,
+      runId,
+      occurredAt: now,
+      payload: { ...run, status: "completed" },
+    } as OrchestrationV2DomainEvent);
+    expect(next?.runs[0]).toMatchObject({ status: "completed", privacy });
+  });
+
   it("replaces only the updated visible item and retains its deferred work cursor", () => {
     const deferredWork = { cursor: "remaining-work", itemCount: 100, lastOrdinal: 101 };
     const first = { ...commandItem("item-first", "first"), deferredWork };

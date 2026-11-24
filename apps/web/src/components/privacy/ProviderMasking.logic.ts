@@ -42,20 +42,62 @@ export const maskedProviders = (
 };
 
 /**
- * The provider whose notice is due: masking is working, the user is signed in to it, its
- * requests go through the gateway, and its notice has not been read.
+ * The providers whose notice has not been read: masking is working, the user is signed in to the
+ * provider and its requests go through the gateway.
+ */
+export const unreadNotices = (
+  status: PrivacyStatus,
+  providers: ReadonlyArray<ServerProvider>,
+): ReadonlyArray<MaskedProvider> => {
+  if (status.mode !== "cloud" && status.mode !== "selfHosted") return [];
+  // An older server does not record who read the notice, so it cannot be shown only once.
+  const read = status.noticesRead;
+  if (read === undefined) return [];
+  const direct = status.directProviders ?? [];
+  return maskedProviders(providers).filter(
+    (provider) =>
+      provider.signedIn && !direct.includes(provider.driver) && !read.includes(provider.driver),
+  );
+};
+
+/** The providers this computer has sent a chat to. A chat with no run yet has sent nothing. */
+export const driversInUse = (
+  chats: ReadonlyArray<{
+    readonly environmentId: string;
+    readonly providerInstanceId: string;
+    readonly latestRun: unknown;
+  }>,
+  providers: ReadonlyArray<ServerProvider>,
+  primaryEnvironmentId: string | null,
+): ReadonlySet<string> => {
+  const driverOf = new Map<string, string>(
+    providers.map((provider) => [provider.instanceId, provider.driver]),
+  );
+  return new Set(
+    chats.flatMap((chat) => {
+      const driver =
+        chat.environmentId === primaryEnvironmentId && chat.latestRun !== null
+          ? driverOf.get(chat.providerInstanceId)
+          : undefined;
+      return driver === undefined ? [] : [driver];
+    }),
+  );
+};
+
+/**
+ * The notice to show now. A provider's notice is shown when a chat with it starts, not for
+ * every signed-in provider at once: the one a message is about to be sent to (`asked`) first,
+ * then one that already has a chat here, such as a chat an agent or a schedule started.
  */
 export const pendingNotice = (
   status: PrivacyStatus,
   providers: ReadonlyArray<ServerProvider>,
+  inUse: ReadonlySet<string>,
+  asked: string | null,
 ): MaskedProvider | undefined => {
-  if (status.mode !== "cloud" && status.mode !== "selfHosted") return undefined;
-  // An older server does not record who read the notice, so it cannot be shown only once.
-  const read = status.noticesRead;
-  if (read === undefined) return undefined;
-  const direct = status.directProviders ?? [];
-  return maskedProviders(providers).find(
-    (provider) =>
-      provider.signedIn && !direct.includes(provider.driver) && !read.includes(provider.driver),
+  const unread = unreadNotices(status, providers);
+  return (
+    unread.find((provider) => provider.driver === asked) ??
+    unread.find((provider) => inUse.has(provider.driver))
   );
 };

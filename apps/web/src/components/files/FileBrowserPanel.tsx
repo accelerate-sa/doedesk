@@ -28,11 +28,28 @@ import { useFileContextMenu, type FileContextMenuAction } from "~/fileContextMen
 import { readLocalApi } from "~/localApi";
 import { T3_PIERRE_ICONS } from "~/pierre-icons";
 import {
+  markRightToLeftTreeNames,
   PIERRE_TREE_UNSAFE_CSS,
   pierreTreeStyle,
   titleClippedPierreTreeRow,
 } from "~/pierre-tree-theme";
 
+import { SealedFilesList, SealingElsewhereNote } from "../privacy/SealedFiles";
+import {
+  fileNameOf,
+  groupSealedListing,
+  sealedFolderAt,
+  sealedFolderHolding,
+  sealedFolderToUnseal,
+} from "../privacy/sealedFiles.logic";
+import { useFolderSealing } from "../privacy/useFolderSealing";
+import { reloadSealedDocuments, useSealedRevision } from "~/privacy/privacyClient";
+import {
+  requestSeal,
+  requestSealFiles,
+  requestSealFolder,
+  requestUnsealFolder,
+} from "~/privacy/sealPrompt";
 import { joinHostPath } from "./filePath";
 import { createFileTreeDragMentionController } from "./fileTreeDragMention";
 import {
@@ -52,6 +69,8 @@ import { type PreviewAction, subscribePreviewAction } from "../preview/previewAc
 interface FileBrowserPanelProps {
   environmentId: EnvironmentId;
   cwd: string;
+  /** The folder's project, when its files can be sealed from this list. */
+  projectId?: string | undefined;
   projectName: string;
   selectedPath: string | null;
   selectedPathRevealId: number;
@@ -158,6 +177,7 @@ function buildTreeEntries(
 export default function FileBrowserPanel({
   environmentId,
   cwd,
+  projectId,
   projectName,
   selectedPath,
   selectedPathRevealId,
@@ -174,6 +194,13 @@ export default function FileBrowserPanel({
   const { resolvedTheme } = useTheme();
   const composerRef = useComposerHandleContext();
   const fileContextMenu = useFileContextMenu(environmentId);
+  const sealing = useFolderSealing(environmentId, projectId);
+  const sealedRevision = useSealedRevision();
+  /** Where a row of the tree lies on the computer that holds the folder. */
+  const hostPath = (treeItemPath: string) => {
+    const relativePath = treeItemPath.replace(/\/$/, "");
+    return hostFolder ? panelPath(relativePath) : joinHostPath(cwd, relativePath);
+  };
   const {
     entries: directoryEntries,
     load,
@@ -205,6 +232,10 @@ export default function FileBrowserPanel({
   // Shadow-DOM row rects are unreliable; capture the composed contextmenu event's viewport position.
   const contextMenuPointerRef = useRef<{ x: number; y: number; at: number } | null>(null);
 
+  // Kept by the tree's selection handler, for the menu that opens on one of the selected rows.
+  const selectedTreePathsRef = useRef<readonly string[]>([]);
+  const selectedFilePaths = () =>
+    selectedTreePathsRef.current.filter((path) => !path.endsWith("/"));
   const showEntryContextMenu = useStableCallback(
     (item: TreeContextMenuItem, context: TreeContextMenuOpenContext) => {
       const api = readLocalApi();
@@ -222,6 +253,34 @@ export default function FileBrowserPanel({
         : { x: anchorRect.left, y: anchorRect.bottom };
       const fileTarget = { environmentId, filePath: relativePath, workspaceRoot: cwd };
       const fileMenuItems = fileContextMenu.buildItems(fileTarget);
+      const isDirectory = item.path.endsWith("/");
+      // A right-click on one of several selected files is about all of them.
+      const selectedFiles = selectedFilePaths();
+      const sealsSelection = selectedFiles.length > 1 && selectedFiles.includes(item.path);
+      const sealedFolder = isDirectory
+        ? sealedFolderAt(sealing.listing, hostPath(item.path))
+        : undefined;
+      const sealItems =
+        !sealing.offered || projectId === undefined
+          ? []
+          : sealedFolder !== undefined
+            ? [{ id: "unseal-folder", label: gt("Unseal folder…") }]
+            : isDirectory
+              ? // A folder inside a sealed one is sealed already, with it.
+                sealedFolderHolding(sealing.listing, hostPath(item.path)) === undefined
+                ? [{ id: "seal-folder", label: gt("Seal folder…") }]
+                : []
+              : sealsSelection
+                ? [
+                    {
+                      id: "seal-selected",
+                      label: gt(
+                        "{count, plural, one {Seal {count} file…} other {Seal {count} files…}}",
+                        { count: selectedFiles.length },
+                      ),
+                    },
+                  ]
+                : [{ id: "seal", label: gt("Seal…") }];
       // The app menu owns focus; the tree's outside-click handler would dismiss it before click.
       context.close({ restoreFocus: !pointerIsFresh });
       void settlePromise(async () => {
@@ -230,6 +289,7 @@ export default function FileBrowserPanel({
             ...fileMenuItems,
             { id: "copy-mention", label: gt("Copy mention") },
             { id: "add-to-chat", label: gt("Add to chat") },
+            ...sealItems,
           ],
           position,
         );
@@ -239,6 +299,27 @@ export default function FileBrowserPanel({
           fileMenuItems.some((entry) => entry.id === clicked) || clicked.startsWith("editor:");
         if (isFileMenuAction) {
           await fileContextMenu.activate(clicked as FileContextMenuAction, fileTarget);
+          return;
+        }
+        if (clicked === "seal" && projectId !== undefined) {
+          requestSeal({ projectId, name: fileNameOf(relativePath), path: hostPath(item.path) });
+          return;
+        }
+        if (clicked === "seal-selected" && projectId !== undefined) {
+          requestSealFiles({ projectId, paths: selectedFiles.map(hostPath) });
+          return;
+        }
+        if (clicked === "seal-folder" && projectId !== undefined) {
+          requestSealFolder({
+            projectId,
+            name: fileNameOf(relativePath),
+            path: hostPath(item.path),
+          });
+          return;
+        }
+        if (clicked === "unseal-folder" && projectId !== undefined) {
+          const folder = sealedFolderToUnseal(sealing.listing, hostPath(item.path));
+          if (folder !== undefined) requestUnsealFolder({ projectId, ...folder });
           return;
         }
         if (clicked === "copy-mention") {
@@ -279,13 +360,16 @@ export default function FileBrowserPanel({
   );
 
   const loadingDirectoriesRef = useRef(loadingDirectories);
+  // What the tree says beside a sealed folder's row, by the row's path: how many files are sealed.
+  const sealedFolderLabelsRef = useRef<ReadonlyMap<string, string>>(new Map());
   const dragMention = createFileTreeDragMentionController(
     hostFolder ? { mentionPath: (path: string) => joinHostPath(cwd, path) } : {},
   );
   const { model } = useFileTree({
     composition: {
       contextMenu: {
-        triggerMode: "right-click",
+        // The row's own button too: a right-click is not something every person finds.
+        triggerMode: "both",
         onOpen: (item, context) => {
           showEntryContextMenu(item, context);
         },
@@ -298,6 +382,7 @@ export default function FileBrowserPanel({
     initialExpansion: "closed",
     icons: T3_PIERRE_ICONS,
     onSelectionChange: (selectedPaths) => {
+      selectedTreePathsRef.current = selectedPaths;
       // Update drag selection even for reveals so subsequent drags cannot use stale paths.
       dragMention.handleSelectionChange(selectedPaths);
       if (syncingSelectionRef.current) return;
@@ -311,12 +396,15 @@ export default function FileBrowserPanel({
       }
     },
     paths: [],
-    renderRowDecoration: ({ item, row }) =>
-      row.kind === "directory" &&
-      row.isExpanded &&
-      loadingDirectoriesRef.current.has(item.path.replace(/\/$/, ""))
-        ? { icon: "t3-tree-icon-loading", title: gt("Loading…") }
-        : null,
+    renderRowDecoration: ({ item, row }) => {
+      if (row.kind !== "directory") return null;
+      if (row.isExpanded && loadingDirectoriesRef.current.has(item.path.replace(/\/$/, ""))) {
+        return { icon: "t3-tree-icon-loading", title: gt("Loading…") };
+      }
+      // Sealed files leave the folder: its row says they are sealed, not gone.
+      const sealed = sealedFolderLabelsRef.current.get(item.path);
+      return sealed === undefined ? null : { text: sealed, title: gt("Sealed folder") };
+    },
     search: false,
     onSearchChange: (value) => setQuery(value ?? ""),
     unsafeCSS: PIERRE_TREE_UNSAFE_CSS,
@@ -327,6 +415,38 @@ export default function FileBrowserPanel({
     loadingDirectoriesRef.current = loadingDirectories;
     model.setComposition(model.getComposition());
   }, [loadingDirectories, model]);
+  // As text, so the effect below runs only when a label really changed.
+  const sealedFolderLabels = JSON.stringify(
+    sealing.listing === null
+      ? []
+      : groupSealedListing(sealing.listing).folders.map((group) => {
+          const root = cwd.replaceAll("\\", "/").replace(/\/+$/, "");
+          const path = group.folder.path.replaceAll("\\", "/");
+          const inside = path.startsWith(`${root}/`);
+          return [
+            `${inside ? path.slice(root.length + 1) : path}/`,
+            gt("{count, plural, one {{count} sealed} other {{count} sealed}}", {
+              count: group.documents.length,
+              $context: "after a folder's name: how many of its files are sealed",
+            }),
+          ];
+        }),
+  );
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- makes the Pierre tree model re-render row decorations when a folder is sealed or its count changes
+  useEffect(() => {
+    sealedFolderLabelsRef.current = new Map(
+      JSON.parse(sealedFolderLabels) as ReadonlyArray<readonly [string, string]>,
+    );
+    model.setComposition(model.getComposition());
+  }, [sealedFolderLabels, model]);
+  // The selected files, as one string so the selector's answer stays the same between changes.
+  const selectedFileList = useFileTreeSelector(model, (currentModel) =>
+    currentModel
+      .getSelectedPaths()
+      .filter((path) => !path.endsWith("/"))
+      .join("\n"),
+  );
+  const selectedFileCount = selectedFileList === "" ? 0 : selectedFileList.split("\n").length;
   const search = useFileTreeSearch(model);
   // Pierre restores the unfiltered tree when a search has no matches.
   const hasNoSearchMatches = search.value.trim().length > 0 && search.matchingPaths.length === 0;
@@ -431,18 +551,49 @@ export default function FileBrowserPanel({
     }
     search.setValue(value);
   };
+  const hasSealedFolders = (sealing.listing?.folders?.length ?? 0) > 0;
   const handleRefresh = () => {
     refresh();
+    if (hasSealedFolders) reloadSealedDocuments();
     if (query.trim()) pathSearch.refresh();
     onRefreshSelectedFile?.();
   };
+  const refreshOnReturn = useEffectEvent(() => {
+    refresh();
+    if (query.trim()) pathSearch.refresh();
+  });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the window coming back to the front: a file saved from another program is in the folder by then, and nothing else says so
+  useEffect(() => {
+    let last = Number.NEGATIVE_INFINITY;
+    const onReturn = () => {
+      // Focus and visibility both fire on one return; a second read within moments adds nothing.
+      if (document.visibilityState !== "visible" || performance.now() - last < 2_000) return;
+      last = performance.now();
+      refreshOnReturn();
+    };
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => {
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
+  }, []);
   useWorkspaceMutationRefresh({
-    mutationId: workspaceMutationId,
+    // Sealing moves a file out of the folder and unsealing puts it back.
+    mutationId:
+      sealedRevision === 0 ? workspaceMutationId : `${workspaceMutationId}:${sealedRevision}`,
     refresh: () => {
       refresh();
       if (query.trim()) pathSearch.refresh();
     },
     resourceKey: `files:${environmentId}:${cwd}`,
+  });
+  // A sealed folder seals what an agent's turn left in it, so its count follows the turn.
+  useWorkspaceMutationRefresh({
+    enabled: hasSealedFolders,
+    mutationId: workspaceMutationId,
+    refresh: reloadSealedDocuments,
+    resourceKey: `sealed:${environmentId}:${cwd}`,
   });
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- applies tree path changes to the imperative Pierre tree model as a reset or batch update
@@ -547,6 +698,7 @@ export default function FileBrowserPanel({
 
   return (
     <div
+      ref={markRightToLeftTreeNames}
       className="flex min-h-0 flex-1 flex-col bg-background"
       data-file-browser-panel={`${environmentId}:${cwd}`}
       // Capture runs before the tree's shadow-internal row handler opens the menu.
@@ -653,6 +805,50 @@ export default function FileBrowserPanel({
           onPointerOver={titleClippedPierreTreeRow}
         />
       )}
+      {sealing.offered && projectId !== undefined && selectedFileCount > 1 ? (
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border/60 px-3 py-1.5 text-xs">
+          <span className="min-w-0 truncate text-muted-foreground">
+            {gt("{count, plural, one {{count} file selected} other {{count} files selected}}", {
+              count: selectedFileCount,
+            })}
+          </span>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() =>
+              requestSealFiles({ projectId, paths: selectedFileList.split("\n").map(hostPath) })
+            }
+          >
+            {gt("{count, plural, one {Seal {count} file} other {Seal {count} files}}", {
+              count: selectedFileCount,
+            })}
+          </Button>
+        </div>
+      ) : null}
+      {projectId !== undefined &&
+      sealing.listing !== null &&
+      sealing.listing.documents.length + (sealing.listing.folders?.length ?? 0) > 0 ? (
+        <section
+          aria-label={gt("Sealed files")}
+          className="max-h-40 shrink-0 overflow-y-auto border-t border-border/60 px-3 py-2"
+        >
+          <h3 className="pb-1 text-2xs font-medium text-muted-foreground">{gt("Sealed files")}</h3>
+          <SealedFilesList
+            projectId={projectId}
+            listing={sealing.listing}
+            onOpen={(origin) => {
+              const root = cwd.replace(/[\\/]+$/, "");
+              const inside = origin.startsWith(`${root}/`) || origin.startsWith(`${root}\\`);
+              onOpenFile(
+                inside && !hostFolder
+                  ? origin.slice(root.length + 1).replaceAll("\\", "/")
+                  : origin,
+              );
+            }}
+          />
+        </section>
+      ) : null}
+      {sealing.elsewhere ? <SealingElsewhereNote environmentId={environmentId} /> : null}
     </div>
   );
 }

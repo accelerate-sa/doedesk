@@ -146,6 +146,7 @@ import { attachmentUploadBlockReason } from "../../lib/attachmentUploadState";
 import { useDictationShortcut } from "../../speech/useDictationShortcut";
 import { useDictationSubmissionShortcut } from "../../speech/useDictationSubmissionShortcut";
 import { useEnvironmentSpeechInput } from "../../speech/useEnvironmentSpeechInput";
+import { ChatPrivacyStatus } from "../privacy/ChatPrivacyStatus";
 import { ComposerSpeechButton, ComposerSpeechRecordingPill } from "./ComposerSpeechButton";
 import type { AssistantCitationSourceAnchor } from "~/lib/assistantTextSelection";
 import { shortcutLabelForCommand, type ShortcutMatchContext } from "../../keybindings";
@@ -214,12 +215,18 @@ import {
 import {
   ComposerAttachButton,
   ComposerAttachmentFileList,
+  ComposerMentionSealList,
   ComposerAttachmentMediaRow,
   ComposerFilePreviewDialog,
   ComposerQueuedAttachmentRow,
   ComposerRestingImagePreviews,
 } from "./ComposerAttachmentStrip";
 import { CollapsedComposerStopAction, ComposerPrimaryActions } from "./ComposerPrimaryActions";
+import { useFolderSealing } from "../privacy/useFolderSealing";
+import { fileNameOf } from "../privacy/sealedFiles.logic";
+import { mentionedPathList, replaceMentionedPath } from "./composerMentionedPaths";
+import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
+import { attachedFilePathInFolder, requestSeal } from "~/privacy/sealPrompt";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
@@ -717,11 +724,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const composerVideos = composerFiles.filter((file) =>
     isPreviewableComposerVideo(file, environmentId),
   );
+  const sealing = useFolderSealing(environmentId, activeProjectId);
   const composerOtherFiles = composerOtherFilesForPresentation(
     composerFiles,
     environmentId,
     inlineFileIdSet,
+    sealing.offered,
   );
+  // The folder's files this message mentions: an agent reads a mentioned file as an attached one.
+  const mentionedPaths =
+    sealing.offered && gitCwd !== null && !questionAttachmentTarget
+      ? mentionedPathList(prompt)
+      : "";
   const composerTerminalContexts = composerDraft.terminalContexts;
   const composerPreviewAnnotations = composerDraft.previewAnnotations;
   const composerReviewComments = composerDraft.reviewComments;
@@ -2869,6 +2883,47 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   };
   const insertComposerTextAtEndStable = useStableCallback(insertComposerTextAtEnd);
 
+  const sealAttachment = (
+    attached: { readonly name: string; readonly file: File },
+    removeFromDraft: () => void,
+  ) => {
+    if (activeProjectId === null) return;
+    // A file attached from inside the folder is sealed where it lies, or it stays readable there.
+    const path = attachedFilePathInFolder(attached.file, gitCwd);
+    requestSeal({
+      projectId: activeProjectId,
+      name: attached.name,
+      ...(path === undefined ? { file: attached.file } : { path }),
+      onSealed: (handle) => {
+        removeFromDraft();
+        // The draft has let go of the file's chip, which names it; the ref follows a render later.
+        // A draft that held nothing else is gone altogether.
+        promptRef.current = getComposerDraft(composerDraftTarget)?.prompt ?? "";
+        // The handle is what the AI knows the file by; the message was about this file.
+        insertComposerTextAtEnd(`${handle} `, { ensureLeadingBoundary: true });
+      },
+    });
+  };
+  const sealComposerFile = useStableCallback((file: ComposerFileAttachment) => {
+    if (file.file === null) return;
+    sealAttachment({ name: file.name, file: file.file }, () =>
+      removeComposerFileFromDraft(file.id),
+    );
+  });
+  const sealComposerImage = useStableCallback((image: ComposerImageAttachment) =>
+    sealAttachment(image, () => removeComposerImage(image.id)),
+  );
+  const sealMentionedFile = useStableCallback((path: string) => {
+    if (activeProjectId === null || gitCwd === null) return;
+    requestSeal({
+      projectId: activeProjectId,
+      name: fileNameOf(path),
+      path: resolvePathLinkTarget(path, gitCwd),
+      // The mention names a path that is gone once sealed; the handle is what the AI asks by.
+      onSealed: (handle) => setPrompt(replaceMentionedPath(promptRef.current, path, handle)),
+    });
+  });
+
   const insertComposerFolders = async (
     folders: File[],
     target: FolderDropTarget,
@@ -3524,6 +3579,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onFileOpen={onFileOpen}
         onRemoveImage={removeComposerImage}
         onRemoveFile={removeComposerFileFromDraft}
+        onSealImage={sealing.offered ? sealComposerImage : undefined}
       />
     ) : null;
   const composerAttachmentFileList =
@@ -3539,6 +3595,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         canOperateThread={canOperateThread}
         onPreviewFile={setPreviewFileId}
         onRemoveFile={removeComposerFileFromDraft}
+        onSealFile={sealing.offered ? sealComposerFile : undefined}
+      />
+    ) : null;
+  const composerMentionSealList =
+    !isComposerCollapsedMobile && mentionedPaths !== "" && gitCwd !== null ? (
+      <ComposerMentionSealList
+        pathList={mentionedPaths}
+        environmentId={environmentId}
+        cwd={gitCwd}
+        resolvedTheme={resolvedTheme}
+        onSeal={sealMentionedFile}
       />
     ) : null;
   const composerAttachButton = showComposerAttachAction ? (
@@ -3818,6 +3885,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
               {composerAttachmentFileList}
 
+              {composerMentionSealList}
+
               <div
                 className={cn(
                   "relative transition-opacity duration-150",
@@ -3972,6 +4041,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 {composerAttachButton && !dictationTakesFooter ? (
                   <div className="me-2">{composerAttachButton}</div>
                 ) : null}
+                {dictationTakesFooter ? null : (
+                  <ChatPrivacyStatus
+                    environmentId={environmentId}
+                    threadRef={routeKind === "server" ? routeThreadRef : null}
+                    projectId={activeProjectId}
+                    driver={selectedProvider}
+                    compact={isComposerFooterCompact}
+                  />
+                )}
                 <div
                   data-chat-composer-actions="right"
                   data-chat-composer-transition-actions="true"

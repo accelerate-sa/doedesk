@@ -250,6 +250,7 @@ import { RpcInstrumentation, rpcInstrumentationLayer } from "./observability/Rpc
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts";
 import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
+import * as PrivacyGateway from "./privacy/PrivacyGateway.ts";
 import * as HostResources from "./resourceTelemetry/HostResources.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import { commandFeatureUsage, featureUsage } from "./telemetry/FeatureUsage.ts";
@@ -718,6 +719,7 @@ function projectFileFailureContext(
 }
 
 const PROVIDER_STATUS_DEBOUNCE_MS = 200;
+const SEALED_CHANGE_DEBOUNCE_MS = 150;
 
 // Middleware added later wraps middleware added earlier, so instrumentation wraps authorization.
 const ServerWsRpcGroup = WsRpcGroup.middleware(RpcInstrumentation);
@@ -1589,6 +1591,7 @@ export const layerWsRpc = (
       const hostResources = yield* HostResources.HostResources;
       const processResourceMonitor = yield* ProcessResourceMonitor.ProcessResourceMonitor;
       const resourceTelemetry = yield* ResourceTelemetry.ResourceTelemetry;
+      const privacyGateway = yield* PrivacyGateway.PrivacyGateway;
       const relayClient = yield* RelayClient.RelayClient;
       // Webhook URLs start agents; expose them only to operate-scoped sessions while keeping tasks readable.
       const withVisibleWebhookUrls = (result: ScheduledTaskListResult): ScheduledTaskListResult =>
@@ -3659,6 +3662,12 @@ export const layerWsRpc = (
             Effect.map(resourceTelemetry.subscribe, ({ latest, changes }) =>
               Stream.concat(Stream.make(latest), changes),
             ),
+          ),
+        [WS_METHODS.subscribePrivacySealedChanges]: (_input) =>
+          privacyGateway.sealedChanges.pipe(
+            // A turn that asks many sealed questions changes the counts many times a second.
+            Stream.debounce(Duration.millis(SEALED_CHANGE_DEBOUNCE_MS)),
+            Stream.map((revision) => ({ revision })),
           ),
       });
       const splitHandlers: Pick<typeof handlers, SplitWsRpc["_tag"]> = handlers;

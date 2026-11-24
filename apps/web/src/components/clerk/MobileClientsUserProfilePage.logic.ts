@@ -2,11 +2,11 @@ import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
 import { msg } from "gt-react";
 
 import { m, type MessageResolver } from "~/i18n/messages";
+import { formatDateTimeWith } from "~/timestampFormat";
 
-const mobileClientUpdatedAtFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+const mobileClientUpdatedAtFormatter = {
+  format: (date: Date) => formatDateTimeWith(date, { dateStyle: "medium", timeStyle: "short" }),
+};
 
 const NOTIFICATION_PREFERENCES = [
   ["notifyOnApproval", msg("approvals")],

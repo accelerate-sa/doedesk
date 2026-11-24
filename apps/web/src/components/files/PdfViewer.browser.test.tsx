@@ -42,6 +42,10 @@ vi.mock(import("./pdfDocument"), async (importOriginal) => {
   };
 });
 
+import { makeKnownValueMatcher } from "@t3tools/shared/privacyKnownValues";
+
+import { FileValueMarksContext } from "../privacy/FileValueMarkSurface";
+import { FILE_VALUE_MARK } from "../privacy/valueMarkRanges";
 import PdfViewer from "./PdfViewer";
 
 // Page 1 is a short banner whose title is drawn in two runs with a font change, so pdf.js
@@ -296,6 +300,92 @@ it("follows a link to another page and exposes a web link", async () => {
     });
     internal.click();
     await expect.element(screen.getByText("2 / 2 pages")).toBeVisible();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+});
+
+it("highlights known values over the text layer, across split runs and line ends", async () => {
+  // Page 1: a name drawn in two runs. Page 2: a name that wraps onto a second line, and a number.
+  const url = URL.createObjectURL(
+    testPdf([
+      {
+        box: "0 0 612 140",
+        rotate: 0,
+        text: "BT /F1 24 Tf 30 70 Td (Kha) Tj /F2 24 Tf (lid Al-Otaibi signed) Tj ET",
+      },
+      {
+        box: "0 0 612 300",
+        rotate: 0,
+        text: "BT /F1 24 Tf 30 200 Td (Lease for Sara) Tj 0 -40 Td (Al-Harbi, 0551234567) Tj ET",
+      },
+    ]),
+  );
+  const matcher = makeKnownValueMatcher([
+    { token: "[PERSON_FBJD2]", surfaces: ["Khalid Al-Otaibi"] },
+    { token: "[PERSON_M3RT8]", surfaces: ["Sara Al-Harbi"] },
+    { token: "[PHONE_K7QW3]", surfaces: ["0551234567"] },
+  ]);
+  const stats = vi.fn();
+  try {
+    const container = document.createElement("div");
+    container.style.cssText = "display:flex;width:500px;height:600px";
+    await using screen = await render(
+      <FileValueMarksContext
+        value={{
+          on: true,
+          setOn: () => undefined,
+          surfaces: { text: 1, textless: 0 },
+          mount: () => () => undefined,
+          state: { kind: "ready", matcher },
+          stats: null,
+          report: stats,
+        }}
+      >
+        <PdfViewer src={url} title="Lease PDF" />
+      </FileValueMarksContext>,
+      { container },
+    );
+    await expect.element(screen.getByText("1 / 2 pages"), { timeout: 10_000 }).toBeVisible();
+    const marks = () => [...(CSS.highlights.get(FILE_VALUE_MARK)?.keys() ?? [])] as Range[];
+    await vi.waitFor(() =>
+      expect(marks().map((range) => range.toString())).toEqual([
+        "Khalid Al-Otaibi",
+        // The line end between the two words is a <br>, which a range's text leaves out.
+        "SaraAl-Harbi",
+        "0551234567",
+      ]),
+    );
+    // A page with text is not a scanned page.
+    expect(stats).toHaveBeenLastCalledWith(expect.objectContaining({ units: 2, marks: 3 }));
+    const region = screen.container.querySelector<HTMLElement>('[role="region"]')!;
+    const layers = region.querySelectorAll<HTMLElement>("[data-pdf-text-layer]");
+    const spans = (layer: HTMLElement, text: string) =>
+      [...layer.querySelectorAll("span")].filter((span) => text.includes(span.textContent ?? "~"));
+    // A glyph box is taller than the line box pdf.js gives a run, so a piece is held to the
+    // run's width and to having its middle on the run's line.
+    const inside = (rect: DOMRect, box: DOMRect) =>
+      rect.left >= box.left - 1 &&
+      rect.right <= box.right + 1 &&
+      (rect.top + rect.bottom) / 2 >= box.top &&
+      (rect.top + rect.bottom) / 2 <= box.bottom;
+    // Each piece of a mark lies on the run of text it marks, which lies on its page.
+    for (const [index, layer, text] of [
+      [0, layers[0]!, "Khalid Al-Otaibi signed"],
+      [1, layers[1]!, "Lease for Sara Al-Harbi, 0551234567"],
+      [2, layers[1]!, "Al-Harbi, 0551234567"],
+    ] as const) {
+      const runs = spans(layer, text).map((span) => span.getBoundingClientRect());
+      const pieces = [...marks()[index]!.getClientRects()].filter((rect) => rect.width > 0);
+      expect(pieces.length).toBeGreaterThan(0);
+      for (const piece of pieces) {
+        expect(runs.some((run) => inside(piece, run))).toBe(true);
+        expect(inside(piece, layer.getBoundingClientRect())).toBe(true);
+      }
+    }
+    // The name that wraps is marked on both of its lines.
+    const wrapped = [...marks()[1]!.getClientRects()].filter((rect) => rect.width > 0);
+    expect(new Set(wrapped.map((rect) => Math.round(rect.top))).size).toBe(2);
   } finally {
     URL.revokeObjectURL(url);
   }

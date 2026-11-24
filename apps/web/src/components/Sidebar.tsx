@@ -1450,10 +1450,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const settledThreadKeysRef = useRef(settledThreadKeys);
   const snoozedThreadKeysRef = useRef(snoozedThreadKeys);
 
+  const chatlessProjectKeys = new Set(
+    projects.flatMap((project) =>
+      project.isScratch ? [] : [`${project.environmentId}:${project.id}`],
+    ),
+  );
+  for (const thread of threads) {
+    chatlessProjectKeys.delete(`${thread.environmentId}:${thread.projectId}`);
+  }
   const { draftIds, routeDraftComposer } = useSidebarDrafts(
     scopedProjectKeys,
     routeDraftIdForRows,
     draftTerminalLabels,
+    chatlessProjectKeys,
   );
   // Draft rows sit above the threads, so jumps and traversal reach them first.
   // Search hides them, so they drop out while it is open.

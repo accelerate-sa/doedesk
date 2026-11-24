@@ -115,6 +115,10 @@ const T3_MCP_SERVER_ALIASES = new Set([
   "t3_code_direct",
 ]);
 
+/** Whether an MCP server name is DoeDesk's own server, under any name a harness gives it. */
+export const isT3McpServerName = (server: string): boolean =>
+  T3_MCP_SERVER_ALIASES.has(server.toLowerCase());
+
 const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   link_pull_request: tool(
     ["Link", "Linking", "Linked", "a pull request"],

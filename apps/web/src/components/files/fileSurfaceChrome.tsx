@@ -57,6 +57,11 @@ export const FILE_LINK_REVEAL_UNSAFE_CSS = `
     ) !important;
     color: var(--diffs-selection-number-fg) !important;
   }
+
+  /* The values DoeDesk replaces. A shadow tree only takes highlight styles from its own sheet. */
+  ::highlight(doedesk-replaced-value) {
+    background-color: color-mix(in oklab, var(--foreground, currentColor) 14%, transparent);
+  }
 `;
 
 export function FileSurfaceAction(props: {

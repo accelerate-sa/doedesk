@@ -296,3 +296,19 @@ export function turnItemHasDetail(item: OrchestrationV2TurnItem): boolean {
       return false;
   }
 }
+
+/** A notice about an MCP server's own state, such as a failed start or a sign-in it needs. */
+function isMcpServerNotice(item: OrchestrationV2TurnItem): boolean {
+  return (
+    item.type === "system_notice" && (item.mcpServer !== undefined || item.mcpSignIn !== undefined)
+  );
+}
+
+/** For people who do not manage MCP servers. Returns the same array when there is nothing to drop. */
+export function withoutMcpServerNotices<Row extends { readonly item: OrchestrationV2TurnItem }>(
+  rows: ReadonlyArray<Row>,
+): ReadonlyArray<Row> {
+  return rows.some((row) => isMcpServerNotice(row.item))
+    ? rows.filter((row) => !isMcpServerNotice(row.item))
+    : rows;
+}

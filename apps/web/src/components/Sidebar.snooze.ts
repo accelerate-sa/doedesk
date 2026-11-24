@@ -11,7 +11,7 @@ import {
 import { m, type MessageResolver } from "../i18n/messages";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { serverEnvironment } from "../state/server";
-import { formatShortTimestamp } from "../timestampFormat";
+import { formatShortTimestamp, formatShortWeekday } from "../timestampFormat";
 import { toastManager } from "./ui/toast";
 
 export { snoozeWakeLabel, type SnoozePreset };
@@ -58,5 +58,6 @@ function snoozeOptions(timestampFormat: TimestampFormat, environmentId: Environm
   return {
     ...(presets ? { presets } : {}),
     formatTime: (date: Date) => formatShortTimestamp(date.toISOString(), timestampFormat),
+    formatWeekday: formatShortWeekday,
   };
 }

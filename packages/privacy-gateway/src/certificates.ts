@@ -11,9 +11,15 @@ import forge from "node-forge";
  * starts are told to trust it; the operating system's trust store is not changed.
  */
 export interface LocalAuthority {
-  /** Path to the authority certificate alone, for programs that add to their defaults. */
+  /**
+   * Path to the certificates programs add to their defaults: the authority, after whatever the
+   * person's own `NODE_EXTRA_CA_CERTS` held.
+   */
   readonly certificatePath: string;
-  /** Path to the usual public roots plus the authority, for programs that replace defaults. */
+  /**
+   * Path to the usual public roots, the certificates the person trusts beyond them, and the
+   * authority, for programs that replace their defaults.
+   */
   readonly bundlePath: string;
   readonly contextFor: (host: string) => NodeTls.SecureContext;
 }
@@ -55,7 +61,13 @@ const createAuthority = (): { readonly certificate: string; readonly privateKey:
   return { certificate: forge.pki.certificateToPem(certificate), privateKey: keys.privateKey };
 };
 
-export const loadLocalAuthority = (directory: string): LocalAuthority => {
+/** The person's own trusted certificates, which the gateway's files add to and never replace. */
+export interface OwnCertificates {
+  readonly certificates: ReadonlyArray<string>;
+  readonly nodeExtraCertificates: ReadonlyArray<string>;
+}
+
+export const loadLocalAuthority = (directory: string, own?: OwnCertificates): LocalAuthority => {
   NodeFS.mkdirSync(directory, { recursive: true, mode: 0o700 });
   const certificatePath = NodePath.join(directory, "authority.pem");
   const keyPath = NodePath.join(directory, "authority.key");
@@ -72,13 +84,24 @@ export const loadLocalAuthority = (directory: string): LocalAuthority => {
     NodeFS.writeFileSync(keyPath, authority.privateKey, { mode: 0o600 });
     NodeFS.writeFileSync(certificatePath, authority.certificate, { mode: 0o644 });
   }
+  // A copy of the gateway's own certificate in what the person had is not written twice.
+  const theirs = (blocks: ReadonlyArray<string>) =>
+    blocks.filter(
+      (block) => block.replace(/\s+/g, "") !== authority.certificate.replace(/\s+/g, ""),
+    );
+  const ownCertificates = theirs(own?.certificates ?? []);
   NodeFS.writeFileSync(
     bundlePath,
-    `${NodeTls.rootCertificates.join("\n")}\n${authority.certificate}`,
-    {
-      mode: 0o644,
-    },
+    [...NodeTls.rootCertificates, ...ownCertificates, authority.certificate].join("\n"),
+    { mode: 0o644 },
   );
+  const nodeExtra = theirs(own?.nodeExtraCertificates ?? []);
+  const addedPath = NodePath.join(directory, "added-certificates.pem");
+  if (nodeExtra.length > 0) {
+    NodeFS.writeFileSync(addedPath, [...nodeExtra, authority.certificate].join("\n"), {
+      mode: 0o644,
+    });
+  }
 
   const authorityCertificate = forge.pki.certificateFromPem(authority.certificate);
   const authorityKey = forge.pki.privateKeyFromPem(authority.privateKey);
@@ -88,7 +111,7 @@ export const loadLocalAuthority = (directory: string): LocalAuthority => {
   const contexts = new Map<string, NodeTls.SecureContext>();
 
   return {
-    certificatePath,
+    certificatePath: nodeExtra.length > 0 ? addedPath : certificatePath,
     bundlePath,
     contextFor: (host) => {
       const cached = contexts.get(host);

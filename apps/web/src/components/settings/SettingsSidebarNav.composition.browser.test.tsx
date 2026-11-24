@@ -3,6 +3,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import { developerMode } from "../../../test/developerMode";
 import { act, render } from "../../../test/render";
+import { m } from "../../i18n/messages";
 import { SidebarProvider } from "../ui/sidebar";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
 import { settingsNavGroups, SETTINGS_SECTION_LABELS } from "./settingsSearch";
@@ -80,7 +81,7 @@ it("moves Tab through every settings section", async () => {
 
   const sections = settingsNavGroups(false, false)
     .flatMap((group) => group.paths)
-    .map((to) => SETTINGS_SECTION_LABELS[to]);
+    .map((to) => m(SETTINGS_SECTION_LABELS[to]));
   const tabbed: string[] = [];
   for (let step = 0; step < sections.length; step += 1) {
     await userEvent.tab();

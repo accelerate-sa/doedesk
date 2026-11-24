@@ -63,6 +63,51 @@ const index = JSON.parse(
   NodeFS.readFileSync(NodePath.join(FIXTURES, "index.json"), "utf8"),
 ) as ReadonlyArray<Fixture>;
 
+const wordsOf = (text: string) =>
+  [...text.matchAll(/\S+/gu)].map((match) => ({ text: match[0], start: match.index }));
+
+/**
+ * The recorded answer for a text that is a recorded one with some words taken out, each run of
+ * them holding a number the local patterns mask since the recording (the reader's words around a
+ * covered number go with it). The service's answer on the rest of the text stands.
+ */
+const answerWithoutNumbers = (
+  asked: string,
+  recorded: ReadonlyArray<Recorded["detects"][number]>,
+): ReadonlyArray<DetectedEntity> | undefined => {
+  const askedWords = wordsOf(asked);
+  for (const { text, entities } of recorded) {
+    const words = wordsOf(text);
+    const shift = new Map<number, number>();
+    let next = 0;
+    let index = 0;
+    while (index < words.length) {
+      const word = words[index] as (typeof words)[number];
+      if (word.text === askedWords[next]?.text) {
+        shift.set(word.start, (askedWords[next]?.start ?? 0) - word.start);
+        index += 1;
+        next += 1;
+        continue;
+      }
+      let end = index;
+      while (end < words.length && words[end]?.text !== askedWords[next]?.text) end += 1;
+      const dropped = words.slice(index, end).map((gone) => gone.text);
+      // Joined: an IBAN in groups of four has no group of five digits.
+      if (!/[0-9٠-٩]{5,}/u.test(dropped.join(""))) break;
+      index = end;
+    }
+    if (index < words.length || next !== askedWords.length) continue;
+    return entities.flatMap(({ start, end, kind }) => {
+      const first = words.findLast((word) => word.start <= start);
+      const delta = first === undefined ? undefined : shift.get(first.start);
+      if (delta === undefined) return [];
+      const moved = { start: start + delta, end: end + delta, kind };
+      return asked.slice(moved.start, moved.end) === text.slice(start, end) ? [moved] : [];
+    });
+  }
+  return undefined;
+};
+
 const replay = async (fixture: Fixture) => {
   const folder = NodePath.join(FIXTURES, fixture.id);
   const recorded = JSON.parse(
@@ -81,7 +126,7 @@ const replay = async (fixture: Fixture) => {
         detect: (texts) =>
           Promise.all(
             texts.map((text) => {
-              const entities = byText.get(text);
+              const entities = byText.get(text) ?? answerWithoutNumbers(text, recorded.detects);
               if (entities === undefined) {
                 throw new DetectorUnavailableError("This text was not in the recording.");
               }

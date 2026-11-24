@@ -1,5 +1,7 @@
-import { isPartialPlaceholder } from "./placeholders.ts";
+import { isPartialPlaceholder, placeholderPattern } from "./placeholders.ts";
+import type { Restorations } from "./restorations.ts";
 import type { Vault } from "./vault.ts";
+import { carriesUnit, isVaultSafe, UNIT_REACH, withoutRepeatedUnit } from "./worker/seal.ts";
 
 type Json = unknown;
 type JsonObject = Record<string, Json>;
@@ -9,6 +11,28 @@ const isObject = (value: Json): value is JsonObject =>
 
 /** Longest tail that can still be the start of a placeholder: `[LOCATION_ABCDE` is 15. */
 const MAX_HELD_LENGTH = 16;
+
+/** Text that has to follow a stand-in at the end of a piece before its unit can be told. */
+const UNIT_WAIT = 24;
+
+/**
+ * How a value is written in text the person reads: without the unit it carries when the model
+ * wrote that unit beside its stand-in. A model knows a value only as a stand-in, not whether it
+ * says "SAR", and writes "[AMOUNT_K2M4P] ريال": restored whole, that read "SAR 12500 ريال".
+ * `leading` is the text that came before this piece.
+ */
+const unitOnce =
+  (vault: Vault, leading = "") =>
+  (token: string, value: string, before: string, after: string): string => {
+    const shorter = withoutRepeatedUnit(
+      value,
+      (leading + before).slice(-UNIT_REACH),
+      after.slice(0, UNIT_REACH),
+      (item) => vault.resolve(item),
+    );
+    if (shorter === value) return value;
+    return vault.writtenAs(token, shorter, isVaultSafe(shorter, "number")) ? shorter : value;
+  };
 
 /** Fields that hold a JSON document as a string, so restored values must be JSON-escaped. */
 const JSON_FRAGMENT_KEYS = new Set(["arguments", "partial_json"]);
@@ -33,25 +57,88 @@ const UNTOUCHED_KEYS = new Set([
 /** Blocks whose text is covered by a signature, or is reasoning the model must get back intact. */
 const UNTOUCHED_TYPES = new Set(["thinking", "redacted_thinking", "reasoning"]);
 
-/** Restores real values in a complete (non-streamed) JSON value, in place. */
-export const unmaskDeep = (value: Json, vault: Vault): Json => {
-  if (typeof value === "string") return vault.unmask(value);
+/** Fields that hold what a tool is run with. Sealed values are not restored under them. */
+const TOOL_INPUT_KEYS = new Set([
+  "input",
+  "arguments",
+  "partial_json",
+  "args",
+  "functionCall",
+  "function_call",
+  "function",
+  "tool_calls",
+]);
+
+/** Items that are a tool call or a tool's answer, in any of the wire formats. */
+const TOOL_TYPE = /tool|function_call|computer_call|shell_call|mcp_call/;
+
+/**
+ * Restores one piece of text the person will read. A sealed value is restored only when
+ * `sealed` is set, and the text is then remembered so that its stand-ins can be put back when
+ * the client sends its history again.
+ */
+const restoreText = (
+  text: string,
+  vault: Vault,
+  jsonFragment: boolean,
+  sealed: boolean,
+  restorations: Restorations | undefined,
+  restoredTokens: Set<string> | undefined,
+): string => {
+  // Text for the person, as opposed to what a tool is run with, which takes values as they are.
+  const restored = vault.unmask(
+    text,
+    jsonFragment,
+    sealed,
+    restoredTokens,
+    sealed && !jsonFragment ? unitOnce(vault) : undefined,
+  );
+  if (sealed && restored !== text && vault.holdsSealedToken(text)) {
+    restorations?.record(restored, text);
+  }
+  return restored;
+};
+
+/**
+ * Restores real values in a complete (non-streamed) JSON value, in place. Values of sealed
+ * documents are restored in text only, never in what a tool is run with: `sealed` is false
+ * below a tool call. `restoredTokens` collects the stand-ins that were restored.
+ */
+export const unmaskDeep = (
+  value: Json,
+  vault: Vault,
+  restorations?: Restorations,
+  sealed = true,
+  restoredTokens?: Set<string>,
+): Json => {
+  if (typeof value === "string") {
+    return restoreText(value, vault, false, sealed, restorations, restoredTokens);
+  }
   if (Array.isArray(value)) {
     value.forEach((child, index) => {
-      value[index] = unmaskDeep(child, vault);
+      value[index] = unmaskDeep(child, vault, restorations, sealed, restoredTokens);
     });
     return value;
   }
   if (!isObject(value)) return value;
   if (typeof value.type === "string" && UNTOUCHED_TYPES.has(value.type)) return value;
   if (value.thought === true) return value;
+  const here = sealed && !(typeof value.type === "string" && TOOL_TYPE.test(value.type));
   for (const key of Object.keys(value)) {
     if (UNTOUCHED_KEYS.has(key)) continue;
     const child = value[key];
+    const below = here && !TOOL_INPUT_KEYS.has(key);
     value[key] =
       typeof child === "string"
-        ? vault.unmask(child, JSON_FRAGMENT_KEYS.has(key))
-        : unmaskDeep(child, vault);
+        ? restoreText(
+            child,
+            vault,
+            JSON_FRAGMENT_KEYS.has(key),
+            below,
+            restorations,
+            restoredTokens,
+          )
+        : unmaskDeep(child, vault, restorations, below, restoredTokens);
   }
   return value;
 };
@@ -64,34 +151,108 @@ export const unmaskDeep = (value: Json, vault: Vault): Json => {
  */
 class PieceUnmasker {
   #held = "";
+  /** The end of what was passed on, as the model wrote it: what stands before the next piece. */
+  #tail = "";
+  /** The whole piece as the model wrote it, and as it was passed on. */
+  #masked = "";
+  #restored = "";
   readonly #vault: Vault;
   readonly #jsonFragment: boolean;
+  /** The piece is text for the person, so values of sealed documents are restored in it. */
+  readonly #sealed: boolean;
+  readonly #restoredTokens: Set<string> | undefined;
 
-  constructor(vault: Vault, jsonFragment: boolean) {
+  constructor(
+    vault: Vault,
+    jsonFragment: boolean,
+    sealed: boolean,
+    restoredTokens: Set<string> | undefined,
+  ) {
     this.#vault = vault;
     this.#jsonFragment = jsonFragment;
+    this.#sealed = sealed;
+    this.#restoredTokens = restoredTokens;
+  }
+
+  /**
+   * Where the first stand-in stands whose file label may still be completed by text to come: a
+   * label is turned back into the file's name only when all of it is here.
+   */
+  #labelStart(text: string): number | undefined {
+    const labels = this.#vault.fileLabels;
+    if (labels.reach === 0 || !text.includes("[")) return undefined;
+    for (const match of text.matchAll(placeholderPattern())) {
+      const before = this.#tail + text.slice(0, match.index);
+      if (labels.awaits(match[0], before, text.slice(match.index + match[0].length))) {
+        return match.index;
+      }
+    }
+    return undefined;
   }
 
   push(piece: string): string {
+    this.#masked += piece;
     const text = this.#held + piece;
     const open = text.lastIndexOf("[");
-    if (
+    const label = this.#labelStart(text);
+    let ready = text;
+    if (label !== undefined) {
+      this.#held = text.slice(label);
+      ready = text.slice(0, label);
+    } else if (
       open !== -1 &&
       text.length - open <= MAX_HELD_LENGTH &&
       isPartialPlaceholder(text.slice(open))
     ) {
       this.#held = text.slice(open);
-      return this.#vault.unmask(text.slice(0, open), this.#jsonFragment);
+      ready = text.slice(0, open);
+    } else {
+      this.#held = "";
+      // A value's unit may follow it in the next piece: a stand-in at the end waits for it, when
+      // its value is written with a unit. Any other value is passed on at once.
+      const last = this.#forPerson ? [...ready.matchAll(placeholderPattern())].at(-1) : undefined;
+      if (
+        last !== undefined &&
+        ready.length - (last.index + last[0].length) < UNIT_WAIT &&
+        carriesUnit(this.#vault.resolve(last[0]) ?? "")
+      ) {
+        this.#held = ready.slice(last.index);
+        ready = ready.slice(0, last.index);
+      }
     }
-    this.#held = "";
-    return this.#vault.unmask(text, this.#jsonFragment);
+    return this.#restore(ready);
   }
 
-  /** Whatever is still held: by now it can no longer become a placeholder. */
+  get #forPerson(): boolean {
+    return this.#sealed && !this.#jsonFragment;
+  }
+
+  #restore(ready: string): string {
+    const restored = this.#vault.unmask(
+      ready,
+      this.#jsonFragment,
+      this.#sealed,
+      this.#restoredTokens,
+      this.#forPerson ? unitOnce(this.#vault, this.#tail) : undefined,
+      this.#tail,
+    );
+    this.#tail = (this.#tail + ready).slice(-Math.max(UNIT_REACH, this.#vault.fileLabels.reach));
+    this.#restored += restored;
+    return restored;
+  }
+
+  /** Whatever is still held: the end of a placeholder that never came, or a last stand-in. */
   flush(): string {
     const held = this.#held;
     this.#held = "";
-    return held;
+    return this.#restore(held);
+  }
+
+  /** Once the piece has ended: remembers it if a sealed value was restored in it. */
+  remember(restorations: Restorations | undefined): void {
+    if (this.#sealed && this.#vault.holdsSealedToken(this.#masked)) {
+      restorations?.record(this.#restored, this.#masked);
+    }
   }
 }
 
@@ -100,6 +261,8 @@ interface PieceSlot {
   readonly block: string;
   readonly key: string;
   readonly jsonFragment: boolean;
+  /** Text for the person, as opposed to what a tool is run with. */
+  readonly sealed: boolean;
   readonly read: () => string;
   readonly write: (value: string) => void;
 }
@@ -116,6 +279,8 @@ const inspectEvent = (
   readonly inline?: boolean;
   /** The event passes through exactly as the model sent it. */
   readonly untouched?: boolean;
+  /** Parts that arrive whole beside the streamed text and are restored as a complete value. */
+  readonly whole?: ReadonlyArray<Json>;
 } => {
   const type = event.type;
 
@@ -124,10 +289,10 @@ const inspectEvent = (
     const delta = event.delta;
     const block = `a:${String(event.index)}`;
     if (delta.type === "text_delta") {
-      return { slots: [slot(block, `${block}:text`, false, delta, "text")] };
+      return { slots: [slot(block, `${block}:text`, false, delta, "text", true)] };
     }
     if (delta.type === "input_json_delta") {
-      return { slots: [slot(block, `${block}:json`, true, delta, "partial_json")] };
+      return { slots: [slot(block, `${block}:json`, true, delta, "partial_json", false)] };
     }
     return { slots: [] };
   }
@@ -139,13 +304,13 @@ const inspectEvent = (
     const block = `r:${String(event.item_id ?? event.output_index)}`;
     if (type === "response.output_text.delta" || type === "response.refusal.delta") {
       const key = `${block}:${String(event.content_index)}:text`;
-      return { slots: [slot(block, key, false, event, "delta")] };
+      return { slots: [slot(block, key, false, event, "delta", true)] };
     }
     if (type === "response.custom_tool_call_input.delta") {
-      return { slots: [slot(block, `${block}:input`, false, event, "delta")] };
+      return { slots: [slot(block, `${block}:input`, false, event, "delta", false)] };
     }
     if (type === "response.function_call_arguments.delta") {
-      return { slots: [slot(block, `${block}:args`, true, event, "delta")] };
+      return { slots: [slot(block, `${block}:args`, true, event, "delta", false)] };
     }
     // Reasoning is returned to the model as written, so its streamed text stays masked too.
     if (type.includes("reasoning")) return { slots: [], untouched: true };
@@ -167,14 +332,14 @@ const inspectEvent = (
       const delta = choice.delta;
       if (!isObject(delta)) continue;
       if (typeof delta.content === "string") {
-        slots.push(slot(block, `${block}:content`, false, delta, "content"));
+        slots.push(slot(block, `${block}:content`, false, delta, "content", true));
       }
       if (Array.isArray(delta.tool_calls)) {
         for (const call of delta.tool_calls) {
           if (!isObject(call) || !isObject(call.function)) continue;
           if (typeof call.function.arguments !== "string") continue;
           const key = `${block}:tool:${String(call.index ?? 0)}`;
-          slots.push(slot(block, key, true, call.function, "arguments"));
+          slots.push(slot(block, key, true, call.function, "arguments", false));
         }
       }
     }
@@ -185,6 +350,7 @@ const inspectEvent = (
   const gemini = isObject(event.response) ? event.response : event;
   if (Array.isArray(gemini.candidates)) {
     const slots: Array<PieceSlot> = [];
+    const whole: Array<Json> = [];
     let finished = false;
     gemini.candidates.forEach((candidate, candidateIndex) => {
       if (!isObject(candidate)) return;
@@ -192,12 +358,15 @@ const inspectEvent = (
       const parts = isObject(candidate.content) ? candidate.content.parts : undefined;
       if (!Array.isArray(parts)) return;
       for (const part of parts) {
-        if (!isObject(part) || part.thought === true || typeof part.text !== "string") continue;
+        if (!isObject(part) || part.thought === true) continue;
+        // A tool call arrives whole, in the same event as text or alone.
+        if (isObject(part.functionCall)) whole.push(part.functionCall);
+        if (typeof part.text !== "string") continue;
         const block = `g:${candidateIndex}`;
-        slots.push(slot(block, `${block}:text`, false, part, "text"));
+        slots.push(slot(block, `${block}:text`, false, part, "text", true));
       }
     });
-    return finished ? { slots, closes: "*", inline: true } : { slots };
+    return finished ? { slots, closes: "*", inline: true, whole } : { slots, whole };
   }
 
   return { slots: [] };
@@ -209,10 +378,12 @@ const slot = (
   jsonFragment: boolean,
   holder: JsonObject,
   field: string,
+  sealed: boolean,
 ): PieceSlot => ({
   block,
   key,
   jsonFragment,
+  sealed,
   read: () => (typeof holder[field] === "string" ? holder[field] : ""),
   write: (value) => {
     holder[field] = value;
@@ -232,10 +403,15 @@ interface OpenPiece {
  */
 export class EventStreamUnmasker {
   readonly #vault: Vault;
+  readonly #restorations: Restorations | undefined;
+  readonly #restoredTokens: Set<string> | undefined;
   readonly #open = new Map<string, OpenPiece>();
 
-  constructor(vault: Vault) {
+  /** `restoredTokens` collects the stand-ins restored anywhere in the stream. */
+  constructor(vault: Vault, restorations?: Restorations, restoredTokens?: Set<string>) {
     this.#vault = vault;
+    this.#restorations = restorations;
+    this.#restoredTokens = restoredTokens;
   }
 
   /**
@@ -251,7 +427,7 @@ export class EventStreamUnmasker {
     }
     if (!isObject(event)) return [raw];
 
-    const { slots, closes, inline, untouched } = inspectEvent(event);
+    const { slots, closes, inline, untouched, whole } = inspectEvent(event);
     if (untouched === true) return [raw];
     const output: Array<string> = [];
     const pieceKeys = new Set(slots.map((piece) => piece.key));
@@ -261,7 +437,12 @@ export class EventStreamUnmasker {
       if (open === undefined) {
         open = {
           block: piece.block,
-          unmasker: new PieceUnmasker(this.#vault, piece.jsonFragment),
+          unmasker: new PieceUnmasker(
+            this.#vault,
+            piece.jsonFragment,
+            piece.sealed,
+            this.#restoredTokens,
+          ),
           remake: () => raw,
         };
       }
@@ -283,6 +464,7 @@ export class EventStreamUnmasker {
       for (const [key, open] of this.#open) {
         if (closes !== "*" && open.block !== closes) continue;
         const tail = open.unmasker.flush();
+        open.unmasker.remember(this.#restorations);
         this.#open.delete(key);
         if (tail.length === 0) continue;
         const piece = slots.find((candidate) => candidate.key === key);
@@ -292,7 +474,14 @@ export class EventStreamUnmasker {
       }
     }
 
-    if (slots.length === 0) unmaskDeep(event, this.#vault);
+    if (slots.length === 0) {
+      unmaskDeep(event, this.#vault, this.#restorations, true, this.#restoredTokens);
+    } else {
+      // A tool call that arrives whole beside text: what a tool is run with, so nothing sealed.
+      for (const value of whole ?? []) {
+        unmaskDeep(value, this.#vault, this.#restorations, false, this.#restoredTokens);
+      }
+    }
     output.push(JSON.stringify(event));
     return output;
   }
@@ -302,6 +491,7 @@ export class EventStreamUnmasker {
     const output: Array<string> = [];
     for (const open of this.#open.values()) {
       const tail = open.unmasker.flush();
+      open.unmasker.remember(this.#restorations);
       if (tail.length > 0) output.push(open.remake(tail));
     }
     this.#open.clear();
@@ -315,8 +505,8 @@ export class SseUnmasker {
   readonly #decoder = new TextDecoder();
   #buffer = "";
 
-  constructor(vault: Vault) {
-    this.#events = new EventStreamUnmasker(vault);
+  constructor(vault: Vault, restorations?: Restorations, restoredTokens?: Set<string>) {
+    this.#events = new EventStreamUnmasker(vault, restorations, restoredTokens);
   }
 
   push(chunk: Uint8Array): string {

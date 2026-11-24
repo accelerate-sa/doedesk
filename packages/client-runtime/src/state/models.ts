@@ -269,6 +269,22 @@ export function scopeProject(
 
 export type PendingSubagentRequest = "approval" | "user_input";
 
+let unnamedThreadTitle: (() => string) | null = null;
+
+/**
+ * Each app sets what it calls a chat that has no name yet, in its language. The server names one
+ * "New chat" ("New thread" in older builds) whatever language the person reads, as it does the
+ * chat it opens on a first start. A title is said again the next time its thread is presented.
+ */
+export function setUnnamedThreadTitle(name: () => string): void {
+  unnamedThreadTitle = name;
+}
+
+const presentedTitle = (title: string): string =>
+  unnamedThreadTitle !== null && (title === "New chat" || title === "New thread")
+    ? unnamedThreadTitle()
+    : title;
+
 export function presentThreadShell(
   environmentId: EnvironmentId,
   thread: OrchestrationV2ThreadShell,
@@ -299,7 +315,7 @@ export function presentThreadShell(
     title:
       thread.lineage.relationshipToParent === "subagent"
         ? formatSubagentDisplayTitle(thread.title)
-        : thread.title,
+        : presentedTitle(thread.title),
     providerInstanceId: thread.providerInstanceId,
     modelSelection: thread.modelSelection,
     runtimeMode: thread.runtimeMode,

@@ -8124,6 +8124,16 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
         occurredAt: now,
         payload: { runId, output },
       });
+      const privacy = { state: "unmasked", reason: "direct" } as const;
+      yield* projectionStore.apply({
+        id: EventId.make("event:projection-delegated-completion:privacy"),
+        type: "run.privacy-recorded",
+        threadId,
+        runId,
+        providerInstanceId,
+        occurredAt: now,
+        payload: { runId, privacy },
+      });
 
       // Lifecycle writers hold the run as it was when the turn started.
       const { delegatedCompletion: _delegatedCompletion, ...staleRun } = run;
@@ -8164,6 +8174,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
       const projection = yield* projectionStore.getThreadProjection(threadId);
       assert.deepEqual(projection.runs[0]?.delegatedCompletion, run.delegatedCompletion);
       assert.deepEqual(projection.runs[0]?.output, output);
+      assert.deepEqual(projection.runs[0]?.privacy, privacy);
       assert.deepEqual(projection.subagents[0]?.completionDelivery, task.completionDelivery);
       assert.deepEqual(
         (yield* projectionStore.getThreadRecords(threadId, ["subagents"], {

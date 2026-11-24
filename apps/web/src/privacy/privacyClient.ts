@@ -1,19 +1,29 @@
 import { useAtomValue } from "@effect/atom-react";
 import type {
+  PrivacyKnownValues,
+  PrivacyKnownValuesRequest,
   PrivacyLocale,
   PrivacyAccountRequest,
   PrivacyAccountResult,
   PrivacyActivityEntry,
+  PrivacyClearAnswer,
   PrivacyConfigureRequest,
   PrivacyConfigureResult,
   PrivacyPreferenceRequest,
   PrivacyProfileRequest,
   PrivacyRedaction,
+  PrivacySealedListing,
+  PrivacySealedRequest,
+  PrivacySealedResult,
+  PrivacySealedTurn,
   PrivacySignInMethod,
   PrivacySignInRequest,
   PrivacySignInResult,
   PrivacyStatus,
-  PrivacyVaultEntry,
+  PrivacyTurnValues,
+  PrivacyVault,
+  PrivacyVaultRequest,
+  PrivacyWorkerRequest,
   UsageDataRequest,
   UsageDataStatus,
 } from "@t3tools/contracts";
@@ -338,28 +348,193 @@ export const clearPrivacyRedactions = async (): Promise<void> => {
 const vaultReadsAtom = counter("privacy:vault-reads");
 const vaultAtom = Atom.make((get) => {
   // Nothing is read until the user asks to see the real values.
-  if (get(vaultReadsAtom) === 0)
-    return Effect.succeed<ReadonlyArray<PrivacyVaultEntry> | null>(null);
+  if (get(vaultReadsAtom) === 0) return Effect.succeed<PrivacyVault | null>(null);
   return Effect.promise(() =>
     runPrimaryHttp(
       PrimaryEnvironmentHttpClient.pipe(
         Effect.flatMap((client) => client.privacy.vault({ headers: {} })),
       ),
     ),
-  ).pipe(Effect.map((vault): ReadonlyArray<PrivacyVaultEntry> | null => vault.entries));
+  ).pipe(Effect.map((vault): PrivacyVault | null => vault));
 }).pipe(Atom.withLabel("privacy:vault"));
 
-export const revealPrivacyVault = (): void => bump(vaultReadsAtom);
+// The server returns the vault with every change, so a change needs no second request.
+const changedVaultAtom = Atom.make<PrivacyVault | null>(null).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("privacy:changed-vault"),
+);
 
+export const revealPrivacyVault = (): void => {
+  appAtomRegistry.set(changedVaultAtom, null);
+  bump(vaultReadsAtom);
+};
+
+/** The stand-ins and their real values, and the values no longer masked. Null until revealed. */
 export function usePrivacyVault(): {
-  readonly entries: ReadonlyArray<PrivacyVaultEntry> | null;
+  readonly vault: PrivacyVault | null;
   readonly loading: boolean;
 } {
   const result = useAtomValue(vaultAtom);
+  const changed = useAtomValue(changedVaultAtom);
   return {
-    entries: AsyncResult.isSuccess(result) ? result.value : null,
+    vault: changed ?? (AsyncResult.isSuccess(result) ? result.value : null),
     loading: result.waiting,
   };
+}
+
+/**
+ * Stops masking one value, or masks it again, by its stand-in. It applies from the next request
+ * of every conversation. Resolves to false when the entry is gone or belongs to a sealed document.
+ */
+export const changePrivacyVault = async (payload: PrivacyVaultRequest): Promise<boolean> => {
+  const result = await runPrimaryHttp(
+    PrimaryEnvironmentHttpClient.pipe(
+      Effect.flatMap((client) => client.privacy.changeVault({ headers: {}, payload })),
+    ),
+  );
+  appAtomRegistry.set(changedVaultAtom, result.vault);
+  setPrivacyStatus(result.status);
+  return result.ok;
+};
+
+/**
+ * A turn's stand-ins beside their real values, read when the person asks to see them. Null when
+ * the list for that turn is no longer kept.
+ */
+export const fetchTurnValues = async (runId: string): Promise<PrivacyTurnValues["values"]> =>
+  (
+    await runPrimaryHttp(
+      PrimaryEnvironmentHttpClient.pipe(
+        Effect.flatMap((client) => client.privacy.turnValues({ headers: {}, payload: { runId } })),
+      ),
+    )
+  ).values;
+
+/**
+ * Stand-ins with every spelling of their values, for marking them in the chat (`turns`) or in an
+ * open file (`vault`). Empty while masking is off.
+ */
+export const fetchKnownValues = (payload: PrivacyKnownValuesRequest): Promise<PrivacyKnownValues> =>
+  runPrimaryHttp(
+    PrimaryEnvironmentHttpClient.pipe(
+      Effect.flatMap((client) => client.privacy.knownValues({ headers: {}, payload })),
+    ),
+  );
+
+/** Connects, changes or removes the worker that reads sealed documents. */
+export const configurePrivacyWorker = async (
+  payload: PrivacyWorkerRequest,
+): Promise<PrivacyConfigureResult> => {
+  const result = await runPrimaryHttp(
+    PrimaryEnvironmentHttpClient.pipe(
+      Effect.flatMap((client) => client.privacy.worker({ headers: {}, payload })),
+    ),
+  );
+  setPrivacyStatus(result.status);
+  return result;
+};
+
+const sealedReadsAtom = counter("privacy:sealed-reads");
+// Counted apart from changes made here: a sealed folder seals files on the server, unasked.
+const sealedReloadsAtom = counter("privacy:sealed-reloads");
+const sealedListingAtom = Atom.family((projectId: string) =>
+  Atom.make((get) => {
+    get(sealedReadsAtom);
+    get(sealedReloadsAtom);
+    if (projectId === "") return Effect.succeed<PrivacySealedListing | null>(null);
+    return Effect.promise(() =>
+      runPrimaryHttp(
+        PrimaryEnvironmentHttpClient.pipe(
+          Effect.flatMap((client) =>
+            client.privacy.sealed({ headers: {}, payload: { action: "list", projectId } }),
+          ),
+        ),
+      ),
+    ).pipe(Effect.map((result): PrivacySealedListing | null => result.listing));
+  }).pipe(Atom.withLabel(`privacy:sealed:${projectId}`)),
+);
+
+/** A project's sealed documents and finished files. Null while loading or with no project. */
+export function useSealedDocuments(projectId: string | null): PrivacySealedListing | null {
+  const result = useAtomValue(sealedListingAtom(projectId ?? ""));
+  return AsyncResult.isSuccess(result) ? result.value : null;
+}
+
+const sealedAnswersAtom = Atom.family((projectId: string) =>
+  Atom.make((get) => {
+    get(sealedReadsAtom);
+    get(sealedReloadsAtom);
+    if (projectId === "") return Effect.succeed<ReadonlyArray<PrivacyClearAnswer> | null>(null);
+    return Effect.promise(() =>
+      runPrimaryHttp(
+        PrimaryEnvironmentHttpClient.pipe(
+          Effect.flatMap((client) =>
+            client.privacy.sealed({ headers: {}, payload: { action: "answers", projectId } }),
+          ),
+        ),
+      ),
+    ).pipe(Effect.map((result): ReadonlyArray<PrivacyClearAnswer> | null => result.answers ?? []));
+  }).pipe(Atom.withLabel(`privacy:sealed-answers:${projectId}`)),
+);
+
+/**
+ * Every answer about a project's sealed files that reached the AI as it is, read again whenever
+ * the listing is. Null while loading, and with no project: nothing is read until it is asked for.
+ */
+export function useSealedAnswers(
+  projectId: string | null,
+): ReadonlyArray<PrivacyClearAnswer> | null {
+  const result = useAtomValue(sealedAnswersAtom(projectId ?? ""));
+  return AsyncResult.isSuccess(result) ? result.value : null;
+}
+
+/** Requests that change nothing, so no list is read again after them. */
+const READS_OF_SEALED: ReadonlySet<PrivacySealedRequest["action"]> = new Set([
+  "inspect",
+  "inspectPaths",
+  "inspectFolder",
+  "labels",
+  "output",
+  "answers",
+  "turn",
+]);
+
+/**
+ * Reads the sealed lists again. A sealed folder seals what arrives in it without being asked
+ * from here, so its list is read again whenever the folder's files are.
+ */
+export const reloadSealedDocuments = (): void => bump(sealedReloadsAtom);
+
+/** Seals or removes a document, resets the limits, or reads a finished file. */
+export const changeSealedDocuments = async (
+  payload: PrivacySealedRequest,
+): Promise<PrivacySealedResult> => {
+  const result = await runPrimaryHttp(
+    PrimaryEnvironmentHttpClient.pipe(
+      Effect.flatMap((client) => client.privacy.sealed({ headers: {}, payload })),
+    ),
+  );
+  if (!READS_OF_SEALED.has(payload.action)) {
+    bump(sealedReadsAtom);
+    // The status carries the count of sealed files, which the chat's status reads.
+    refreshPrivacyStatus();
+  }
+  return result;
+};
+
+/**
+ * What one turn asked of sealed files: the files by name and the answers that reached the AI as
+ * they are. Null when the turn asked nothing, or its record is no longer kept.
+ */
+export const fetchSealedTurn = async (
+  projectId: string,
+  runId: string,
+): Promise<PrivacySealedTurn | null> =>
+  (await changeSealedDocuments({ action: "turn", projectId, runId })).turn ?? null;
+
+/** Counts changes to sealed documents, for views that list the folder they were moved out of. */
+export function useSealedRevision(): number {
+  return useAtomValue(sealedReadsAtom);
 }
 
 /** Masking is decided: either a detection service is connected, or the user turned it off. */

@@ -34,6 +34,7 @@ import {
   DialogPanel,
   DialogFooter,
 } from "./ui/dialog";
+import { formatDateTimeWith } from "~/timestampFormat";
 
 type SnoozeChoice = { readonly snoozedUntil: string };
 type Request = { readonly resolve: (choice: SnoozeChoice | null) => void };
@@ -148,7 +149,7 @@ function CustomSnoozeDialog() {
                             />
                           }
                         >
-                          {date.toLocaleDateString(undefined, {
+                          {formatDateTimeWith(date, {
                             month: "short",
                             day: "numeric",
                             year: "numeric",

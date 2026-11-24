@@ -1,5 +1,8 @@
 const NIGHTLY_SERVER_VERSION_PATTERN = /^[^-+]+-(?:nightly|preview)\.\d{8}\.\d+$/;
 
+/** The product name of a web build. vite.config.ts stamps it into index.html's title too. */
+export const WEB_APP_BASE_NAME = "DoeDesk";
+
 export function formatAppDisplayName(input: {
   readonly baseName: string;
   readonly stageLabel: string;

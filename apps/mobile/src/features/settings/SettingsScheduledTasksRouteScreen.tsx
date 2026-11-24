@@ -100,6 +100,7 @@ import {
   formatNextScheduledTaskRun,
   formatScheduledTaskInterval,
 } from "./scheduledTaskPresentation";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
 
 type ScheduledTaskRoutes = {
   SettingsScheduledTaskNew: undefined;
@@ -154,15 +155,15 @@ function formatTime(value: string): string {
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return value;
   const time = new Date();
   time.setHours(hours ?? 9, minutes ?? 0, 0, 0);
-  return time.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatAppDateTime(time, { hour: "numeric", minute: "2-digit" });
 }
 
 function formatRunAtDate(value: Date): string {
-  return value.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  return formatAppDateTime(value, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatRunAtTime(value: Date): string {
-  return value.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatAppDateTime(value, { hour: "numeric", minute: "2-digit" });
 }
 
 function timePickerValue(value: string): Date {

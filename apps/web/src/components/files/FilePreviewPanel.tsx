@@ -49,7 +49,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
-import { FolderTree, Globe2, WrapTextIcon } from "lucide-react";
+import { FileLock2Icon, FolderTree, Globe2, WrapTextIcon } from "lucide-react";
 import * as Schema from "effect/Schema";
 import {
   lazy,
@@ -98,6 +98,10 @@ import { BrowserDocumentFrame, isPdfPreviewFile } from "./BrowserDocumentFrame";
 import { DelimitedTablePreview } from "./DelimitedTablePreview";
 import { PreviewImage } from "./PreviewImage";
 import FileBrowserPanel from "./FileBrowserPanel";
+import { SealedFilePlaceholder } from "../privacy/SealedFiles";
+import { fileNameOf, sealedDocumentAt, sealedFolderToUnseal } from "../privacy/sealedFiles.logic";
+import { useFolderSealing } from "../privacy/useFolderSealing";
+import { requestSeal } from "~/privacy/sealPrompt";
 import { FileExplorerPane } from "./FileExplorerPane";
 import { FileBreadcrumbs } from "./FileBreadcrumbs";
 import { breadcrumbPathOf, retainedBreadcrumbTrail, trailChildOf } from "./filePath";
@@ -122,6 +126,14 @@ import {
   FileSurfaceLoading,
 } from "./fileSurfaceChrome";
 import SourceFilePreview from "./ReadOnlySourcePreview";
+import { FileValueMarkSurface } from "../privacy/FileValueMarkSurface";
+import {
+  FileValueMarksNotice,
+  FileValueMarksProvider,
+  FileValueMarksToggle,
+  NestedFilePreview,
+} from "../privacy/FileValueMarks";
+import { codeViewerShadowRoot } from "../privacy/valueMarkRanges";
 import { resolveCenteredFileLineScrollTop } from "./fileLineReveal";
 import { DiffCommentAnnotation } from "../diffs/DiffCommentAnnotation";
 import { projectFileCacheKey } from "./fileContentRevision";
@@ -562,14 +574,16 @@ function WorkspaceDocumentPreview(props: {
     return <FileSurfaceLoading />;
   }
   return (
-    <AttachmentFilePreview
-      key={`${revision}:${props.refreshRevision}`}
-      name={props.name}
-      mimeType="application/octet-stream"
-      sizeBytes={0}
-      asset={{ environmentId: props.environmentId, resource }}
-      origin={gt("File", { $context: "label for a file opened from the workspace" })}
-    />
+    <NestedFilePreview>
+      <AttachmentFilePreview
+        key={`${revision}:${props.refreshRevision}`}
+        name={props.name}
+        mimeType="application/octet-stream"
+        sizeBytes={0}
+        asset={{ environmentId: props.environmentId, resource }}
+        origin={gt("File", { $context: "label for a file opened from the workspace" })}
+      />
+    </NestedFilePreview>
   );
 }
 
@@ -1107,6 +1121,7 @@ function EditableFileSurface({
   return (
     <EditProvider createEditor={createFileEditor}>
       <div ref={surfaceRef} className="flex min-h-0 flex-1">
+        <FileValueMarkSurface shadow={codeViewerShadowRoot} unitSelector="[data-line]" />
         <Virtualizer
           className="file-preview-virtualizer min-h-0 flex-1 overflow-auto"
           config={{
@@ -1267,7 +1282,18 @@ function initialExplorerOpen(): boolean {
   }
 }
 
-export default function FilePreviewPanel({
+export default function FilePreviewPanel(props: FilePreviewPanelProps) {
+  return (
+    <FileValueMarksProvider
+      environmentId={props.environmentId}
+      fileKey={props.attachment?.id ?? props.relativePath}
+    >
+      <FilePreviewPanelContent {...props} />
+    </FileValueMarksProvider>
+  );
+}
+
+function FilePreviewPanelContent({
   environmentId,
   cwd,
   projectName,
@@ -1520,6 +1546,21 @@ export default function FilePreviewPanel({
       : relativePath && attachment === undefined
         ? resolvePathLinkTarget(relativePath, cwd)
         : null;
+  const sealing = useFolderSealing(environmentId, projectId);
+  const sealedHere =
+    attachment === undefined ? sealedDocumentAt(sealing.listing, absolutePath) : undefined;
+  const sealedFolder =
+    attachment === undefined ? sealedFolderToUnseal(sealing.listing, absolutePath) : undefined;
+  // Not while edits wait to be saved: a late save would write the file back into the folder.
+  const canSeal =
+    sealing.offered &&
+    projectId !== undefined &&
+    attachment === undefined &&
+    previewPath !== null &&
+    absolutePath !== null &&
+    file.isFile &&
+    sealedHere === undefined &&
+    !selectedFilePending;
   const onFilePostRender = useFileLineReveal(relativePath, revealLine, revealRequestId);
   // Mounting the file read under the workspace mutation id refetches it after each mutation.
   useAtomMount(
@@ -1625,7 +1666,9 @@ export default function FilePreviewPanel({
               />
             </div>
           </ScrollArea>
+          {/* A sealed file is not in the folder, so no editor has anything to open. */}
           {absolutePath &&
+          sealedHere === undefined &&
           (environmentId === primaryEnvironmentId ||
             environmentId === hostEnvironmentId ||
             remoteOpenState.mode !== "local-exec") ? (
@@ -1680,6 +1723,16 @@ export default function FilePreviewPanel({
               {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
             </FileSurfaceAction>
           ) : null}
+          {canSeal ? (
+            <FileSurfaceAction
+              label={gt("Seal this file")}
+              onPress={() =>
+                requestSeal({ projectId, name: fileNameOf(absolutePath), path: absolutePath })
+              }
+            >
+              <FileLock2Icon className="size-3.5" />
+            </FileSurfaceAction>
+          ) : null}
           {canOpenInBrowser ? (
             <FileSurfaceAction
               label={gt("Open file in preview browser")}
@@ -1688,6 +1741,7 @@ export default function FilePreviewPanel({
               <Globe2 className="size-3.5" />
             </FileSurfaceAction>
           ) : null}
+          <FileValueMarksToggle />
           {!isHostFile && previewPath !== null ? (
             <FileSurfaceAction
               label={explorerOpen ? gt("Hide file explorer") : gt("Show file explorer")}
@@ -1699,6 +1753,7 @@ export default function FilePreviewPanel({
           ) : null}
         </div>
       ) : null}
+      <FileValueMarksNotice />
       {relativePath && !attachment && !isHostFile && !canWriteFiles && !fileAccess.isPending ? (
         <div className="shrink-0 border-b px-3 py-1.5 text-2xs text-muted-foreground">
           <T>Read-only connection. Unsaved edits are kept until write access returns.</T>
@@ -1735,7 +1790,13 @@ export default function FilePreviewPanel({
               onFocus={() => queueMicrotask(focusEditorFromContent)}
             />
           ) : null}
-          {isFolder ? null : relativePath && attachment ? (
+          {isFolder ? null : sealedHere !== undefined && projectId !== undefined ? (
+            <SealedFilePlaceholder
+              projectId={projectId}
+              document={sealedHere}
+              {...(sealedFolder === undefined ? {} : { folder: sealedFolder })}
+            />
+          ) : relativePath && attachment ? (
             <AttachmentFilePreview
               key={`${environmentId}:${attachment.id}`}
               name={attachment.name}
@@ -1926,6 +1987,7 @@ export default function FilePreviewPanel({
                 key={`${environmentId}:${hostFolderPath ?? cwd}`}
                 environmentId={environmentId}
                 cwd={hostFolderPath ?? cwd}
+                projectId={projectId}
                 projectName={hostFolderPath ?? projectName}
                 hostFolder={hostFolderPath !== null}
                 selectedPath={

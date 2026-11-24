@@ -47,6 +47,7 @@ import * as EventSink from "./EventSink.ts";
 import * as EventStore from "./EventStore.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import { sealedFoldersBeforeTurn, setSealedFolderChecks } from "../privacy/agentWorkspaces.ts";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
 import * as ProviderUsageAnalytics from "../telemetry/ProviderUsageAnalytics.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
@@ -1065,6 +1066,86 @@ layer("ProviderEventIngestorV2", (it) => {
       assert.equal(persisted?.threadId, threadEvent.threadId);
       assert.equal(persisted?.status, "completed");
     }),
+  );
+
+  it.effect("sweeps the project's sealed folders when a command or a file change ends", () =>
+    Effect.gen(function* () {
+      const now = yield* DateTime.now;
+      const eventSink = yield* EventSink.EventSinkV2;
+      const ingestor = yield* ProviderEventIngestor.ProviderEventIngestorV2;
+      const idAllocator = yield* IdAllocator.IdAllocatorV2;
+      const threadEvent = yield* threadCreatedEvent(now);
+      const runId = RunId.make("run:provider-event-sealed-sweep");
+      const providerSessionId = yield* idAllocator.allocate.providerSession({
+        providerInstanceId: modelSelection.instanceId,
+        threadId: threadEvent.threadId,
+      });
+      const swept: Array<string> = [];
+      setSealedFolderChecks({
+        beforeTurn: () => Promise.resolve({ ok: true, sealed: 0 }),
+        sweepSoon: (project) => swept.push(project),
+      });
+      // The turn start is where a thread's project becomes known to the sweep.
+      yield* Effect.promise(() => sealedFoldersBeforeTurn(threadEvent.threadId, "project-sealed"));
+      const command = {
+        id: TurnItemId.make("turn-item:provider-event-sealed-sweep"),
+        threadId: threadEvent.threadId,
+        runId,
+        nodeId: NodeId.make("node:provider-event-sealed-sweep"),
+        providerThreadId: idAllocator.derive.providerThread({
+          driver: CODEX_DRIVER,
+          nativeThreadId: "native-thread-sealed-sweep",
+        }),
+        providerTurnId: idAllocator.derive.providerTurn({
+          driver: CODEX_DRIVER,
+          nativeTurnId: "native-turn-sealed-sweep",
+        }),
+        nativeItemRef: null,
+        parentItemId: null,
+        ordinal: 1,
+        status: "running",
+        title: "Copy the export",
+        startedAt: now,
+        completedAt: null,
+        updatedAt: now,
+        type: "command_execution",
+        input: "cp export.csv contracts/",
+      } satisfies OrchestrationV2TurnItem;
+      const ingest = (turnItem: OrchestrationV2TurnItem) =>
+        ingestor.ingestNormalized({
+          providerSessionId,
+          providerInstanceId: modelSelection.instanceId,
+          threadId: threadEvent.threadId,
+          runId,
+          event: { type: "turn_item.updated", driver: CODEX_DRIVER, turnItem },
+        });
+
+      yield* eventSink.write({ events: [threadEvent] });
+      yield* ingest(command);
+      // Still running: what it writes is not whole yet.
+      assert.deepEqual(swept, []);
+      yield* ingest({ ...command, status: "completed", completedAt: now });
+      assert.deepEqual(swept, ["project-sealed"]);
+      // Reading and thinking write nothing.
+      yield* ingest({
+        ...command,
+        id: TurnItemId.make("turn-item:provider-event-sealed-search"),
+        status: "completed",
+        completedAt: now,
+        type: "file_search",
+        pattern: "contracts",
+      } as OrchestrationV2TurnItem);
+      assert.deepEqual(swept, ["project-sealed"]);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() =>
+          setSealedFolderChecks({
+            beforeTurn: () => Promise.resolve({ ok: true, sealed: 0 }),
+            sweepSoon: () => undefined,
+          }),
+        ),
+      ),
+    ),
   );
 
   it.effect("persists a completed run's late background terminal exactly once", () =>

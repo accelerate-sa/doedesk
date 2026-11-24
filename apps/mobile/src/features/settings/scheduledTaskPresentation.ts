@@ -1,6 +1,7 @@
 import { msg } from "gt-react-native";
 
 import { m, type MessageResolver } from "../../i18n/messages";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -85,7 +86,7 @@ export function formatNextScheduledTaskRun(
     );
   }
 
-  const time = next.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = formatAppDateTime(next, { hour: "numeric", minute: "2-digit" });
   if (days === 1) return resolve(msg("Next run tomorrow at {time}", { time }));
   if (days <= 7) {
     return resolve(
@@ -95,7 +96,7 @@ export function formatNextScheduledTaskRun(
       ),
     );
   }
-  const date = next.toLocaleDateString([], {
+  const date = formatAppDateTime(next, {
     month: "short",
     day: "numeric",
     ...(next.getFullYear() !== current.getFullYear() ? { year: "numeric" as const } : {}),

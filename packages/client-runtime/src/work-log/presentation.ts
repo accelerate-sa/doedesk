@@ -643,9 +643,11 @@ function joinClauses(items: ReadonlyArray<string>, resolve: MFunctionType): stri
   if (items.length === 2) {
     return resolve(msg("{first} and {second}", { first: items[0]!, second: items[1]! }));
   }
-  return resolve(
-    msg("{items}, and {last}", { items: items.slice(0, -1).join(", "), last: items.at(-1)! }),
-  );
+  // The comma is part of the translated text: Arabic writes its own.
+  const leading = items
+    .slice(1, -1)
+    .reduce((joined, next) => resolve(msg("{items}, {next}", { items: joined, next })), items[0]!);
+  return resolve(msg("{items}, and {last}", { items: leading, last: items.at(-1)! }));
 }
 
 function t3ToolSummaryCall(entry: WorkLogPresentationEntry): T3ToolSummaryCall {

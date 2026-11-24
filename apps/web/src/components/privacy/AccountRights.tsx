@@ -1,5 +1,7 @@
 import type { PrivacyAccountDeleted, PrivacyStatus } from "@t3tools/contracts";
 import { useGT, useMessages } from "gt-react";
+
+import { formatLongDate } from "~/timestampFormat";
 import { useState } from "react";
 
 import { CLOUD_MESSAGES, NOT_WORKED, UNREACHABLE } from "~/doedesk/privacyMessages";
@@ -24,19 +26,14 @@ import {
 } from "../ui/dialog";
 import { SettingsRow, SettingsSection } from "../settings/settingsLayout";
 import { useSearchableSetting } from "../settings/settingsSearch";
+import { AccountRegionNotice, AccountRegionSelect, useAccountRegionChange } from "./AccountRegion";
 import { accountExportFileName, methodOfAccount } from "./AccountRights.logic";
 import { CloudSignIn } from "./PrivacySetup";
 import { ProfileQuestions } from "./ProfileQuestions";
+import { accountRegionExplained } from "./sealReader";
 
 // In the interface's language, not the system's: the date sits inside an interface sentence.
-const formatDay = (iso: string): string => {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? iso
-    : new Intl.DateTimeFormat(document.documentElement.lang || "en", {
-        dateStyle: "long",
-      }).format(date);
-};
+const formatDay = formatLongDate;
 
 const saveFile = (fileName: string, contents: string): void => {
   const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
@@ -114,6 +111,7 @@ export function AccountRightsSection({ status }: { readonly status: PrivacyStatu
   const [editingAnswers, setEditingAnswers] = useState(false);
   const [deletion, setDeletion] = useState<Deletion>({ step: "closed" });
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const regionChange = useAccountRegionChange(status);
   const messageFor = (result: {
     readonly code: string | null;
     readonly message: string | null;
@@ -149,6 +147,21 @@ export function AccountRightsSection({ status }: { readonly status: PrivacyStatu
     <>
       {signedIn ? (
         <SettingsSection id="privacy-account" title={gt("DoeDesk Cloud account")}>
+          {/* The region governs only DoeDesk Cloud's worker, so only an account with it sees it. */}
+          {status.hostedWorkerEntitled === true ? (
+            <SettingsRow
+              {...searchableSetting("account-region")}
+              title={gt("Region", { $context: "the DoeDesk Cloud account's region" })}
+              description={
+                regionChange.region === null
+                  ? gt("DoeDesk Cloud has not said yet which region this account is in.")
+                  : accountRegionExplained(status, regionChange.region, m)
+              }
+              control={<AccountRegionSelect change={regionChange} />}
+            >
+              <AccountRegionNotice change={regionChange} />
+            </SettingsRow>
+          ) : null}
           <SettingsRow
             {...searchableSetting("account-answers")}
             title={gt("Your answers")}

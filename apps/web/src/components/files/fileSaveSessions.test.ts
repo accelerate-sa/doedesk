@@ -57,9 +57,13 @@ describe("file save sessions", () => {
     h.sessions.change(target, "a");
     h.sessions.change(target, "ab");
     expect(h.onPendingChange).toHaveBeenLastCalledWith("file.txt", true);
+    expect(h.sessions.hasUnsavedAt("/workspace/file.txt")).toBe(true);
+    expect(h.sessions.hasUnsavedAt("\\workspace\\file.txt")).toBe(true);
+    expect(h.sessions.hasUnsavedAt("/workspace/other.txt")).toBe(false);
     await vi.advanceTimersByTimeAsync(500);
     expect(h.writes()).toEqual([[target, "ab"]]);
     expect(h.onPendingChange).toHaveBeenLastCalledWith("file.txt", false);
+    expect(h.sessions.hasUnsavedAt("/workspace/file.txt")).toBe(false);
   });
 
   it("flushes on the last release and drops edits from retired editors", async () => {
@@ -71,7 +75,10 @@ describe("file save sessions", () => {
     expect(h.persist).not.toHaveBeenCalled();
     releaseSecond();
     h.sessions.change(target, "stale editor contents");
+    // The closed file's last write is still on its way: it would put the file back.
+    expect(h.sessions.hasUnsavedAt("/workspace/file.txt")).toBe(true);
     await vi.runAllTimersAsync();
+    expect(h.sessions.hasUnsavedAt("/workspace/file.txt")).toBe(false);
     expect(h.writes()).toEqual([[target, "pending edit"]]);
     expect(h.onPendingChange).toHaveBeenLastCalledWith("file.txt", false);
   });

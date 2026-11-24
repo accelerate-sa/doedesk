@@ -59,8 +59,9 @@ function BreadcrumbLabel(props: {
       <TooltipTrigger
         render={
           <span
+            dir="auto"
             className={cn(
-              "block max-w-40 truncate rounded-sm px-0.5",
+              "file-name block max-w-40 truncate rounded-sm px-0.5",
               props.current ? "font-medium text-foreground" : "text-muted-foreground",
             )}
           />
@@ -299,7 +300,9 @@ function FolderBreadcrumb(props: {
           />
         }
       >
-        <span className="block truncate">{props.crumb.label}</span>
+        <span dir="auto" className="file-name block truncate">
+          {props.crumb.label}
+        </span>
       </TooltipTrigger>
       <TooltipPopup side="top">{props.crumb.path || props.projectName}</TooltipPopup>
     </Tooltip>

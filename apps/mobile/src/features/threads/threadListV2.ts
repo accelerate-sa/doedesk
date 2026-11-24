@@ -42,13 +42,14 @@ import type { ThreadMoveAvailability } from "./threadOrder";
 
 import { relativeTime } from "../../lib/time";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
-import { m, type MessageResolver } from "../../i18n/messages";
+import { getActiveLocale, m, type MessageResolver } from "../../i18n/messages";
 
 import {
   applyPendingThreadOrder,
   reconcilePendingThreadOrder,
   type PendingThreadOrder,
 } from "./threadOrder";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
 
 export const threadListInboxReturns = createInboxReturnTracker();
 
@@ -98,8 +99,16 @@ export function resolveThreadListV2SnoozePresets(
 }
 
 function presetOptions(presets: ReadonlyArray<SnoozePresetSetting> | undefined) {
-  return presets ? { presets } : {};
+  return {
+    ...(presets ? { presets } : {}),
+    formatTime: (date: Date) => formatAppDateTime(date, { hour: "numeric", minute: "2-digit" }),
+    formatWeekday: shortWeekday,
+  };
 }
+
+// A weekday's name is a word, so it follows the app's language.
+const shortWeekday = (date: Date): string =>
+  new Intl.DateTimeFormat(getActiveLocale(), { weekday: "short" }).format(date);
 
 export function resolveThreadListV2SnoozeMenuSelection(input: {
   readonly event: string;

@@ -103,7 +103,10 @@ import {
   useSharedPullRequestSummary,
 } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
-import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
+import {
+  COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
+  WORKSPACE_CONTROLS_END_CLASS,
+} from "~/workspaceTitlebar";
 
 import { PreviewPanelShell, type PreviewPanelMode } from "./preview/PreviewPanelShell";
 import { FaviconImage } from "./preview/PreviewFaviconIcon";
@@ -285,8 +288,9 @@ type SurfaceShortcutEvent = Pick<
 /** Surfaces that only make sense for source code. Shown in Developer mode. */
 const DEVELOPER_SURFACE_LABELS: ReadonlySet<string> = new Set([
   "Terminal",
+  "Changes",
   "Pull request",
-  "Linked pull requests",
+  "Linked items",
   "Device",
 ]);
 
@@ -1089,7 +1093,12 @@ function RightPanelTab(
                 }
                 onClick={() => onActivate(surface)}
               >
-                <span className="truncate">{title}</span>
+                <span
+                  dir={surface.kind === "file" ? "auto" : undefined}
+                  className={cn("truncate", surface.kind === "file" && "file-name")}
+                >
+                  {title}
+                </span>
               </button>
             }
           />
@@ -1691,7 +1700,10 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
         {ownsDesktopTitleBar ? (
           <span
             aria-hidden
-            className="pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] h-[var(--workspace-topbar-height)] w-28 [-webkit-app-region:no-drag]"
+            className={cn(
+              "pointer-events-none fixed top-[var(--workspace-controls-top)] h-[var(--workspace-topbar-height)] w-28 [-webkit-app-region:no-drag]",
+              WORKSPACE_CONTROLS_END_CLASS,
+            )}
           />
         ) : null}
       </div>

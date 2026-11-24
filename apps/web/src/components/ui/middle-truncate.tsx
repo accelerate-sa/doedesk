@@ -31,6 +31,9 @@ export function MiddleTruncate({
   return (
     <span
       {...(showTitle ? { title: value } : {})}
+      // The head and tail are separate boxes: without the text's own direction, a Latin name
+      // in a right-to-left page shows its tail first.
+      dir="auto"
       className={cn(
         "inline-flex min-w-0 max-w-full overflow-hidden whitespace-nowrap",
         variant === "cap-aligned" &&

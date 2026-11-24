@@ -2,7 +2,12 @@ import type { PrivacyStatus, ServerProvider } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { isProviderOffered, maskedRowText, providerWords } from "~/doedesk/providerConnections";
-import { maskedProviders, pendingNotice } from "./ProviderMasking.logic";
+import {
+  driversInUse,
+  maskedProviders,
+  pendingNotice,
+  unreadNotices,
+} from "./ProviderMasking.logic";
 
 const status = (overrides: Partial<PrivacyStatus> = {}): PrivacyStatus => ({
   mode: "cloud",
@@ -32,20 +37,22 @@ const provider = (driver: string, signedIn = true, enabled = true) =>
     auth: { status: signedIn ? "authenticated" : "unauthenticated" },
   }) as never as ServerProvider;
 
-describe("pendingNotice", () => {
+describe("a provider's notice", () => {
   const providers = [provider("claudeAgent"), provider("codex")];
+  const drivers = (list: ReadonlyArray<{ readonly driver: string }>) =>
+    list.map((entry) => entry.driver);
 
-  it("is due for the first signed-in provider whose requests are masked and unread", () => {
-    expect(pendingNotice(status(), providers)?.driver).toBe("claudeAgent");
-    expect(pendingNotice(status({ noticesRead: ["claudeAgent"] }), providers)?.driver).toBe(
+  it("is unread for each signed-in provider whose requests are masked, until it is read", () => {
+    expect(drivers(unreadNotices(status(), providers))).toEqual(["claudeAgent", "codex"]);
+    expect(drivers(unreadNotices(status({ noticesRead: ["claudeAgent"] }), providers))).toEqual([
       "codex",
-    );
+    ]);
     expect(
-      pendingNotice(
+      unreadNotices(
         status({ noticesRead: ["claudeAgent"], directProviders: ["codex"] }),
         providers,
       ),
-    ).toBeUndefined();
+    ).toEqual([]);
   });
 
   it.each([
@@ -54,8 +61,36 @@ describe("pendingNotice", () => {
     ["the user is not signed in to the provider", status(), [provider("claudeAgent", false)]],
     ["the provider is switched off", status(), [provider("claudeAgent", true, false)]],
     ["the server is too old to remember it", olderServerStatus, providers],
-  ] as const)("is not due when %s", (_name, current, list) => {
-    expect(pendingNotice(current, list)).toBeUndefined();
+  ] as const)("is not unread when %s", (_name, current, list) => {
+    expect(unreadNotices(current, list)).toEqual([]);
+  });
+
+  it("is shown for the provider a chat is starting with, and for no other", () => {
+    // Just set up, no chat yet: nothing opens over the app.
+    expect(pendingNotice(status(), providers, new Set(), null)).toBeUndefined();
+    // The person pressed Send in a chat with ChatGPT: that notice, before the message goes.
+    expect(pendingNotice(status(), providers, new Set(), "codex")?.driver).toBe("codex");
+    // A chat with a provider already exists (an agent or a schedule started it): its notice.
+    expect(pendingNotice(status(), providers, new Set(["codex"]), null)?.driver).toBe("codex");
+    expect(
+      pendingNotice(status({ noticesRead: ["codex"] }), providers, new Set(["codex"]), "codex"),
+    ).toBeUndefined();
+  });
+
+  it("counts a provider as in use once this computer has a chat with it", () => {
+    const here = "this-computer";
+    const instances = [
+      { instanceId: "claude-1", driver: "claudeAgent" },
+      { instanceId: "codex-1", driver: "codex" },
+    ] as never as ReadonlyArray<ServerProvider>;
+    const chat = (environmentId: string, providerInstanceId: string, latestRun: unknown = {}) =>
+      ({ environmentId, providerInstanceId, latestRun }) as never;
+    expect([...driversInUse([chat(here, "codex-1")], instances, here)]).toEqual(["codex"]);
+    // A chat nothing was sent in yet, such as the one a new server opens with, is not a use.
+    expect([...driversInUse([chat(here, "codex-1", null)], instances, here)]).toEqual([]);
+    // A chat on another computer is masked by that computer, under its own notices.
+    expect([...driversInUse([chat("office", "claude-1")], instances, here)]).toEqual([]);
+    expect([...driversInUse([], instances, here)]).toEqual([]);
   });
 });
 

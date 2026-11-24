@@ -110,6 +110,10 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
         prefix: `t3code-${prefix}-${process.pid}-`,
       })
       .pipe(
+        // Codex refuses an output file whose path passes through a symlink, as TMPDIR can.
+        Effect.flatMap((filePath) =>
+          fileSystem.realPath(filePath).pipe(Effect.orElseSucceed(() => filePath)),
+        ),
         Effect.tap((filePath) =>
           fileSystem
             .writeFileString(filePath, content)

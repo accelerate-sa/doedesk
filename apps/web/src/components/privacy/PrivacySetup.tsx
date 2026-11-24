@@ -20,6 +20,7 @@ import {
   SIGN_UP_UNAVAILABLE,
   UNREACHABLE,
   usePrivacyMessage,
+  useServiceProblemMessage,
 } from "~/doedesk/privacyMessages";
 import { useInSetup } from "~/onboarding/setupLocale";
 import {
@@ -51,11 +52,12 @@ export function PrivacySetup({
 }: {
   readonly status: PrivacyStatus;
   readonly onStatus: (status: PrivacyStatus) => void;
-  /** Settings offers turning masking off; the welcome page does not. */
+  /** Settings offers turning masking off here; setup offers it as a choice of its own. */
   readonly allowTurningOff?: boolean;
 }) {
   const gt = useGT();
   const m = usePrivacyMessage();
+  const serviceProblem = useServiceProblemMessage();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ownService, setOwnService] = useState(false);
@@ -70,7 +72,13 @@ export function PrivacySetup({
       return;
     }
     onStatus(result.status);
-    if (!result.ok) setError(result.message ?? m(NOT_WORKED));
+    if (!result.ok) {
+      setError(
+        result.problem === undefined
+          ? (result.message ?? m(NOT_WORKED))
+          : serviceProblem(result.problem),
+      );
+    }
   };
 
   if (status.problem !== null) {

@@ -10,6 +10,7 @@ import {
 import { msg } from "gt-react-native";
 
 import { m, type MessageResolver } from "../i18n/messages";
+import { formatAppDateTime } from "../lib/dateTimeFormat";
 
 import { providerColors } from "../features/usage/providerColors";
 import type { WidgetTheme } from "./widgetTheme";
@@ -105,9 +106,9 @@ function accountName(account: LimitAccount, resolve: MessageResolver) {
 function clockLabel(at: number, from: number) {
   const time = { hour: "numeric", minute: "2-digit" } as const;
   if (new Date(at).toDateString() === new Date(from).toDateString())
-    return new Date(at).toLocaleTimeString(undefined, time);
-  return new Date(at).toLocaleString(
-    undefined,
+    return formatAppDateTime(at, time);
+  return formatAppDateTime(
+    at,
     at - from < 6 * 86_400_000 ? { weekday: "short", ...time } : { month: "short", day: "numeric" },
   );
 }
@@ -147,7 +148,7 @@ const isUpcoming = (reset: LimitPoolWindow["resets"][number]) =>
   reset.at > Date.parse(reset.member.account.limits.checkedAt);
 
 const resetTime = (at: number) =>
-  new Date(at).toLocaleString(undefined, {
+  formatAppDateTime(at, {
     month: "short",
     day: "numeric",
     hour: "numeric",

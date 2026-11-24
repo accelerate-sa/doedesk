@@ -67,6 +67,7 @@ import { useUsageLimitsPanel } from "./chat/useUsageLimitsPanel";
 import { useWorktreeSetup } from "./chat/useWorktreeSetup";
 import { useChatShortcuts } from "./chat/useChatShortcuts";
 import { ChatBannerLane } from "./chat/ChatBannerLane";
+import { usePrivacyComposerBanners, useRefusedHostCheck } from "./privacy/privacyComposerBanners";
 import * as Schema from "effect/Schema";
 import {
   AuthOrchestrationOperateScope,
@@ -213,7 +214,10 @@ import { isEditableFocused } from "../lib/editableFocus";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import { shortcutLabelForCommand } from "../keybindings";
 import { cn } from "~/lib/utils";
-import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
+import {
+  COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
+  WORKSPACE_CONTROLS_END_CLASS,
+} from "~/workspaceTitlebar";
 import { toastManager } from "./ui/toast";
 import { projectScriptIdFromCommand } from "~/projectScripts";
 import { newMessageId } from "~/lib/utils";
@@ -1392,6 +1396,12 @@ export default function ChatView(props: ChatViewProps) {
     automaticEnvironment,
     autoUpdateEnvironments,
   });
+  const privacyComposerBannerItems = usePrivacyComposerBanners(
+    activeThreadEnvironmentId ?? null,
+    activeThreadProjectId ?? null,
+    routeThreadKey,
+    isServerThread && activeActivityRun?.status === "starting",
+  );
   const providerInstanceEntries = providerInstanceEntriesFor(
     providerStatuses,
     settings,
@@ -1635,6 +1645,10 @@ export default function ChatView(props: ChatViewProps) {
   // ChatView's own entries (anchoring, rewind, prompt history); ThreadTimeline
   // renders every row from the live turn items.
   const serverTimelineRows = serverVisibleTurnItems.filter(isCompleteTurnItemRow);
+  useRefusedHostCheck(
+    activeThreadEnvironmentId ?? null,
+    isServerThread ? `${serverTimelineRows.length}:${phase}` : null,
+  );
   const hasStreamedTimelineRows =
     isServerThread && serverTimelineRows.length !== serverVisibleTurnItems.length;
   const serverTimelineEntries = useIncrementalTimelineEntries(activeThreadKey, {
@@ -2800,6 +2814,7 @@ export default function ChatView(props: ChatViewProps) {
         ...freshSessionItems,
         ...heldSendItems,
         ...systemComposerBannerItems,
+        ...privacyComposerBannerItems,
       ];
     }
     return [
@@ -2812,6 +2827,7 @@ export default function ChatView(props: ChatViewProps) {
       ...freshSessionItems,
       ...heldSendItems,
       ...systemComposerBannerItems,
+      ...privacyComposerBannerItems,
       branchMismatchBannerItem(
         {
           mismatchKey: activeBranchMismatchKey,
@@ -3529,7 +3545,10 @@ export default function ChatView(props: ChatViewProps) {
             {isElectron && rightPanelControlsAtRoot ? (
               <span
                 aria-hidden
-                className="pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] h-[var(--workspace-topbar-height)] w-28 [-webkit-app-region:no-drag]"
+                className={cn(
+                  "pointer-events-none fixed top-[var(--workspace-controls-top)] h-[var(--workspace-topbar-height)] w-28 [-webkit-app-region:no-drag]",
+                  WORKSPACE_CONTROLS_END_CLASS,
+                )}
               />
             ) : null}
             {!rightPanelControlsAtRoot && !rightPanelControlsInPanel ? panelLayoutControls : null}

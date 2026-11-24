@@ -1008,13 +1008,13 @@ it("commits own detection service and no-masking choices with a single Continue 
     endpoint: "http://localhost:8080",
   });
 
-  // Continue without masking: no separate confirmation button; Continue commits and advances.
+  // Without masking: no separate confirmation button; Continue commits and advances.
   appAtomRegistry.set(state.privacyStatus as Atom.Writable<PrivacyStatus>, unconfigured);
   await click("Back");
   await vi.waitFor(() => expect(heading()).toBe("Choose how personal details are detected"));
   await act(async () => {
     (
-      screen.getByRole("radio", { name: /Continue without masking/ }).element() as HTMLElement
+      screen.getByRole("radio", { name: /Use DoeDesk without masking/ }).element() as HTMLElement
     ).click();
   });
   expect(screen.getByRole("button", { name: "Use DoeDesk without masking" }).query()).toBeNull();

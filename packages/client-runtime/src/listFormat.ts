@@ -24,13 +24,24 @@ export function formatConjunctionList(
     }),
   );
   for (let index = items.length - 3; index >= 0; index -= 1) {
-    list = resolve(
-      msg("{first}, {rest}", {
-        first: items[index]!,
-        rest: list,
-        $context: "an item followed by the rest of a list",
-      }),
-    );
+    list = withRest(items[index]!, list, resolve);
+  }
+  return list;
+}
+
+const withRest = (first: string, rest: string, resolve: MFunctionType): string =>
+  resolve(
+    msg("{first}, {rest}", { first, rest, $context: "an item followed by the rest of a list" }),
+  );
+
+/** "A, B, C" with the language's own comma and no "and": for a list that may be cut short. */
+export function formatCommaList(
+  items: ReadonlyArray<string>,
+  resolve: MFunctionType = mFallback,
+): string {
+  let list = items.at(-1) ?? "";
+  for (let index = items.length - 2; index >= 0; index -= 1) {
+    list = withRest(items[index]!, list, resolve);
   }
   return list;
 }

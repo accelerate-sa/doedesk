@@ -3874,12 +3874,18 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         yield* harness.firstTerminal;
         const notices = harness.events.flatMap((event) =>
           event.type === "turn_item.updated" && event.turnItem.type === "system_notice"
-            ? [[event.turnItem.title, event.turnItem.mcpSignIn?.server ?? null]]
+            ? [
+                [
+                  event.turnItem.title,
+                  event.turnItem.mcpServer ?? null,
+                  event.turnItem.mcpSignIn?.server ?? null,
+                ],
+              ]
             : [],
         );
         assert.deepEqual(notices, [
-          ["MCP server example_mcp failed to start", null],
-          ["MCP server login_mcp failed to start", "login_mcp"],
+          ["MCP server example_mcp failed to start", "example_mcp", null],
+          ["MCP server login_mcp failed to start", "login_mcp", "login_mcp"],
         ]);
       }).pipe(
         Effect.provide(

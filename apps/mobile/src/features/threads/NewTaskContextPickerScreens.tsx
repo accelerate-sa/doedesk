@@ -53,6 +53,11 @@ import {
   useConnectionDiagnosis,
 } from "../connection/ConnectionDiagnosisDetails";
 import { environmentStatusText } from "../connection/environmentStatusText";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
+
+/** A clock time with its seconds, as the app writes times. */
+const clockTime = (at: number | string): string =>
+  formatAppDateTime(new Date(at), { hour: "numeric", minute: "2-digit", second: "2-digit" });
 
 const BRANCH_SEARCH_DEBOUNCE_MS = 150;
 
@@ -133,7 +138,7 @@ function EnvironmentPickerRow(props: {
           {state.retryAt ? (
             <Text className="text-sm text-foreground-muted">
               <T>
-                Next reconnect at <Var>{new Date(state.retryAt).toLocaleTimeString()}</Var>
+                Next reconnect at <Var>{clockTime(state.retryAt)}</Var>
               </T>
             </Text>
           ) : null}

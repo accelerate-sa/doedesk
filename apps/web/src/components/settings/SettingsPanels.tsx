@@ -864,41 +864,44 @@ export function GeneralSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="sidebar" title={gt("Sidebar")}>
-        <SettingsRow
-          {...setting("project-grouping")}
-          description={<T>Combine matching repositories across computers.</T>}
-          resetAction={
-            settings.sidebarProjectGroupingMode !==
-            DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ? (
-              <SettingResetButton
-                ariaLabel={gt("Reset folder grouping to default")}
-                onClick={() =>
+        {settings.developerMode ? (
+          <SettingsRow
+            {...setting("project-grouping")}
+            description={<T>Combine matching repositories across computers.</T>}
+            resetAction={
+              settings.sidebarProjectGroupingMode !==
+              DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ? (
+                <SettingResetButton
+                  ariaLabel={gt("Reset folder grouping to default")}
+                  onClick={() =>
+                    updateSettings({
+                      sidebarProjectGroupingMode:
+                        DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <Switch
+                checked={isProjectGroupingEnabled(settings.sidebarProjectGroupingMode)}
+                onCheckedChange={(checked) => {
+                  if (!checked && settings.sidebarProjectGroupingMode !== "separate") {
+                    lastEnabledProjectGroupingMode.current = settings.sidebarProjectGroupingMode;
+                    rememberEnabledProjectGroupingMode(settings.sidebarProjectGroupingMode);
+                  }
                   updateSettings({
-                    sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
-                  })
-                }
+                    sidebarProjectGroupingMode: projectGroupingModeFromToggle(
+                      checked,
+                      lastEnabledProjectGroupingMode.current,
+                    ),
+                  });
+                }}
+                aria-label={gt("Folder grouping")}
               />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={isProjectGroupingEnabled(settings.sidebarProjectGroupingMode)}
-              onCheckedChange={(checked) => {
-                if (!checked && settings.sidebarProjectGroupingMode !== "separate") {
-                  lastEnabledProjectGroupingMode.current = settings.sidebarProjectGroupingMode;
-                  rememberEnabledProjectGroupingMode(settings.sidebarProjectGroupingMode);
-                }
-                updateSettings({
-                  sidebarProjectGroupingMode: projectGroupingModeFromToggle(
-                    checked,
-                    lastEnabledProjectGroupingMode.current,
-                  ),
-                });
-              }}
-              aria-label={gt("Folder grouping")}
-            />
-          }
-        />
+            }
+          />
+        ) : null}
         <SettingsRow
           {...setting("project-order")}
           description={<T>Order of folders in the sidebar folder picker and command palette.</T>}
@@ -942,10 +945,17 @@ export function GeneralSettingsPanel() {
         <SettingsRow
           {...setting("working-shelf")}
           description={
-            <T>
-              Fold working and monitoring chats into a Working section. They return to the top of
-              the inbox when they need you. The boring sidebar in Labs has no Working section.
-            </T>
+            settings.developerMode ? (
+              <T>
+                Fold working and monitoring chats into a Working section. They return to the top of
+                the inbox when they need you. The boring sidebar in Labs has no Working section.
+              </T>
+            ) : (
+              <T>
+                Fold working and monitoring chats into a Working section. They return to the top of
+                the inbox when they need you.
+              </T>
+            )
           }
           resetAction={
             settings.sidebarWorkingShelfEnabled !==
@@ -1000,9 +1010,7 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...setting("archive-confirmation")}
-          description={
-            <T>Require a second click on the inline archive action before a chat is archived.</T>
-          }
+          description={<T>Ask before archiving a chat.</T>}
           resetAction={
             settings.confirmThreadArchive !== DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive ? (
               <SettingResetButton
@@ -1022,17 +1030,6 @@ export function GeneralSettingsPanel() {
                 updateSettings({ confirmThreadArchive: Boolean(checked) })
               }
               aria-label={gt("Confirm chat archiving")}
-            />
-          }
-        />
-        <SettingsRow
-          {...setting("developer-mode")}
-          description={<T>Shows the terminal, git, pull requests and other programming tools.</T>}
-          control={
-            <Switch
-              checked={settings.developerMode}
-              onCheckedChange={(checked) => updateSettings({ developerMode: Boolean(checked) })}
-              aria-label={gt("Developer mode")}
             />
           }
         />
@@ -1061,31 +1058,33 @@ export function GeneralSettingsPanel() {
             />
           }
         />
-        <SettingsRow
-          {...setting("terminal-close-confirmation")}
-          description={<T>Ask before closing terminals and stopping their running processes.</T>}
-          resetAction={
-            settings.confirmTerminalClose !== DEFAULT_UNIFIED_SETTINGS.confirmTerminalClose ? (
-              <SettingResetButton
-                ariaLabel={gt("Reset terminal close confirmation to default")}
-                onClick={() =>
-                  updateSettings({
-                    confirmTerminalClose: DEFAULT_UNIFIED_SETTINGS.confirmTerminalClose,
-                  })
+        {settings.developerMode ? (
+          <SettingsRow
+            {...setting("terminal-close-confirmation")}
+            description={<T>Ask before closing terminals and stopping their running processes.</T>}
+            resetAction={
+              settings.confirmTerminalClose !== DEFAULT_UNIFIED_SETTINGS.confirmTerminalClose ? (
+                <SettingResetButton
+                  ariaLabel={gt("Reset terminal close confirmation to default")}
+                  onClick={() =>
+                    updateSettings({
+                      confirmTerminalClose: DEFAULT_UNIFIED_SETTINGS.confirmTerminalClose,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <Switch
+                checked={settings.confirmTerminalClose}
+                onCheckedChange={(checked) =>
+                  updateSettings({ confirmTerminalClose: Boolean(checked) })
                 }
+                aria-label={gt("Confirm terminal closing")}
               />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.confirmTerminalClose}
-              onCheckedChange={(checked) =>
-                updateSettings({ confirmTerminalClose: Boolean(checked) })
-              }
-              aria-label={gt("Confirm terminal closing")}
-            />
-          }
-        />
+            }
+          />
+        ) : null}
         {isElectron ? (
           <SettingsRow
             {...setting("quit-confirmation")}
@@ -1219,6 +1218,17 @@ export function GeneralSettingsPanel() {
                 </SelectItem>
               </SelectPopup>
             </Select>
+          }
+        />
+        <SettingsRow
+          {...setting("developer-mode")}
+          description={<T>Shows the terminal, git, pull requests and other programming tools.</T>}
+          control={
+            <Switch
+              checked={settings.developerMode}
+              onCheckedChange={(checked) => updateSettings({ developerMode: Boolean(checked) })}
+              aria-label={gt("Developer mode")}
+            />
           }
         />
       </SettingsSection>
@@ -2021,30 +2031,33 @@ export function ThreadsSettingsPanel() {
             />
           }
         />
-        <SettingsRow
-          serverScoped
-          settingKeys={["ghqCloneLayout"]}
-          {...setting("ghq-clone-layout")}
-          description={gt("Clones go to github.com/owner/repo under the folder above, like ghq.")}
-          resetAction={
-            settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
-              <SettingResetButton
-                ariaLabel={gt("Reset clone into host folders to default")}
-                onClick={() =>
-                  updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
-                }
+        {/* Cloning a repository by its address is a programmer's way to add a folder. */}
+        {settings.developerMode ? (
+          <SettingsRow
+            serverScoped
+            settingKeys={["ghqCloneLayout"]}
+            {...setting("ghq-clone-layout")}
+            description={gt("Clones go to github.com/owner/repo under the folder above, like ghq.")}
+            resetAction={
+              settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
+                <SettingResetButton
+                  ariaLabel={gt("Reset clone into host folders to default")}
+                  onClick={() =>
+                    updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <ScopedSwitch
+                settingKeys={["ghqCloneLayout"]}
+                checked={settings.ghqCloneLayout}
+                onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
+                aria-label={gt("Clone into host folders")}
               />
-            ) : null
-          }
-          control={
-            <ScopedSwitch
-              settingKeys={["ghqCloneLayout"]}
-              checked={settings.ghqCloneLayout}
-              onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
-              aria-label={gt("Clone into host folders")}
-            />
-          }
-        />
+            }
+          />
+        ) : null}
       </SettingsSection>
 
       <ProjectDefaultsSettings category="general" />
@@ -2096,37 +2109,39 @@ export function ThreadsSettingsPanel() {
 
       {hasServerTargets ? (
         <SettingsSection id="auto-settle" title={gt("Auto-settle")}>
-          <SettingsRow
-            serverScoped
-            settingKeys={["sidebarAutoSettleOnMerge"]}
-            {...setting("auto-settle-merged-threads")}
-            description={gt(
-              "Settle a chat when its pull request merges. Closed pull requests still settle automatically.",
-            )}
-            resetAction={
-              settings.sidebarAutoSettleOnMerge !==
-              DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
-                <SettingResetButton
-                  ariaLabel={gt("Reset auto-settle on merge to default")}
-                  onClick={() =>
-                    updateSettings({
-                      sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
-                    })
+          {settings.developerMode ? (
+            <SettingsRow
+              serverScoped
+              settingKeys={["sidebarAutoSettleOnMerge"]}
+              {...setting("auto-settle-merged-threads")}
+              description={gt(
+                "Settle a chat when its pull request merges. Closed pull requests still settle automatically.",
+              )}
+              resetAction={
+                settings.sidebarAutoSettleOnMerge !==
+                DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
+                  <SettingResetButton
+                    ariaLabel={gt("Reset auto-settle on merge to default")}
+                    onClick={() =>
+                      updateSettings({
+                        sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
+                      })
+                    }
+                  />
+                ) : null
+              }
+              control={
+                <ScopedSwitch
+                  settingKeys={["sidebarAutoSettleOnMerge"]}
+                  checked={settings.sidebarAutoSettleOnMerge}
+                  onCheckedChange={(checked) =>
+                    updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
                   }
+                  aria-label={gt("Auto-settle merged chats")}
                 />
-              ) : null
-            }
-            control={
-              <ScopedSwitch
-                settingKeys={["sidebarAutoSettleOnMerge"]}
-                checked={settings.sidebarAutoSettleOnMerge}
-                onCheckedChange={(checked) =>
-                  updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
-                }
-                aria-label={gt("Auto-settle merged chats")}
-              />
-            }
-          />
+              }
+            />
+          ) : null}
 
           <SettingsRow
             serverScoped
@@ -2176,7 +2191,9 @@ export function ThreadsSettingsPanel() {
               }
             />
           ) : null}
-          {settings.sidebarAutoSettleAfterDays !== null && supportsAutoSettlementScope ? (
+          {settings.developerMode &&
+          settings.sidebarAutoSettleAfterDays !== null &&
+          supportsAutoSettlementScope ? (
             <SettingsRow
               serverScoped
               settingKeys={["sidebarAutoSettleKeepPullRequests"]}
@@ -2205,7 +2222,7 @@ export function ThreadsSettingsPanel() {
           settingKeys={["textGenerationModelSelection"]}
           {...setting("text-generation-model")}
           description={gt(
-            "For chat titles and other generated text. Source control has its own setting. Text generators from Providers also appear here.",
+            "For chat titles and other generated text. Source control has its own setting. Text generators from AI accounts also appear here.",
           )}
           resetAction={
             hasServerTargets && isTextGenerationModelDirty ? (

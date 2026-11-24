@@ -61,6 +61,7 @@ interface FakeCodexInput {
   requireInstructions?: string;
   requireMcpServersOff?: ReadonlyArray<string>;
   requireOriginator?: string;
+  refuseSymlinkedOutputPath?: boolean;
 }
 
 function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
@@ -78,6 +79,7 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
     requireInstructions: input.requireInstructions ?? null,
     requireMcpServersOff: input.requireMcpServersOff ?? [],
     requireOriginator: input.requireOriginator ?? null,
+    refuseSymlinkedOutputPath: input.refuseSymlinkedOutputPath ?? false,
     stderr: input.stderr ?? null,
     output: input.output,
     exitCode: input.exitCode ?? 0,
@@ -164,6 +166,10 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
         "if (check.requireOriginator !== null && process.env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE !== check.requireOriginator) {",
         '  fail("unexpected originator: " + process.env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE, 14);',
         "}",
+        "// Like Codex 0.170: an output path that passes through a symlink is refused.",
+        "if (check.refuseSymlinkedOutputPath && outputPath !== null && NodeFS.realpathSync(outputPath) !== outputPath) {",
+        '  fail("Error: Failed to open last message file: Not a directory (os error 20)", 15);',
+        "}",
         'if (check.requiredCwd !== null && process.cwd() !== check.requiredCwd) fail("cannot inspect checkout", 10);',
         'if (check.requireInstructions !== null && !instructions.includes(check.requireInstructions)) fail("missing writer task", 11);',
         "if (check.requireArg !== null && !originalArgs.includes(` ${check.requireArg} `)) {",
@@ -201,6 +207,16 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
       ].join("\n"),
     });
   });
+}
+
+/** Points the process's temp directory elsewhere; the returned function puts it back. */
+function useTempDirectory(directory: string): () => void {
+  const previous = process.env.TMPDIR;
+  process.env.TMPDIR = directory;
+  return () => {
+    if (previous === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previous;
+  };
 }
 
 function withFakeCodexEnv<A, E, R>(
@@ -531,6 +547,31 @@ it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
       { output: JSON.stringify({ title: "Live title" }), requireOriginator: "DoeDesk" },
       (textGeneration) =>
         Effect.gen(function* () {
+          const result = yield* textGeneration.generateThreadTitle({
+            cwd: process.cwd(),
+            message: "Name this thread",
+            modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+          });
+          expect(result.title).toBe("Live title");
+        }),
+    ),
+  );
+
+  it.effect("gives codex exec an output file whose path has no symlink", () =>
+    withFakeCodexEnv(
+      { output: JSON.stringify({ title: "Live title" }), refuseSymlinkedOutputPath: true },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3code-codex-tmp-" });
+          const linked = path.join(root, "linked");
+          yield* fs.makeDirectory(path.join(root, "real"));
+          yield* fs.symlink(path.join(root, "real"), linked);
+          yield* Effect.acquireRelease(
+            Effect.sync(() => useTempDirectory(linked)),
+            (restore) => Effect.sync(restore),
+          );
           const result = yield* textGeneration.generateThreadTitle({
             cwd: process.cwd(),
             message: "Name this thread",

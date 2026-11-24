@@ -90,7 +90,7 @@ function summarize(
                 repository: `${repository.owner}/${repository.name}`,
               }),
             )
-          : resolve(msg("No project")),
+          : resolve(msg("No folder", { $context: "a chat that is not in any folder" })),
         ...(provider
           ? [resolve(msg("Model {model}", { model: model ? `${provider} ${model}` : provider }))]
           : []),

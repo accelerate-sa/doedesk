@@ -59,6 +59,8 @@ export interface SettingsSearchItem {
   readonly searchTerms?: ReadonlyArray<string>;
   readonly scope?: SettingsSearchScope;
   readonly desktopOnly?: boolean;
+  /** About code or the terminal, on a page that plain mode also shows. */
+  readonly developerOnly?: boolean;
   readonly macOnly?: boolean;
   readonly windowsOnly?: boolean;
   readonly releaseChannelOnly?: boolean;
@@ -101,7 +103,10 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/projects": msg("Folders"),
   "/settings/general": msg("General"),
   "/settings/appearance": msg("Appearance"),
-  "/settings/chat": msg("Chat"),
+  "/settings/chat": msg("Chat", {
+    $context:
+      "settings section: the message box and how chats are shown, beside a section named Chats",
+  }),
   "/settings/diffs": msg("Diffs & pull requests"),
   "/settings/keybindings": msg("Keybindings"),
   "/settings/snap-shot": msg("Window capture"),
@@ -241,7 +246,9 @@ export const settingsForMode = (
   items: ReadonlyArray<SettingsSearchItem>,
   developerMode: boolean,
 ): ReadonlyArray<SettingsSearchItem> =>
-  developerMode ? items : items.filter((item) => PLAIN_SETTINGS_PATHS.has(item.to));
+  developerMode
+    ? items
+    : items.filter((item) => PLAIN_SETTINGS_PATHS.has(item.to) && item.developerOnly !== true);
 
 export function keybindingSearchAnchorId<Command extends KeybindingCommand>(command: Command) {
   return `keybinding-${command}` as const;
@@ -526,6 +533,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "project-grouping",
     title: msg("Folder grouping"),
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: [msg("combine matching repositories computers sidebar")],
   },
   {
@@ -631,6 +639,40 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "privacy-web",
+    title: msg("Web pages and searches"),
+    to: "/settings/privacy",
+    scope: "environment",
+    searchTerms: [msg("web fetch search results public page names research detection check")],
+  },
+  {
+    id: "privacy-worker",
+    title: msg("Who reads sealed files"),
+    to: "/settings/privacy",
+    scope: "environment",
+    searchTerms: [
+      msg(
+        "sealed confidential documents worker small model local server endpoint Chat Completions Responses API key",
+      ),
+    ],
+  },
+  {
+    id: "privacy-sealed",
+    title: msg("This folder's sealed files"),
+    to: "/settings/privacy",
+    scope: "environment",
+    searchTerms: [
+      msg("seal unseal file confidential contract handle finished files outputs limit answers"),
+    ],
+  },
+  {
+    id: "privacy-egress",
+    title: msg("Other hosts"),
+    to: "/settings/privacy",
+    scope: "environment",
+    searchTerms: [msg("egress allowlist hosts network curl download block proxy exfiltration")],
+  },
+  {
     id: "privacy-redactions",
     title: msg("What was sent in place of files"),
     to: "/settings/privacy",
@@ -643,6 +685,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/privacy",
     scope: "environment",
     searchTerms: [msg("telemetry analytics tracking opt out statistics installation identifier")],
+  },
+  {
+    id: "account-region",
+    title: msg("Region", { $context: "the DoeDesk Cloud account's region" }),
+    to: "/settings/privacy",
+    searchTerms: [
+      msg("account region Saudi Arabia European Union EU global sealed files worker where runs"),
+    ],
   },
   {
     id: "account-answers",
@@ -1045,6 +1095,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "terminal-close-confirmation",
     title: msg("Terminal close confirmation"),
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["ask before delete stop process shell console history"],
   },
   {
@@ -1802,7 +1853,7 @@ export function searchSettings(
       const title = normalizeSearchText(decodeMsg(item.title));
       const fields = [
         title,
-        normalizeSearchText(SETTINGS_SECTION_LABELS[item.to]),
+        normalizeSearchText(decodeMsg(SETTINGS_SECTION_LABELS[item.to])),
         // The labels as displayed, so search also works in the active language.
         normalizeSearchText(translate(item.title)),
         normalizeSearchText(translate(SETTINGS_SECTION_LABELS[item.to])),

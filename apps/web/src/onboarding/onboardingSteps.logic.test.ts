@@ -71,6 +71,14 @@ describe("onboarding steps", () => {
     expect(goForward(state({ step: "masking", masking: "ownService" }), own).step).toBe("agents");
   });
 
+  it("holds the count while the way to detect is still being chosen", () => {
+    const counts = (["account", "ownService", "off"] as const).map((masking) => {
+      const view = onboardingView(state({ step: "masking", masking }), facts());
+      return `${view.position}/${view.count}`;
+    });
+    expect(counts).toEqual(["2/6", "2/6", "2/6"]);
+  });
+
   it("adds the programming steps only in Developer mode", () => {
     const available = { foldersAvailable: true, phoneAvailable: true, privacyMode: "off" } as const;
     expect(onboardingView(state(), facts(available)).steps).not.toContain("folders");
@@ -96,6 +104,19 @@ describe("onboarding steps", () => {
     expect(onboardingView(stored, signedIn)).toMatchObject({
       step: "usageData",
       position: 5,
+      count: 6,
+    });
+    // Setup left on the removed sealed-documents step goes on at the step that followed it.
+    const leftOnSealed = readOnboardingState({
+      step: "sealed",
+      seen: ["welcome", "masking", "account", "profile", "usageData", "sealed"],
+      locale: "ar",
+      masking: "account",
+    });
+    expect(leftOnSealed.seen).not.toContain("sealed");
+    expect(onboardingView(leftOnSealed, signedIn)).toMatchObject({
+      step: "agents",
+      position: 6,
       count: 6,
     });
   });

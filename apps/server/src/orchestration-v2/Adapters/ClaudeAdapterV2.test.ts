@@ -87,6 +87,7 @@ import * as PortScanner from "../../preview/PortScanner.ts";
 import { attachmentRelativePath } from "../../attachmentStore.ts";
 import { WorkflowAgentTranscriptReadObserver } from "../workflowAgentTranscript.ts";
 import * as ServerConfig from "../../config.ts";
+import { setSealedFolderLookup } from "@t3tools/provider-core/server/instanceEnvironment";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import { T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH } from "@t3tools/provider-core/server/orchestrationInstructions";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
@@ -976,6 +977,59 @@ describe("ClaudeAdapterV2 device instructions", () => {
     ]);
     assert.deepEqual(await subagentContext({ mcp: true, deviceToolsAvailable: false }), []);
     assert.deepEqual(await subagentContext({ mcp: false, deviceToolsAvailable: true }), []);
+  });
+});
+
+describe("ClaudeAdapterV2 sealed folders", () => {
+  it("refuses a file written into a sealed folder and lets other writes through", async () => {
+    setSealedFolderLookup((path) =>
+      path.startsWith("/workspace/contracts/") ? "/workspace/contracts" : undefined,
+    );
+    try {
+      const options = ClaudeAdapterV2.makeClaudeQueryOptions({
+        modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+        nativeThreadId: "native-thread-claude-sealed-folder",
+        resume: false,
+        cwd: "/workspace",
+      });
+      const [matcher] = options.hooks?.PreToolUse ?? [];
+      const decide = (toolName: string, toolInput: Record<string, string>) =>
+        matcher?.hooks[0]?.(
+          {
+            hook_event_name: "PreToolUse",
+            tool_name: toolName,
+            tool_input: toolInput,
+            tool_use_id: "tool-1",
+            session_id: "native-thread-claude-sealed-folder",
+            transcript_path: "/transcript.jsonl",
+            cwd: "/workspace",
+          },
+          "tool-1",
+          { signal: new AbortController().signal },
+        );
+      for (const tool of ["Write", "Edit", "MultiEdit", "NotebookEdit"]) {
+        assert.isTrue(new RegExp(`^(?:${matcher?.matcher})$`).test(tool));
+      }
+      // A path given relative to the folder the agent works in is refused too.
+      for (const input of [
+        { file_path: "/workspace/contracts/summary.md" },
+        { file_path: "contracts/2024/summary.md" },
+        { notebook_path: "/workspace/contracts/review.ipynb" },
+      ]) {
+        const refused = await decide("Write", input);
+        assert.deepInclude(refused && "hookSpecificOutput" in refused ? refused : {}, {
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            permissionDecision: "deny",
+            permissionDecisionReason:
+              'The folder "contracts" is sealed: every file in it is kept from you, so nothing can be written there. Write the file somewhere else in the workspace, or finish it with fill_sealed if it needs sealed values.',
+          },
+        });
+      }
+      assert.deepEqual(await decide("Write", { file_path: "/workspace/summary.md" }), {});
+    } finally {
+      setSealedFolderLookup(() => undefined);
+    }
   });
 });
 

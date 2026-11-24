@@ -108,9 +108,9 @@ export interface OwnServiceDraft {
 }
 
 /**
- * How names and numbers are found: a DoeDesk account, a detection service of one's own, or, only
- * where no account can be made here, no masking. The step footer's Continue button commits the
- * choice and advances in one step. Once configured, the step shows it until signed out or disconnected.
+ * How names and numbers are found: a DoeDesk account, a detection service of one's own, or no
+ * masking, worded as in Settings. The step footer's Continue button commits the choice and
+ * advances in one step. Once configured, the step shows it until signed out or disconnected.
  */
 export function MaskingStep({
   status,
@@ -134,7 +134,6 @@ export function MaskingStep({
   readonly onSubmitOwnService: () => void;
 }) {
   const gt = useGT();
-  const options = useSignInOptions();
 
   if (loading) return <Spinner size="md" tone="muted" aria-label={gt("Loading")} />;
   if (status === null) return <PrivacyUnavailable />;
@@ -142,8 +141,6 @@ export function MaskingStep({
     return <PrivacySetup status={status} onStatus={setPrivacyStatus} />;
   }
 
-  // Without masking is offered only where DoeDesk Cloud will not open an account from here.
-  const refused = options?.signUpAvailable === false;
   const selected = choice ?? "account";
 
   return (
@@ -165,26 +162,35 @@ export function MaskingStep({
           )}
           onSelect={() => onChoice("ownService")}
         />
-        {refused ? (
-          <ChoiceCard
-            selected={selected === "off"}
-            title={gt("Continue without masking")}
-            detail={gt(
-              "Everything you send, including messages and files, reaches the AI as written.",
-            )}
-            onSelect={() => onChoice("off")}
-          />
-        ) : null}
+        <ChoiceCard
+          selected={selected === "off"}
+          title={gt("Use DoeDesk without masking")}
+          detail={gt("Your messages and files reach the AI as written.")}
+          onSelect={() => onChoice("off")}
+        />
       </div>
       {selected === "ownService" ? (
-        <OwnServiceForm
-          busy={busy}
-          hideSubmit
-          endpoint={ownServiceDraft.endpoint}
-          token={ownServiceDraft.token}
-          onDraftChange={onOwnServiceDraftChange}
-          onSubmit={onSubmitOwnService}
-        />
+        <>
+          <OwnServiceForm
+            busy={busy}
+            hideSubmit
+            endpoint={ownServiceDraft.endpoint}
+            token={ownServiceDraft.token}
+            onDraftChange={onOwnServiceDraftChange}
+            onSubmit={onSubmitOwnService}
+          />
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <T>
+              Your server must answer{" "}
+              <bdi dir="ltr">
+                <code>POST /v1/detect</code>
+              </bdi>
+              : DoeDesk sends the text to check and expects back where each personal detail starts
+              and ends. The full format is in the DoeDesk user guide, under “Running your own
+              service”.
+            </T>
+          </p>
+        </>
       ) : null}
       {error !== null ? (
         <p role="alert" className="text-sm text-destructive">

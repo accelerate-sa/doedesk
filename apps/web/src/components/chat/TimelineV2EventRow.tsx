@@ -14,6 +14,8 @@ import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from "../ui/collaps
 import { EnvironmentSubagentAvatar, SubagentElapsed, V2LifecycleRow } from "./V2LifecycleRow";
 import { LinkRequestCard } from "./LinkRequestCard";
 import { SecretRequestCard } from "./SecretRequestCard";
+import { SealedOutputCard } from "../privacy/SealedOutputCard";
+import { sealedOutputFromToolItem } from "@t3tools/shared/toolOutput";
 import { TimelineRowCtx, type TimelineRow } from "./timelineRowContext";
 import { subagentGroupTiming } from "./TimelineV2EventRow.logic";
 
@@ -38,6 +40,16 @@ export function V2EventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
         environmentId={ctx.activeThreadEnvironmentId}
         item={item}
         visibility={visibility}
+      />
+    );
+  }
+  const finishedFile = item.type === "dynamic_tool" ? sealedOutputFromToolItem(item) : undefined;
+  if (finishedFile !== undefined) {
+    return (
+      <SealedOutputCard
+        environmentId={ctx.activeThreadEnvironmentId}
+        threadId={item.threadId}
+        name={finishedFile.name}
       />
     );
   }

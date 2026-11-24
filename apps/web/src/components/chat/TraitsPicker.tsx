@@ -1,3 +1,4 @@
+import { localizeProviderOptionDescriptor } from "./providerOptionLabels";
 import {
   buildTraitsTriggerDisplay,
   getDescriptorStringValue,
@@ -130,17 +131,19 @@ function getSelectedTraits(
   const modelIsUnavailable =
     keepsUnavailableModelOptions(provider, model) &&
     !models.some((candidate) => candidate.slug === normalizeModelSlug(model, provider));
-  const descriptors = modelIsUnavailable
-    ? buildUnavailableModelOptionDescriptors(
-        includePlanAgent
-          ? modelOptions
-          : modelOptions?.filter((option) => option.id !== "agent" || option.value !== "plan"),
-        resolve,
-      )
-    : getProviderOptionDescriptors({
-        caps,
-        selections: modelOptions,
-      });
+  const descriptors = (
+    modelIsUnavailable
+      ? buildUnavailableModelOptionDescriptors(
+          includePlanAgent
+            ? modelOptions
+            : modelOptions?.filter((option) => option.id !== "agent" || option.value !== "plan"),
+          resolve,
+        )
+      : getProviderOptionDescriptors({
+          caps,
+          selections: modelOptions,
+        })
+  ).map((descriptor) => localizeProviderOptionDescriptor(descriptor, resolve));
   const selectDescriptors = descriptors.filter(
     (descriptor): descriptor is Extract<ProviderOptionDescriptor, { type: "select" }> =>
       descriptor.type === "select",

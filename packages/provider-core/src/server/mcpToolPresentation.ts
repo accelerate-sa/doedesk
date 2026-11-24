@@ -1,5 +1,8 @@
 import type { ToolActivityIcon, ToolActivitySource } from "@t3tools/contracts";
-import { resolveT3McpToolDefinition } from "@t3tools/shared/t3McpToolPresentation";
+import {
+  isT3McpServerName,
+  resolveT3McpToolDefinition,
+} from "@t3tools/shared/t3McpToolPresentation";
 
 export function normalizeMcpText(value: unknown, maxLength = 160): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -44,6 +47,8 @@ export function mcpToolPresentation(input: {
     (server && tool ? normalizeMcpText(tool.replace(/[_-]+/gu, " ")) : undefined);
   if (!server) return title ? { title } : {};
   const name =
+    // The built-in server keeps its upstream name for agents; people know it as the product.
+    (isT3McpServerName(server) ? "DoeDesk" : undefined) ??
     normalizeMcpText(input.serverDisplayName) ??
     normalizeMcpText(source && Reflect.get(source, "name")) ??
     normalizeMcpText(server.replace(/[_-]+/gu, " ")) ??

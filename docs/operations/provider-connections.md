@@ -72,6 +72,54 @@ each turn as a continuation of a thread held by Anthropic, so a request carries 
 messages. By Codex: `chatgpt.com` (the model WebSocket, usage reports, plugin and model lists),
 `ab.chatgpt.com` (metrics), `github.com`, and the user's own MCP servers.
 
+### Paths other than model requests
+
+Measured on 24 November 2026: the 4,246 sessions of the sealed-worker evaluation (Claude Code,
+every request body recorded by the gateway), and one session each of Claude Code 2.1.330 and
+Codex 0.170.0 through the recorder, which also sees requests without a body.
+
+| Program     | Path                                                                                                    | Carries                                                                                   | Gateway                      |
+| ----------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------- |
+| Claude Code | `POST /v1/messages`, `/v1/messages/count_tokens`                                                        | The conversation                                                                          | Masked                       |
+| Claude Code | `POST /api/event_logging/v2/batch` (up to 1 MB each, 7 GB in all)                                       | Event names, counts, hashes of file paths and contents, program names of shell commands   | Sent; known values replaced  |
+| Claude Code | `POST /api/eval/sdk-…`                                                                                  | Account, device and plan identifiers                                                      | Sent as written              |
+| Claude Code | `GET /api/claude_cli/bootstrap`, `/api/claude_code_penguin_mode`, `/v1/mcp_servers`                     | Nothing                                                                                   | Sent as written              |
+| Codex       | `POST /backend-api/codex/responses` (after its WebSocket is refused)                                    | The conversation                                                                          | Masked                       |
+| Codex       | `POST /backend-api/codex/analytics-events/events`, `POST ab.chatgpt.com/otlp/v1/metrics` (up to 1.2 MB) | Event names, timings, the names of MCP servers and tools                                  | Sent; known values replaced  |
+| Codex       | `POST /backend-api/ps/mcp`                                                                              | `initialize` and `tools/list` in ordinary use; a `tools/call` would carry restored values | Listing sent, a call refused |
+| Codex       | `GET /backend-api/codex/models`, `/ps/plugins/…`, `/wham/accounts/check`, `/wham/settings/user`         | Nothing                                                                                   | Sent as written              |
+
+No planted or protected value was found in any of these bodies: 189,405 protected values of
+the evaluation's tasks were searched for in 6.97 GB of them, as written and inside Claude Code's
+base64 event details. Both programs can send much more than they did here (file uploads,
+feedback, transcripts, sessions run from another device, cloud tasks): any such request with a
+body has no rule in `packages/privacy-gateway/src/routes.ts` and is refused. Gemini CLI's paths
+in that file were read from its program text and not measured.
+
+### Other programs behind the gateway
+
+Measured on 24 November 2026 with `packages/privacy-gateway/scripts/routes-seen.ts`, each in a
+home folder of its own.
+
+| Program                          | How it was run                                                                | What it called on AI hosts                                                                                                                                                                                                                                         | Result                                                                                                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex 0.170.0 as DoeDesk runs it | `codex app-server`, two turns and a compaction on Luna, signed in             | The paths of `codex exec`, and more listings without a body (`connectors/directory/list`, `plugins/featured`, `ps/plugins/list`, `wham/usage`, `wham/rate-limit-reset-credits`)                                                                                    | Works. Nothing refused                                                                                                                                               |
+| Antigravity 1.5.12               | `agy --print`, signed in                                                      | `daily-cloudcode-pa.googleapis.com/v1internal:` `loadCodeAssist`, `fetchAdminControls`, `listExperiments`, `fetchAvailableModels`, `fetchUserInfo`, `retrieveUserQuotaSummary`, `writeTrajectoryAcls` (a project name or an id each), then `streamGenerateContent` | Starts, and its model request is masked. The account's quota ended the turn there (HTTP 429)                                                                         |
+| OpenCode 1.19.6                  | `opencode run` on OpenRouter with a key, and on its own free models with none | `openrouter.ai/api/v1/chat/completions`; `opencode.ai/inference/openai/v1/chat/completions`; `GET models.opencode.ai/api.json`                                                                                                                                     | Works on OpenRouter. The free models answer "Free usage limit reached" to any request that comes through the gateway, with masking on or off                         |
+| Pi 1.6.0                         | `pi -p` on OpenRouter with a key                                              | `openrouter.ai/api/v1/messages`                                                                                                                                                                                                                                    | Works. Nothing refused                                                                                                                                               |
+| Grok Build 1.0.92                | `grok -p` with no sign-in, then with a made-up key                            | `GET api.x.ai/v1/api-key`, `GET api.x.ai/v1/models`, then it stops for want of a sign-in                                                                                                                                                                           | Not measured past sign-in. Its program text sends model requests to `cli-chat-proxy.grok.com/v1` with a grok.com sign-in: that host is opened since this measurement |
+| Gemini CLI                       | `gemini -p` with the stored sign-in                                           | Nothing: it asks to sign in again in a browser                                                                                                                                                                                                                     | Not measured. Its rules were read from its program text, and overlap with Antigravity's                                                                              |
+
+Before this measurement Antigravity could not start behind the gateway: `fetchAvailableModels`,
+`fetchUserInfo` and `retrieveUserQuotaSummary` had no rule. Antigravity also reaches
+`aicode.googleapis.com` (`GET /v1alpha:fetchConfig`, no body) and `play.googleapis.com/log` (a
+90-byte binary log); neither is on the list of AI hosts.
+
+Cursor's model hosts are refused at connection. Kiro, Muse Code and fx send to hosts the gateway
+does not open, so no rule applies to them and nothing of theirs is masked. An agent from the ACP
+registry is whatever program it names: one that asks an AI host on the list is held to the same
+rules, and its set-up calls are unmeasured.
+
 `/api/artifacts/mcp` is not rewritten by the gateway. With masking on DoeDesk turns the Artifact
 tool off with Anthropic's own switch, because a page the model writes would be published with the
 real values restored.

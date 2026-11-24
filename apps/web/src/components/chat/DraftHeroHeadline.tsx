@@ -244,7 +244,9 @@ export function DraftHeroHeadline({
         >
           <DraftProjectName
             value={
-              isScratchDraft ? gt("No project") : (activeProjectTitle ?? gt("Choose a folder"))
+              isScratchDraft
+                ? gt("No folder", { $context: "a chat that is not in any folder" })
+                : (activeProjectTitle ?? gt("Choose a folder"))
             }
             singleLine
           />

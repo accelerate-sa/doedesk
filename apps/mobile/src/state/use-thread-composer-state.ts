@@ -69,6 +69,8 @@ import {
 } from "../lib/composerImages";
 import { retainComposerAttachmentFileForPreview } from "../lib/composerAttachmentPreviewRetention";
 import { scopedThreadKey } from "../lib/scopedEntities";
+import { withoutMcpServerNotices } from "@t3tools/client-runtime/work-log/item-detail";
+import { useDeveloperMode } from "../doedesk/product";
 import { buildThreadFeed, createThreadFeedCache } from "../lib/threadActivity";
 import {
   acknowledgedThreadMessagesAtom,
@@ -305,13 +307,18 @@ export function useThreadComposerState(input: {
   // cannot be an either/or with the loaded messages.
   const pendingCreationMessage = selectedThreadCreation?.message ?? null;
   const [feedCache] = useState(createThreadFeedCache);
+  const developerMode = useDeveloperMode();
+  // Other programs' MCP servers failing or wanting a sign-in say nothing about this chat's work.
+  const feedTurnItems = developerMode
+    ? selectedThreadVisibleTurnItems
+    : withoutMcpServerNotices(selectedThreadVisibleTurnItems);
   const selectedThreadFeed = (() => {
     const pendingCreation =
       pendingCreationMessage !== null &&
       !selectedThreadMessages?.some((message) => message.id === pendingCreationMessage.messageId)
         ? [pendingThreadCreationMessage(pendingCreationMessage)]
         : [];
-    const feed = buildThreadFeed(selectedThreadVisibleTurnItems, {
+    const feed = buildThreadFeed(feedTurnItems, {
       anchoredMessages: pendingCreation,
       attempts: selectedThreadAttempts,
       nodes: selectedThreadNodes,

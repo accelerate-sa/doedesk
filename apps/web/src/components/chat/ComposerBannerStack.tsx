@@ -181,7 +181,8 @@ function NoticeCard({
       density="comfortable"
       data-chat-composer-collapsed-controls="true"
     >
-      <ComposerBanner.Row layout="wrap-actions">
+      {/* Action buttons may wrap below a long title; a lone close button stays on its line. */}
+      <ComposerBanner.Row layout={item.actions ? "wrap-actions" : "inline"}>
         <ComposerBanner.Icon className="h-(--composer-banner-icon-column) self-start">
           {item.icon}
         </ComposerBanner.Icon>

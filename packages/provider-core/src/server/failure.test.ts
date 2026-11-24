@@ -19,6 +19,7 @@ import {
   makeProviderFailure,
   makeProviderFailureTurnItem,
   MAX_PROVIDER_FAILURE_MESSAGE_LENGTH,
+  setGatewayRefusalSource,
   ContextHandoffBudgetError,
   ContextHandoffBackgroundWorkError,
 } from "./failure.ts";
@@ -82,6 +83,68 @@ it("reports an oversized provider request as not retryable instead of the gatewa
     const failure = makeProviderFailure({ message, retryable: true });
     assert.equal(failure.message, message);
     assert.equal(failure.retryable, true);
+  }
+});
+
+it("shows what the privacy gateway said alone, whatever a provider's program wraps it in, and does not call for a retry", () => {
+  const reasons = [
+    "POST daily-cloudcode-pa.googleapis.com/v1internal:fetchUserInfo is a kind of request DoeDesk has no rule for, so it could not check it for personal data. Settings, Privacy, Recent requests lists it.",
+    // A reason that holds a quote and a bracket, as a proxy's refusal does.
+    'The proxy this computer is set to use ("proxy.corp:8080") refused the connection (it answered 403).',
+  ];
+  for (const reason of reasons) {
+    const said = `DoeDesk did not send this request. ${reason} Nothing of it was sent.`;
+    const body = JSON.stringify({
+      type: "error",
+      error: { type: "invalid_request_error", message: said, code: "doedesk_privacy_gateway" },
+    });
+    for (const message of [
+      // Antigravity 1.5.12, as it failed to start behind the gateway on 24 November 2026.
+      `Eligibility check failed: request failed (code 400): ${body}`,
+      `API Error: 400 ${body}`,
+      JSON.stringify({ error: `unexpected status 400 Bad Request: ${body}` }),
+      // Codex, which puts the address it asked after what it was told.
+      `unexpected status 400 Bad Request: ${said}, url: https://chatgpt.com/backend-api/codex/responses`,
+      `${said}., url: https://chatgpt.com/backend-api/codex/responses, request id: 7f3`,
+      said,
+    ]) {
+      // Retryable or not as the program reported it: a request DoeDesk refused is never retried.
+      const failure = makeProviderFailure({ message, retryable: true });
+      assert.equal(failure.message, reason, message);
+      assert.equal(failure.code, "doedesk_not_sent");
+      assert.equal(failure.retryable, false);
+    }
+  }
+  // A provider's own error that happens to mention DoeDesk is left as it is.
+  const other = "The model said: DoeDesk did not send the file.";
+  assert.equal(makeProviderFailure({ message: other }).message, other);
+  assert.equal(makeProviderFailure({ message: other }).code, null);
+
+  // A program's own setup request met the same refusal and reports it in words that carry none
+  // of DoeDesk's (Codex, 24 November 2026): the gateway is asked why nothing is being sent.
+  const proxy =
+    "The proxy this computer is set to use (127.0.0.1:48761) refused the connection to chatgpt.com (it answered 403).";
+  let refusing: string | undefined = proxy;
+  setGatewayRefusalSource(() => refusing);
+  try {
+    for (const retryable of [true, null]) {
+      const failure = makeProviderFailure({
+        message: "workspace routing discovery failed",
+        code: "other",
+        class: "provider_error",
+        retryable,
+      });
+      assert.deepEqual(
+        [failure.message, failure.code, failure.retryable],
+        [proxy, "doedesk_not_sent", false],
+      );
+    }
+    // Once requests get out again, a program's error is its own.
+    refusing = undefined;
+    const own = makeProviderFailure({ message: "workspace routing discovery failed" });
+    assert.deepEqual([own.message, own.code], ["workspace routing discovery failed", null]);
+  } finally {
+    setGatewayRefusalSource(undefined);
   }
 });
 

@@ -11,6 +11,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as PlatformError from "effect/PlatformError";
 import * as Scope from "effect/Scope";
+import * as TestClock from "effect/testing/TestClock";
 import { describe, expect } from "vite-plus/test";
 
 import * as Base64Url from "effect/encoding/Base64Url";
@@ -19,6 +20,7 @@ import * as CheckpointStore from "./CheckpointStore.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as ServerConfig from "../config.ts";
+import { setSealedFolderPaths } from "../privacy/agentWorkspaces.ts";
 
 function checkpointRefForThreadTurn(threadId: ThreadId, turnCount: number): CheckpointRef {
   return CheckpointRef.make(`refs/t3/checkpoints/${Base64Url.encode(threadId)}/turn/${turnCount}`);
@@ -64,7 +66,11 @@ function writeTextFile(
 function git(
   cwd: string,
   args: ReadonlyArray<string>,
-  options: { readonly committedAt?: string; readonly allowNonZeroExit?: boolean } = {},
+  options: {
+    readonly committedAt?: string;
+    readonly allowNonZeroExit?: boolean;
+    readonly stdin?: string;
+  } = {},
 ): Effect.Effect<string, VcsError, VcsProcess.VcsProcess> {
   return Effect.gen(function* () {
     const vcsProcess = yield* VcsProcess.VcsProcess;
@@ -80,6 +86,7 @@ function git(
       ...(options.allowNonZeroExit === undefined
         ? {}
         : { allowNonZeroExit: options.allowNonZeroExit }),
+      ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
     });
     return result.stdout.trim();
   });
@@ -161,6 +168,277 @@ it.layer(layerTest)("CheckpointStore.layer", (it) => {
         true,
       );
       expect(yield* fileSystem.readFileString(letter)).toBe("Dear Khalid,\n");
+    }),
+  );
+
+  it.effect("takes a sealed file out of a plain folder's history and keeps it out", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const folder = yield* makeTmpDir("plain-folder-");
+      // A space, Arabic letters and brackets: quoted where history is rewritten, and no pattern.
+      const contract = NodePath.join(folder, "contracts", "عقد الإيجار [1].md");
+      const annex = NodePath.join(folder, "annex.md");
+      const notes = NodePath.join(folder, "notes.txt");
+      yield* fileSystem.makeDirectory(NodePath.dirname(contract));
+      yield* writeTextFile(contract, "Rent: 480,000 SAR a year.\n");
+      yield* writeTextFile(annex, "Deposit: 40,000 SAR.\n");
+      yield* writeTextFile(notes, "first\n");
+      const checkpointStore = yield* CheckpointStore.CheckpointStore;
+      yield* checkpointStore.ensureRepository(folder);
+      const threadId = ThreadId.make("thread-sealed-history");
+      const first = checkpointRefForThreadTurn(threadId, 0);
+      const second = checkpointRefForThreadTurn(threadId, 1);
+      yield* checkpointStore.captureCheckpoint({ cwd: folder, checkpointRef: first });
+      yield* writeTextFile(contract, "Rent: 520,000 SAR a year.\n");
+      yield* writeTextFile(notes, "second\n");
+      yield* checkpointStore.captureCheckpoint({
+        cwd: folder,
+        checkpointRef: second,
+        previousCheckpointRef: first,
+      });
+      const copies = (yield* git(folder, ["rev-list", "--all", "--objects"]))
+        .split("\n")
+        .filter((line) => line.endsWith(".md"))
+        .map((line) => line.slice(0, 40));
+      // Two versions of the contract and one of the annex.
+      expect(copies).toHaveLength(3);
+      expect(yield* checkpointStore.fileHistory(contract)).toEqual({
+        keptByGit: false,
+        seenByTurns: true,
+      });
+
+      // An agent that takes the folder for a repository can have staged the file itself.
+      yield* git(folder, ["add", "--", "contracts"]);
+      // Sealing moves the files out of the folder, then has their history forgotten: both at once.
+      yield* fileSystem.remove(contract);
+      yield* fileSystem.remove(annex);
+      yield* checkpointStore.sealChanged({ kind: "sealed", paths: [contract, annex] });
+
+      expect(
+        yield* git(folder, ["log", "--all", "--format=%H", "--", "contracts", "annex.md"]),
+      ).toBe("");
+      expect(yield* git(folder, ["ls-files", "--", "contracts"])).toBe("");
+      for (const copy of copies) {
+        expect(yield* git(folder, ["cat-file", "-t", copy], { allowNonZeroExit: true })).toBe("");
+      }
+      // The rest of the history is as it was.
+      const diff = yield* checkpointStore.diffCheckpoints({
+        cwd: folder,
+        fromCheckpointRef: first,
+        toCheckpointRef: second,
+        ignoreWhitespace: false,
+      });
+      expect(diff).toContain("+second");
+      expect(diff).not.toContain("SAR");
+
+      // Unsealed again, the file is neither stored by a checkpoint nor removed by a restore.
+      yield* writeTextFile(contract, "Rent: 520,000 SAR a year.\n");
+      const third = checkpointRefForThreadTurn(threadId, 2);
+      yield* checkpointStore.captureCheckpoint({
+        cwd: folder,
+        checkpointRef: third,
+        previousCheckpointRef: second,
+      });
+      expect(yield* git(folder, ["log", "--all", "--format=%H", "--", "contracts"])).toBe("");
+      expect(yield* checkpointStore.restoreCheckpoint({ cwd: folder, checkpointRef: first })).toBe(
+        true,
+      );
+      expect(yield* fileSystem.readFileString(notes)).toBe("first\n");
+      expect(yield* fileSystem.readFileString(contract)).toBe("Rent: 520,000 SAR a year.\n");
+    }),
+  );
+
+  it.effect.each([{ packed: false }, { packed: true }])(
+    "takes a sealed file out of DoeDesk's checkpoints in the person's repository, and nothing of theirs: %j",
+    ({ packed }) =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const repository = yield* makeTmpDir();
+        yield* initRepoWithCommit(repository);
+        const review = NodePath.join(repository, "hr", "Reem review.txt");
+        const draft = NodePath.join(repository, "draft.txt");
+        yield* fileSystem.makeDirectory(NodePath.dirname(review));
+        yield* writeTextFile(review, "Rating: meets expectations.\n");
+        yield* git(repository, ["add", "."]);
+        yield* git(repository, ["commit", "-m", "the review as filed"]);
+        const checkpointStore = yield* CheckpointStore.CheckpointStore;
+        const threadId = ThreadId.make("thread-own-repository");
+        const first = checkpointRefForThreadTurn(threadId, 0);
+        const second = checkpointRefForThreadTurn(threadId, 1);
+        const untracked = NodePath.join(repository, "export.json");
+        yield* writeTextFile(untracked, "[]\n");
+        expect(yield* checkpointStore.fileHistory(untracked)).toEqual({
+          keptByGit: false,
+          seenByTurns: false,
+        });
+        // Typed and never committed: only DoeDesk's checkpoints hold these lines.
+        yield* writeTextFile(review, "Rating: meets expectations.\nSalary to be cut by 12%.\n");
+        yield* writeTextFile(draft, "first\n");
+        yield* checkpointStore.captureCheckpoint({ cwd: repository, checkpointRef: first });
+        yield* writeTextFile(
+          review,
+          "Rating: meets expectations.\nSalary to be cut by 12%.\nNot to be shared.\n",
+        );
+        yield* writeTextFile(draft, "second\n");
+        yield* checkpointStore.captureCheckpoint({
+          cwd: repository,
+          checkpointRef: second,
+          previousCheckpointRef: first,
+        });
+        // The warning is for the person's own commits: a file only checkpoints hold gets none.
+        expect(yield* checkpointStore.fileHistory(untracked)).toEqual({
+          keptByGit: false,
+          seenByTurns: true,
+        });
+        expect(yield* checkpointStore.fileHistory(review)).toEqual({
+          keptByGit: true,
+          seenByTurns: true,
+        });
+        // What is the person's and must stay: a staged change, a dangling object, the reflog.
+        yield* writeTextFile(NodePath.join(repository, "README.md"), "# test\n\nStaged.\n");
+        yield* git(repository, ["add", "README.md"]);
+        const dangling = yield* git(repository, ["hash-object", "-w", "--stdin"], {
+          stdin: "a note the person hashed and never used\n",
+        });
+        if (packed) yield* git(repository, ["gc", "--quiet"]);
+        const theirs = () =>
+          Effect.all([
+            git(repository, ["rev-parse", "HEAD"]),
+            git(repository, ["ls-files", "--stage"]),
+            git(repository, ["reflog", "--format=%H %gs"]),
+            git(repository, ["cat-file", "-p", dangling]),
+            git(repository, ["show", "HEAD:hr/Reem review.txt"]),
+          ]);
+        const before = yield* theirs();
+        /** Every object an agent can reach by a ref, or find as lost, that holds the text. */
+        const holding = (text: string) =>
+          Effect.gen(function* () {
+            const reachable = (yield* git(repository, ["rev-list", "--all", "--objects"]))
+              .split("\n")
+              .map((line) => line.slice(0, 40));
+            const lost = [
+              ...(yield* git(repository, ["fsck", "--unreachable", "--no-reflogs"], {
+                allowNonZeroExit: true,
+              })).matchAll(/^unreachable \w+ ([0-9a-f]{40})$/gm),
+            ].map((match) => match[1] ?? "");
+            const found: Array<string> = [];
+            for (const oid of [...reachable, ...lost]) {
+              if ((yield* git(repository, ["cat-file", "-t", oid])) !== "blob") continue;
+              if ((yield* git(repository, ["cat-file", "-p", oid])).includes(text)) found.push(oid);
+            }
+            return found;
+          });
+        expect((yield* holding("Salary to be cut")).length).toBeGreaterThan(0);
+
+        yield* fileSystem.remove(review);
+        yield* checkpointStore.sealChanged({ kind: "sealed", paths: [review] });
+
+        expect(yield* holding("Salary to be cut")).toEqual([]);
+        expect(yield* holding("Not to be shared")).toEqual([]);
+        // The store is whole: nothing that is left points at something that was removed.
+        expect(yield* git(repository, ["fsck", "--no-dangling"])).toBe("");
+        expect(yield* theirs()).toEqual(before);
+        // The checkpoints are still there, and still tell the rest of the turn's changes.
+        const diff = yield* checkpointStore.diffCheckpoints({
+          cwd: repository,
+          fromCheckpointRef: first,
+          toCheckpointRef: second,
+          ignoreWhitespace: false,
+        });
+        expect(diff).toContain("+second");
+        expect(diff).not.toContain("Salary");
+
+        // Unsealed again with its unsaved text, it is neither stored nor touched by a restore.
+        yield* writeTextFile(review, "Rating: meets expectations.\nSalary to be cut by 12%.\n");
+        yield* checkpointStore.captureCheckpoint({
+          cwd: repository,
+          checkpointRef: checkpointRefForThreadTurn(threadId, 2),
+          previousCheckpointRef: second,
+        });
+        expect(yield* holding("Salary to be cut")).toEqual([]);
+        expect(
+          yield* checkpointStore.restoreCheckpoint({ cwd: repository, checkpointRef: first }),
+        ).toBe(true);
+        expect(yield* fileSystem.readFileString(draft)).toBe("first\n");
+        expect(yield* fileSystem.readFileString(review)).toContain("Salary to be cut by 12%.");
+      }),
+  );
+
+  it.effect("does not count a file the person unsealed between turns as the turn's change", () =>
+    Effect.gen(function* () {
+      const repository = yield* makeTmpDir();
+      yield* initRepoWithCommit(repository);
+      const checkpointStore = yield* CheckpointStore.CheckpointStore;
+      const threadId = ThreadId.make("thread-unsealed-between-turns");
+      const before = checkpointRefForThreadTurn(threadId, 0);
+      const after = checkpointRefForThreadTurn(threadId, 1);
+      yield* checkpointStore.captureCheckpoint({ cwd: repository, checkpointRef: before });
+
+      const unsealed = NodePath.join(repository, "data", "export.json");
+      yield* (yield* FileSystem.FileSystem).makeDirectory(NodePath.dirname(unsealed));
+      yield* writeTextFile(unsealed, "[1, 2, 3]\n");
+      // Checkpoints carry Git's own time, so the note is made at the first one's.
+      yield* TestClock.setTime(
+        Number(yield* git(repository, ["log", "-1", "--format=%ct", before])) * 1000,
+      );
+      yield* checkpointStore.sealChanged({ kind: "unsealed", paths: [unsealed] });
+      yield* writeTextFile(
+        NodePath.join(repository, "README.md"),
+        "# test\n\nThe turn wrote this.\n",
+      );
+      yield* checkpointStore.captureCheckpoint({
+        cwd: repository,
+        checkpointRef: after,
+        previousCheckpointRef: before,
+      });
+
+      const files = parseTurnDiffFilesFromNumstat(
+        yield* checkpointStore.diffCheckpoints({
+          cwd: repository,
+          fromCheckpointRef: before,
+          toCheckpointRef: after,
+          ignoreWhitespace: false,
+          format: "numstat",
+        }),
+      );
+      expect(files.map((file) => file.path)).toEqual(["README.md"]);
+
+      // A store started later, as after a restart, has kept the note.
+      const restarted = yield* CheckpointStore.make;
+      expect(
+        parseTurnDiffFilesFromNumstat(
+          yield* restarted.diffCheckpoints({
+            cwd: repository,
+            fromCheckpointRef: before,
+            toCheckpointRef: after,
+            ignoreWhitespace: false,
+            format: "numstat",
+          }),
+        ).map((file) => file.path),
+      ).toEqual(["README.md"]);
+    }),
+  );
+
+  it.effect("keeps a file that lies in a sealed folder out of a checkpoint", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const folder = yield* makeTmpDir("plain-folder-");
+      const sealedFolder = NodePath.join(folder, "contracts");
+      yield* fileSystem.makeDirectory(sealedFolder);
+      yield* writeTextFile(NodePath.join(folder, "notes.txt"), "first\n");
+      // It arrived a moment ago: the sweep that seals it has not run yet.
+      yield* writeTextFile(NodePath.join(sealedFolder, "lease.md"), "Rent: 480,000 SAR.\n");
+      setSealedFolderPaths(() => [sealedFolder]);
+      yield* Effect.addFinalizer(() => Effect.sync(() => setSealedFolderPaths(() => [])));
+      const checkpointStore = yield* CheckpointStore.CheckpointStore;
+      yield* checkpointStore.ensureRepository(folder);
+      yield* checkpointStore.captureCheckpoint({
+        cwd: folder,
+        checkpointRef: checkpointRefForThreadTurn(ThreadId.make("thread-sealed-folder"), 0),
+      });
+
+      expect(yield* git(folder, ["log", "--all", "--format=%H", "--", "notes.txt"])).not.toBe("");
+      expect(yield* git(folder, ["log", "--all", "--format=%H", "--", "contracts"])).toBe("");
     }),
   );
 

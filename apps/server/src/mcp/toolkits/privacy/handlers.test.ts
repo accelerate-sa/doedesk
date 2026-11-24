@@ -11,6 +11,7 @@ import * as Project from "../../../project/ProjectService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import { liveThreadShell } from "../../McpToolAccess.testkit.ts";
 import { readableFile } from "./handlers.ts";
+import { sealedFilesIn } from "./sealedHandlers.ts";
 
 const threadId = ThreadId.make("thread:reading");
 
@@ -119,3 +120,22 @@ it.effect("reads for a thread only what the agent could read without asking", ()
     }
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
+
+it("lists the sealed files that were in a folder as the agent names it, oldest handle first", () => {
+  const files = [
+    { handle: "DOC_12", origin: "/case/contracts/2025/annex.pdf" },
+    { handle: "DOC_3", origin: "/case/contracts/lease.md" },
+    { handle: "DOC_4", origin: "C:\\case\\contracts\\win.md" },
+    { handle: "DOC_5", origin: "/case/subcontracts/other.md" },
+    { handle: "DOC_6" },
+    { handle: "DOC_7", origin: "/case/patients/Adel_AlAmri/chart.txt" },
+  ];
+  const handles = (folder?: string) => sealedFilesIn(files, folder).map((file) => file.handle);
+  // A masked folder name comes back from the agent as the name's words.
+  expect(handles("patients/Adel Al Amri")).toEqual(["DOC_7"]);
+  expect(handles("contracts")).toEqual(["DOC_3", "DOC_4", "DOC_12"]);
+  expect(handles("contracts/2025/")).toEqual(["DOC_12"]);
+  expect(handles("/case/contracts")).toEqual(["DOC_3", "DOC_4", "DOC_12"]);
+  expect(handles("case/subcontracts")).toEqual(["DOC_5"]);
+  expect(handles()).toEqual(["DOC_3", "DOC_4", "DOC_5", "DOC_6", "DOC_7", "DOC_12"]);
+});

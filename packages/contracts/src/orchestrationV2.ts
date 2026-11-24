@@ -44,6 +44,7 @@ import {
 import { AuthMcpClientAccess } from "./auth.ts";
 import { ChatAttachment } from "./chatAttachment.ts";
 import { ThreadGuestShare } from "./guestShare.ts";
+import { PrivacyTurnRecord } from "./privacy.ts";
 import { StoredThreadTags, ThreadTag } from "./threadTags.ts";
 import { ThreadTitleRegenerationOutcome } from "./threadTitle.ts";
 import {
@@ -834,8 +835,16 @@ export const OrchestrationV2Run = Schema.Struct({
    * the turn started, and their updates must not put an unanswered run back.
    */
   output: Schema.optional(OrchestrationV2RunOutput),
+  /** What the privacy gateway did for this run. Written by its own event once the run ends. */
+  privacy: Schema.optional(PrivacyTurnRecord),
 });
 export type OrchestrationV2Run = typeof OrchestrationV2Run.Type;
+
+export const OrchestrationV2RunPrivacyRecorded = Schema.Struct({
+  runId: RunId,
+  privacy: PrivacyTurnRecord,
+});
+export type OrchestrationV2RunPrivacyRecorded = typeof OrchestrationV2RunPrivacyRecorded.Type;
 
 export const OrchestrationV2RunOutputSubmitted = Schema.Struct({
   runId: RunId,
@@ -1693,6 +1702,12 @@ const OrchestrationV2ProviderFailureMessage = TrimmedNonEmptyString.check(
 );
 const OrchestrationV2ProviderFailureCode = TrimmedNonEmptyString.check(Schema.isMaxLength(128));
 
+/**
+ * The `code` of a failure that is DoeDesk's own refusal to send a request, not the provider's
+ * error: its `message` is DoeDesk's reason, and a client heads it so.
+ */
+export const PROVIDER_FAILURE_NOT_SENT_CODE = "doedesk_not_sent";
+
 /** Producers must redact credentials before construction. */
 export const OrchestrationV2ProviderFailure = Schema.Struct({
   class: OrchestrationV2ProviderFailureClass,
@@ -1984,6 +1999,8 @@ export const OrchestrationV2TurnItem = Schema.Union([
     type: Schema.Literal("system_notice"),
     message: Schema.String,
     level: Schema.optional(OrchestrationV2SystemNoticeLevel),
+    /** The MCP server whose own state this notice reports; it says nothing about the turn. */
+    mcpServer: Schema.optional(Schema.String),
     mcpSignIn: Schema.optional(OrchestrationV2McpSignIn),
   }),
   Schema.Struct({
@@ -2186,6 +2203,11 @@ export const OrchestrationV2DomainEvent = Schema.Union([
     ...OrchestrationV2EventBase.fields,
     type: Schema.Literal("run.output-submitted"),
     payload: OrchestrationV2RunOutputSubmitted,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2EventBase.fields,
+    type: Schema.Literal("run.privacy-recorded"),
+    payload: OrchestrationV2RunPrivacyRecorded,
   }),
   Schema.Struct({
     ...OrchestrationV2EventBase.fields,
@@ -2874,6 +2896,8 @@ export const OrchestrationV2TurnItemJson = Schema.Union([
     type: Schema.Literal("system_notice"),
     message: Schema.String,
     level: Schema.optional(OrchestrationV2SystemNoticeLevel),
+    /** The MCP server whose own state this notice reports; it says nothing about the turn. */
+    mcpServer: Schema.optional(Schema.String),
     mcpSignIn: Schema.optional(OrchestrationV2McpSignIn),
   }),
   Schema.Struct({
@@ -3139,6 +3163,11 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
     ...OrchestrationV2JsonEventBaseFields,
     type: Schema.Literal("run.output-submitted"),
     payload: OrchestrationV2RunOutputSubmitted,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2JsonEventBaseFields,
+    type: Schema.Literal("run.privacy-recorded"),
+    payload: OrchestrationV2RunPrivacyRecorded,
   }),
   Schema.Struct({
     ...OrchestrationV2JsonEventBaseFields,

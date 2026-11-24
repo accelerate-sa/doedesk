@@ -11,6 +11,7 @@ import { captureAssistantMessageOpening } from "~/lib/assistantTextSelection";
 import { responseContextRecord } from "~/lib/composerContextRecords";
 import { Button } from "../ui/button";
 import { ProposedPlanCard } from "./ProposedPlanCard";
+import { TurnPrivacyLine } from "../privacy/TurnPrivacy";
 import { HtmlRenderFrame } from "./HtmlRenderFrame";
 import { McpAppFrame } from "./McpAppFrame";
 import { checkpointFileTotals } from "@t3tools/client-runtime/state/thread-checkpoints";
@@ -95,6 +96,13 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
             routeThreadKey={ctx.routeThreadKey}
             resolvedTheme={ctx.resolvedTheme}
             onOpenTurnDiff={ctx.onOpenTurnDiff}
+          />
+        ) : null}
+        {row.showAssistantMeta && ctx.threadRef && row.message.runId ? (
+          <TurnPrivacyLine
+            threadRef={ctx.threadRef}
+            runId={row.message.runId}
+            environmentId={ctx.activeThreadEnvironmentId}
           />
         ) : null}
         {!row.showAssistantMeta && row.projectedItem?.item.status === "interrupted" ? (

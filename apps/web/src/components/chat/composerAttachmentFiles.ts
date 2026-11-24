@@ -185,13 +185,21 @@ export function isPreviewableComposerVideo(
   );
 }
 
+/**
+ * The files listed under the message box. A file with a chip in the text is left to its chip,
+ * unless it can be sealed from here: its row is where Seal and the suggestion to seal are, and
+ * every way of attaching a file ends in a chip.
+ */
 export function composerOtherFilesForPresentation(
   files: ReadonlyArray<ComposerFileAttachment>,
   environmentId: EnvironmentId,
   inlineFileIds: ReadonlySet<string>,
+  sealOffered = false,
 ): ComposerFileAttachment[] {
   return files.filter(
-    (file) => !isPreviewableComposerVideo(file, environmentId) && !inlineFileIds.has(file.id),
+    (file) =>
+      !isPreviewableComposerVideo(file, environmentId) &&
+      (!inlineFileIds.has(file.id) || (sealOffered && file.file !== null)),
   );
 }
 

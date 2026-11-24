@@ -22,6 +22,57 @@ export const setProviderEnvironmentOverlay = (
   environmentOverlay = overlay;
 };
 
+/**
+ * Providers whose model requests the privacy gateway rewrites when it is in their path. Cursor's
+ * model hosts are blocked; Kiro, Muse Code and fx send to hosts the gateway does not open; an ACP
+ * registry agent may send anywhere.
+ */
+const REWRITTEN_PROVIDERS: ReadonlySet<string> = new Set([
+  "claudeAgent",
+  "codex",
+  "opencode",
+  "grok",
+  "antigravity",
+  "pi",
+]);
+
+/** Whether this provider's processes start routed through the privacy gateway, which masks them. */
+export const providerRequestsMasked = (provider: string): boolean =>
+  REWRITTEN_PROVIDERS.has(provider) && environmentOverlay?.(provider) !== undefined;
+
+let sealedValues: () => boolean = () => false;
+
+/** Set by the privacy gateway: whether a worker reads sealed files, whose values agents then get as stand-ins. */
+export const setSealedValuesInUse = (inUse: () => boolean): void => {
+  sealedValues = inUse;
+};
+
+export const sealedValuesInUse = (): boolean => sealedValues();
+
+let sealedFolderOf: (path: string) => string | undefined = () => undefined;
+
+/** Set by the privacy gateway: tells which sealed folder, if any, holds a path. */
+export const setSealedFolderLookup = (lookup: (path: string) => string | undefined): void => {
+  sealedFolderOf = lookup;
+};
+
+const lastPart = (path: string): string =>
+  path.split(/[\\/]/).findLast((part) => part !== "") ?? path;
+const isAbsolutePath = (path: string): boolean => /^(?:[\\/]|[A-Za-z]:[\\/])/.test(path);
+
+/**
+ * Why an agent's file may not be written at this path, or undefined when it may: every file of a
+ * sealed folder is sealed as it arrives, so one written there could never be read back. Told to
+ * the agent in place of the write.
+ */
+export const sealedFolderWriteRefusal = (path: string, cwd: string | null): string | undefined => {
+  const absolute = isAbsolutePath(path) || cwd === null ? path : `${cwd}/${path}`;
+  const folder = sealedFolderOf(absolute);
+  return folder === undefined
+    ? undefined
+    : `The folder "${lastPart(folder)}" is sealed: every file in it is kept from you, so nothing can be written there. Write the file somewhere else in the workspace, or finish it with fill_sealed if it needs sealed values.`;
+};
+
 const withOverlay = (
   environment: NodeJS.ProcessEnv,
   provider: string | undefined,

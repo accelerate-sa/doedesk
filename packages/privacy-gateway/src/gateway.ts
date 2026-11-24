@@ -9,13 +9,18 @@ import type { LocalAuthority } from "./certificates.ts";
 import { describeMaskingFailure } from "./core.ts";
 import type { Pseudonymizer } from "./pseudonymizer.ts";
 import type { Reader } from "./reader.ts";
+import type { Restorations } from "./restorations.ts";
 import {
   type AttachmentHandling,
   maskRequestBody,
+  replaceKnownValues,
   type WireFormat,
   wireFormatForPath,
 } from "./requestMasking.ts";
 import { SseUnmasker, unmaskDeep } from "./responseUnmasking.ts";
+import { appsBodyIsPlain, type Route, routeFor } from "./routes.ts";
+import { sessionsNamedIn } from "./turns.ts";
+import { connectThrough, plainProxyHeaders, ProxyError, tunnelThrough } from "./upstream.ts";
 
 /** Hosts whose traffic is opened and rewritten. Subdomains are included. */
 export const DEFAULT_INSPECTED_HOSTS: ReadonlyArray<string> = [
@@ -27,6 +32,8 @@ export const DEFAULT_INSPECTED_HOSTS: ReadonlyArray<string> = [
   "daily-cloudcode-pa.googleapis.com",
   "openrouter.ai",
   "api.x.ai",
+  // Grok Build with a grok.com sign-in sends here, not to api.x.ai (read in its program text).
+  "cli-chat-proxy.grok.com",
   "api.groq.com",
   "api.mistral.ai",
   "api.deepseek.com",
@@ -46,22 +53,78 @@ export const DEFAULT_BLOCKED_HOSTS: ReadonlyArray<string> = [
   "repo42.cursor.sh",
 ];
 
+/**
+ * What happens to traffic for hosts that are not model hosts. The gateway restores real values
+ * in what the model writes, so a command the model runs can carry them to any host it can reach.
+ * `open`: every host passes, unread. `allowlist`: only listed hosts pass. `closed`: none do.
+ * Model hosts are inspected and masked whatever this says.
+ */
+export type EgressPolicy = "open" | "allowlist" | "closed";
+
+export interface EgressRules {
+  readonly policy: EgressPolicy;
+  /** Hosts that pass under `allowlist`. Subdomains are included. */
+  readonly hosts: ReadonlyArray<string>;
+  /** Hosts the person let through until the app closes. They pass under `closed` too. */
+  readonly untilClose?: ReadonlyArray<string>;
+}
+
+/**
+ * Hosts the agent tools themselves need to sign in and stay signed in. They pass under
+ * `allowlist` and `closed`, or the tool could not start at all.
+ */
+export const SIGN_IN_HOSTS: ReadonlyArray<string> = [
+  "console.anthropic.com",
+  "platform.claude.com",
+  "claude.ai",
+  "auth.openai.com",
+  "oauth2.googleapis.com",
+  "accounts.google.com",
+];
+
+/**
+ * An entry the app words itself, in the reader's language. `websocketToMaskedRoute`: a WebSocket
+ * was refused to an address whose HTTPS requests are masked, so the refusal cost the tool
+ * nothing but a retry.
+ */
+export type GatewayNotice =
+  | "websocketToMaskedRoute"
+  /** A request with a body on a path the gateway has no rule for: not sent. */
+  | "unknownRequest"
+  /** A call to an app the AI company hosts: not sent. */
+  | "appCall"
+  /** The person's proxy asked for a name and password, or would not carry the connection. */
+  | "proxySignIn"
+  | "proxyRefused";
+
 export interface GatewayRecord {
   readonly at: string;
   readonly host: string;
   readonly path: string;
+  /** The request's method. Absent for a connection that was refused before any request. */
+  readonly method?: string;
   readonly outcome: "masked" | "passed" | "refused" | "blocked";
+  /** What kind of request to an AI host it was, when it was not a model request. */
+  readonly route?: Exclude<Route["kind"], "masked">;
+  /** What happened, for an app that words it itself. `reason` says the same in English. */
+  readonly notice?: GatewayNotice;
   readonly format?: WireFormat;
   /** Texts checked for personal data in this request. */
   readonly checked?: number;
   /** Values replaced with placeholders in this request. */
   readonly masked?: number;
+  /** The distinct stand-ins those replacements wrote. */
+  readonly replaced?: ReadonlyArray<string>;
+  /** The names the provider's program gives the chat this request belongs to. See `turns.ts`. */
+  readonly sessions?: ReadonlyArray<string>;
   /** Images and files removed because they could not be checked. */
   readonly withheld?: number;
   /** Images and files replaced by the text read from them. */
   readonly read?: number;
   /** Images sent with their personal data covered. */
   readonly redacted?: number;
+  /** Texts replaced by a note because they held sealed document text. */
+  readonly sealed?: number;
   readonly reason?: string;
 }
 
@@ -76,6 +139,14 @@ export interface GatewayOptions {
   readonly blockedHosts?: ReadonlyArray<string>;
   readonly onRecord?: (record: GatewayRecord) => void;
   /**
+   * Told the stand-ins restored in a reply, once it has ended, with the chat its request named.
+   * A reply can use a stand-in no request of the turn wrote: one the model has from earlier.
+   */
+  readonly onRestored?: (restored: {
+    readonly sessions?: ReadonlyArray<string>;
+    readonly tokens: ReadonlyArray<string>;
+  }) => void;
+  /**
    * When this returns false the gateway forwards everything unchanged. Only an agent process that
    * was started while masking was on still has the gateway in its path at that point: one started
    * with masking off is never given the gateway.
@@ -87,10 +158,35 @@ export interface GatewayOptions {
    */
   readonly onSentBody?: (host: string, path: string, body: string) => void;
   /**
+   * Measurement only (`scripts/routes-seen.ts`): the body of a request with no rule, which was
+   * not sent, so that a person can read what it carries before writing its rule.
+   */
+  readonly onUnsentBody?: (host: string, path: string, body: string) => void;
+  /**
    * Evaluation only. While this returns true, a masked request has its images and files replaced
    * by the text read from them and nothing else: no value becomes a placeholder.
    */
   readonly attachmentsOnly?: () => boolean;
+  /** Remembers assistant text in which sealed values were restored. See `Restorations`. */
+  readonly restorations?: Restorations;
+  /** Which other hosts may be reached. Looked up per connection. Without it every host passes. */
+  readonly egress?: () => EgressRules;
+  /** See `MaskRequestOptions.webResults`. Looked up per request. */
+  readonly webResults?: () => "known" | "detect";
+  /** See `MaskRequestOptions.withholdSealedText`. Looked up per request. */
+  readonly withholdSealedText?: (text: string, typed: boolean) => string | undefined;
+  /**
+   * Evaluation only: told of every connection to a host that is not a model host, and whether
+   * it was let through.
+   */
+  readonly onOtherHost?: (host: string, port: number, outcome: "passed" | "blocked") => void;
+  /**
+   * The person's own proxy for a host, or undefined to connect to it directly. The gateway sits
+   * where their proxy was, so it sends through theirs. See `readHostNetwork`.
+   */
+  readonly upstreamProxy?: (host: string, port: number, secure: boolean) => URL | undefined;
+  /** Certificates the person trusts beyond the public roots, for the gateway's own connections. */
+  readonly upstreamCertificates?: ReadonlyArray<string>;
   /** Where intercepted requests are sent. Tests point this at a local server. */
   readonly upstream?: (host: string) => {
     readonly host: string;
@@ -146,7 +242,23 @@ const readBody = (stream: NodeHttp.IncomingMessage): Promise<Buffer> =>
     stream.on("error", reject);
   });
 
+const proxyNotice = (cause: unknown): GatewayNotice =>
+  cause instanceof ProxyError && cause.kind === "signIn" ? "proxySignIn" : "proxyRefused";
+
+/** A path as a person is shown it: no query, which can hold identifiers, and no great length. */
+const shownPath = (path: string): string => (path.split("?")[0] ?? path).slice(0, 120);
+
 /** An error in the shape model clients already know how to show. 400 is not retried. */
+/**
+ * What a program is answered for a request DoeDesk did not send. The program wraps the words in
+ * its own and adds to them (an address, an id), so they close with a fixed sentence: the app
+ * shows what stands between the two (`makeProviderFailure` in provider-core).
+ */
+const notSentBody = (reason: string): string =>
+  refusalBody(
+    `DoeDesk did not send this request. ${reason.trim().replace(/([^.!?])$/u, "$1.")} Nothing of it was sent.`,
+  );
+
 const refusalBody = (message: string): string =>
   JSON.stringify({
     type: "error",
@@ -160,6 +272,20 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
     options.onRecord?.({ at: new Date().toISOString(), ...entry });
   const upstreamFor =
     options.upstream ?? ((host: string) => ({ host, port: 443, tls: true as boolean }));
+  /** Whether a host that is not a model host may be reached now. */
+  const mayReach = (host: string): boolean => {
+    if (options.masking?.() === false) return true;
+    const rules = options.egress?.();
+    if (rules === undefined || rules.policy === "open") return true;
+    if (hostMatches(host, SIGN_IN_HOSTS) || hostMatches(host, rules.untilClose ?? [])) return true;
+    return rules.policy === "allowlist" && hostMatches(host, rules.hosts);
+  };
+  const EGRESS_REASON =
+    "This host is not on the list of hosts agents may reach. Add it in Settings, under Privacy, if it should be.";
+  const trusted =
+    options.upstreamCertificates === undefined || options.upstreamCertificates.length === 0
+      ? undefined
+      : [...NodeTls.rootCertificates, ...options.upstreamCertificates];
   const hostBySocket = new WeakMap<NodeStream.Duplex, string>();
   const sockets = new Set<NodeStream.Duplex>();
   const track = (socket: NodeStream.Duplex) => {
@@ -173,7 +299,19 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
     response: NodeHttp.ServerResponse,
     body: Buffer | undefined,
     unmask: boolean,
+    /** The chat the request named, for telling what its reply restored. */
+    sessions: ReadonlyArray<string> | undefined,
+    /** The way through the person's proxy, already open. Undefined: straight to the host. */
+    connection: NodeStream.Duplex | undefined,
   ) => {
+    const restoredTokens = new Set<string>();
+    const tellRestored = () => {
+      if (restoredTokens.size === 0) return;
+      options.onRestored?.({
+        ...(sessions === undefined || sessions.length === 0 ? {} : { sessions }),
+        tokens: [...restoredTokens],
+      });
+    };
     const target = upstreamFor(host);
     const headers: NodeHttp.OutgoingHttpHeaders = {};
     for (const [name, value] of Object.entries(request.headers)) {
@@ -188,12 +326,18 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
     // The reply has to be readable to restore values in it.
     if (unmask) headers["accept-encoding"] = "identity";
 
-    const transport = target.tls ? NodeHttps : NodeHttp;
-    const upstream = transport.request(
+    // A request given its connection must be given no agent: with `agent: false` Node makes an
+    // agent of its own, which ignores `createConnection` and connects straight to the host.
+    const upstream = (connection === undefined && target.tls ? NodeHttps : NodeHttp).request(
       {
-        host: target.host,
-        port: target.port,
-        servername: host,
+        ...(connection === undefined
+          ? {
+              host: target.host,
+              port: target.port,
+              servername: host,
+              ...(trusted ? { ca: trusted } : {}),
+            }
+          : { createConnection: () => connection }),
         method: request.method,
         path: request.url,
         headers,
@@ -211,12 +355,19 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
         if (readable && (contentType.includes("text/event-stream") || contentType.trim() === "")) {
           delete replyHeaders["content-length"];
           response.writeHead(reply.statusCode ?? 502, replyHeaders);
-          const stream = new SseUnmasker(options.pseudonymizer.vault);
+          const stream = new SseUnmasker(
+            options.pseudonymizer.vault,
+            options.restorations,
+            restoredTokens,
+          );
           reply.on("data", (chunk: Buffer) => {
             const text = stream.push(chunk);
             if (text.length > 0) response.write(text);
           });
-          reply.on("end", () => response.end(stream.end()));
+          reply.on("end", () => {
+            response.end(stream.end());
+            tellRestored();
+          });
           reply.on("error", () => response.destroy());
           return;
         }
@@ -225,10 +376,19 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
             (raw) => {
               let text = raw.toString("utf8");
               try {
-                text = JSON.stringify(unmaskDeep(JSON.parse(text), options.pseudonymizer.vault));
+                text = JSON.stringify(
+                  unmaskDeep(
+                    JSON.parse(text),
+                    options.pseudonymizer.vault,
+                    options.restorations,
+                    true,
+                    restoredTokens,
+                  ),
+                );
               } catch {
                 // Not JSON after all: pass it on as it came.
               }
+              tellRestored();
               const buffer = Buffer.from(text, "utf8");
               replyHeaders["content-length"] = buffer.length;
               response.writeHead(reply.statusCode ?? 502, replyHeaders);
@@ -243,6 +403,7 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
       },
     );
     upstream.on("error", (cause) => {
+      connection?.destroy();
       if (response.headersSent) {
         response.destroy();
         return;
@@ -250,6 +411,8 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
       response.writeHead(502, { "content-type": "application/json" });
       response.end(refusalBody(`DoeDesk could not reach ${host}: ${cause.message}`));
     });
+    // One request to a tunnel: it is closed with the reply, never left open and idle.
+    upstream.on("close", () => connection?.destroy());
     response.on("close", () => {
       if (!response.writableFinished) upstream.destroy();
     });
@@ -263,11 +426,51 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
   ) => {
     const host = hostBySocket.get(request.socket) ?? String(request.headers.host ?? "");
     const path = request.url ?? "/";
-    const format = request.method === "POST" ? wireFormatForPath(path) : undefined;
+    const method = request.method ?? "GET";
+    const hasBody =
+      Number(request.headers["content-length"] ?? 0) > 0 ||
+      request.headers["transfer-encoding"] !== undefined;
+    /**
+     * Opens the way to the host: through the person's proxy when one applies, and then through
+     * nothing else. Null when the proxy would not carry it: the program is answered, the
+     * failure recorded, and nothing is sent.
+     */
+    const open = async (
+      about: Partial<GatewayRecord> = {},
+    ): Promise<NodeStream.Duplex | undefined | null> => {
+      const target = upstreamFor(host);
+      const proxy = options.upstreamProxy?.(target.host, target.port, target.tls);
+      if (proxy === undefined) return undefined;
+      try {
+        const connection = await connectThrough(
+          proxy,
+          { host: target.host, port: target.port, secure: target.tls },
+          { servername: host, ca: trusted },
+        );
+        track(connection);
+        return connection;
+      } catch (cause) {
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        record({
+          host,
+          path,
+          method,
+          outcome: "refused",
+          ...about,
+          notice: proxyNotice(cause),
+          reason,
+        });
+        request.resume();
+        // 400, as for every request DoeDesk refuses: a program asks again after a 502.
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(notSentBody(reason));
+        return null;
+      }
+    };
     /** Forwards a request the gateway does not rewrite, showing its body to the listener. */
-    const pass = async () => {
-      if (options.onSentBody === undefined || request.method !== "POST") {
-        forward(host, request, response, undefined, false);
+    const pass = async (connection: NodeStream.Duplex | undefined) => {
+      if (options.onSentBody === undefined || !hasBody) {
+        forward(host, request, response, undefined, false, undefined, connection);
         return;
       }
       let raw: Buffer;
@@ -278,25 +481,106 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
         return;
       }
       options.onSentBody(host, path, raw.toString("utf8"));
-      forward(host, request, response, raw, false);
+      forward(host, request, response, raw, false, undefined, connection);
     };
     if (options.masking?.() === false) {
-      if (options.onSentBody !== undefined && request.method === "POST") {
-        record({ host, path, outcome: "passed", ...(format === undefined ? {} : { format }) });
+      const known = hasBody ? wireFormatForPath(path) : undefined;
+      const connection = await open();
+      if (connection === null) return;
+      record({ host, path, method, outcome: "passed", ...(known ? { format: known } : {}) });
+      await pass(connection);
+      return;
+    }
+    const route = routeFor(host, path, hasBody);
+    if (route.kind === "plain") {
+      const connection = await open({ route: "plain" });
+      if (connection === null) return;
+      record({ host, path, method, outcome: "passed", route: "plain" });
+      await pass(connection);
+      return;
+    }
+    /** Answers the program itself. What it sent is read to the end and dropped. */
+    const notSent = (notice: GatewayNotice, reason: string) => {
+      const kind = route.kind === "masked" ? {} : { route: route.kind };
+      record({ host, path, method, outcome: "refused", ...kind, notice, reason });
+      if (options.onUnsentBody !== undefined && !request.readableEnded) {
+        const show = options.onUnsentBody;
+        const encoding = request.headers["content-encoding"];
+        void readBody(request).then(
+          (raw) => {
+            try {
+              show(host, path, decodeBody(raw, encoding).toString("utf8"));
+            } catch {
+              show(host, path, "");
+            }
+          },
+          () => undefined,
+        );
+      } else {
+        request.resume();
       }
-      await pass();
-      return;
-    }
-    if (format === undefined) {
-      if (request.method === "POST") record({ host, path, outcome: "passed" });
-      await pass();
-      return;
-    }
-
-    const refuse = (reason: string) => {
-      record({ host, path, outcome: "refused", format, reason });
       response.writeHead(400, { "content-type": "application/json" });
-      response.end(refusalBody(`DoeDesk did not send this request. ${reason}`));
+      response.end(notSentBody(reason));
+    };
+    if (route.kind === "unknown") {
+      notSent(
+        "unknownRequest",
+        `${method} ${host}${shownPath(path)} is a kind of request DoeDesk has no rule for, so it could not check it for personal data. Settings, Privacy, Recent requests lists it.`,
+      );
+      return;
+    }
+    if (route.kind !== "masked") {
+      let raw: Buffer;
+      try {
+        raw = decodeBody(await readBody(request), request.headers["content-encoding"]);
+      } catch (cause) {
+        notSent("unknownRequest", `The request could not be read (${String(cause)}).`);
+        return;
+      }
+      let sent = raw;
+      let replaced = 0;
+      try {
+        const body: unknown = JSON.parse(raw.toString("utf8"));
+        if (route.kind === "apps" && !appsBodyIsPlain(body)) {
+          notSent(
+            "appCall",
+            "A call to an app that the AI company hosts would carry what the agent wrote, with the real values, to that company.",
+          );
+          return;
+        }
+        if (route.kind === "report") {
+          replaced = replaceKnownValues(body, options.pseudonymizer.vault);
+          if (replaced > 0) sent = Buffer.from(JSON.stringify(body), "utf8");
+        }
+      } catch {
+        // A report that is not JSON is sent as written. An app call that is not JSON is not one.
+        if (route.kind === "apps") {
+          notSent("unknownRequest", "The request to the app server could not be read.");
+          return;
+        }
+      }
+      const connection = await open({ route: route.kind });
+      if (connection === null) return;
+      record({
+        host,
+        path,
+        method,
+        outcome: "passed",
+        route: route.kind,
+        ...(replaced > 0 ? { masked: replaced } : {}),
+      });
+      options.onSentBody?.(host, path, sent.toString("utf8"));
+      forward(host, request, response, sent, false, undefined, connection);
+      return;
+    }
+    const { format } = route;
+
+    let sessions: ReadonlyArray<string> = [];
+    const named = () => (sessions.length === 0 ? {} : { sessions });
+    const refuse = (reason: string) => {
+      record({ host, path, method, outcome: "refused", format, reason, ...named() });
+      response.writeHead(400, { "content-type": "application/json" });
+      response.end(notSentBody(reason));
     };
 
     let parsed: unknown;
@@ -307,6 +591,7 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
       refuse(`The request could not be read to check it for personal data (${String(cause)}).`);
       return;
     }
+    sessions = sessionsNamedIn(request.headers, parsed);
     try {
       const attachmentsOnly = options.attachmentsOnly?.() === true;
       const masked = await maskRequestBody(
@@ -314,22 +599,34 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
         parsed,
         options.pseudonymizer,
         options.reader?.(),
-        { attachmentsOnly, attachments: options.attachments?.() },
+        {
+          attachmentsOnly,
+          attachments: options.attachments?.(),
+          withholdSealedText: options.withholdSealedText,
+          remask: (text: string) => options.restorations?.masked(text),
+          webResults: options.webResults?.(),
+        },
       );
+      const connection = await open({ format, ...named() });
+      if (connection === null) return;
       record({
         host,
         path,
+        method,
         outcome: "masked",
         format,
         checked: masked.stats.checked,
         masked: masked.stats.masked,
+        replaced: masked.stats.replaced,
+        ...named(),
         withheld: masked.withheld,
         read: masked.read,
         redacted: masked.redacted,
+        ...(masked.sealed > 0 ? { sealed: masked.sealed } : {}),
       });
       const sent = JSON.stringify(masked.body);
       options.onSentBody?.(host, path, sent);
-      forward(host, request, response, Buffer.from(sent, "utf8"), true);
+      forward(host, request, response, Buffer.from(sent, "utf8"), true, sessions, connection);
     } catch (cause) {
       refuse(describeMaskingFailure(cause));
     }
@@ -338,14 +635,27 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
   const inner = NodeHttp.createServer((request, response) => {
     void handleInspected(request, response);
   });
-  // A WebSocket to a model host would carry requests the gateway has not rewritten.
+  // A WebSocket to a model host would carry requests the gateway has not rewritten: every one is
+  // refused, masking on or off. A tool that then posts to the same address (Codex does) is
+  // masked there when the address is one the gateway rewrites and masking is on.
   inner.on("upgrade", (request, socket) => {
     const host = hostBySocket.get(request.socket) ?? "";
+    const path = request.url ?? "/";
+    const maskedOverHttps = options.masking?.() !== false && wireFormatForPath(path) !== undefined;
     record({
       host,
-      path: request.url ?? "/",
+      path,
       outcome: "blocked",
-      reason: "WebSocket connections to model hosts are not inspected yet.",
+      ...(maskedOverHttps
+        ? {
+            notice: "websocketToMaskedRoute",
+            reason:
+              "The AI tool asked for a WebSocket connection, which DoeDesk cannot mask, so DoeDesk refused it and nothing was sent on it. The tool then sends its requests over HTTPS, and DoeDesk masks them. Nothing needs fixing.",
+          }
+        : {
+            reason:
+              "DoeDesk refused a WebSocket connection to this AI host: it cannot mask what such a connection carries. Nothing was sent on it.",
+          }),
     });
     socket.end("HTTP/1.1 426 Upgrade Required\r\nconnection: close\r\ncontent-length: 0\r\n\r\n");
   });
@@ -360,14 +670,32 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
       response.writeHead(400).end();
       return;
     }
+    const allowed = mayReach(url.hostname);
+    options.onOtherHost?.(url.hostname, Number(url.port) || 80, allowed ? "passed" : "blocked");
+    if (!allowed) {
+      record({ host: url.hostname, path: "/", outcome: "blocked", reason: EGRESS_REASON });
+      response.writeHead(403, { "content-type": "text/plain" }).end(`DoeDesk: ${EGRESS_REASON}\n`);
+      return;
+    }
+    const port = Number(url.port) || 80;
+    const proxy = options.upstreamProxy?.(url.hostname, port, false);
     const upstream = NodeHttp.request(
-      {
-        host: url.hostname,
-        port: url.port || 80,
-        method: request.method,
-        path: `${url.pathname}${url.search}`,
-        headers: request.headers,
-      },
+      proxy === undefined
+        ? {
+            host: url.hostname,
+            port,
+            method: request.method,
+            path: `${url.pathname}${url.search}`,
+            headers: request.headers,
+          }
+        : {
+            // The person's proxy takes the whole address, as this gateway was given it.
+            host: proxy.hostname,
+            port: proxy.port || 80,
+            method: request.method,
+            path: url.href,
+            headers: { ...request.headers, ...plainProxyHeaders(proxy) },
+          },
       (reply) => {
         response.writeHead(reply.statusCode ?? 502, reply.headers);
         reply.pipe(response);
@@ -398,15 +726,46 @@ export const startGateway = (options: GatewayOptions): Promise<RunningGateway> =
     }
 
     if (!hostMatches(host, inspectedHosts)) {
-      const upstream = NodeNet.connect(port, host, () => {
+      const allowed = mayReach(host);
+      options.onOtherHost?.(host, port, allowed ? "passed" : "blocked");
+      if (!allowed) {
+        record({ host, path: "/", outcome: "blocked", reason: EGRESS_REASON });
+        clientSocket.end(
+          "HTTP/1.1 403 Forbidden\r\nconnection: close\r\ncontent-length: 0\r\n\r\n",
+        );
+        return;
+      }
+      const join = (upstream: NodeNet.Socket) => {
         clientSocket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
         if (head.length > 0) upstream.write(head);
         upstream.pipe(clientSocket);
         clientSocket.pipe(upstream);
-      });
-      track(upstream);
-      upstream.on("error", () => clientSocket.destroy());
-      clientSocket.on("close", () => upstream.destroy());
+      };
+      const watch = (upstream: NodeNet.Socket) => {
+        track(upstream);
+        upstream.on("error", () => clientSocket.destroy());
+        clientSocket.on("close", () => upstream.destroy());
+      };
+      const proxy = options.upstreamProxy?.(host, port, true);
+      if (proxy === undefined) {
+        const upstream = NodeNet.connect(port, host, () => join(upstream));
+        watch(upstream);
+        return;
+      }
+      tunnelThrough(proxy, host, port).then(
+        (upstream) => {
+          watch(upstream);
+          if (clientSocket.destroyed) upstream.destroy();
+          else join(upstream);
+        },
+        (cause: unknown) => {
+          const reason = cause instanceof Error ? cause.message : String(cause);
+          record({ host, path: "/", outcome: "blocked", notice: proxyNotice(cause), reason });
+          clientSocket.end(
+            "HTTP/1.1 502 Bad Gateway\r\nconnection: close\r\ncontent-length: 0\r\n\r\n",
+          );
+        },
+      );
       return;
     }
 

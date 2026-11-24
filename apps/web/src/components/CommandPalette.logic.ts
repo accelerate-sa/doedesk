@@ -837,11 +837,11 @@ export function getCommandPaletteInputPlaceholder(
     case "root":
       return resolve(msg("Search commands, folders, and chats..."));
     case "root-browse":
-      return resolve(msg("Enter folder path (e.g. ~/projects/my-app)"));
+      return resolve(msg("Enter folder path (e.g. ~/Documents/Contracts)"));
     case "submenu":
       return resolve(msg("Search..."));
     case "submenu-browse":
-      return resolve(msg("Enter path (e.g. ~/projects/my-app)"));
+      return resolve(msg("Enter path (e.g. ~/Documents/Contracts)"));
   }
 }
 

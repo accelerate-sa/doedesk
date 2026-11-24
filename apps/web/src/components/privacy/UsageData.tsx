@@ -96,11 +96,21 @@ export function UsageDataChoice({ status }: { readonly status: UsageDataStatus }
           </span>
         ) : null}
         <label htmlFor={controlId} className="min-w-0 flex-1 text-muted-foreground">
-          <ConsentSentence
-            parts={ask ? words.usageChoice : words.usageNotice}
-            locale={locale}
-            legal={legal}
-          />
+          {ask || on ? (
+            <ConsentSentence
+              parts={ask ? words.usageChoice : words.usageNotice}
+              locale={locale}
+              legal={legal}
+            />
+          ) : (
+            // The notice opens by saying usage data is on. Turned off, the switch is named as in
+            // Settings, in words the notice's own wording set already holds.
+            <ConsentSentence
+              parts={[{ strong: words.usageSwitch }, ` ${words.usageSettings}`]}
+              locale={locale}
+              legal={legal}
+            />
+          )}
         </label>
         {ask ? null : (
           // The switch slides the same way in both languages.

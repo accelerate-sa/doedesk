@@ -71,14 +71,49 @@ export const decodeJsonReply = <S extends Schema.Top>(
   );
 };
 
-export const generatedThreadTitle = (raw: string) => {
+/** Everything of a thread that a title request carries, as one text. */
+export const threadTitleSource = (input: {
+  readonly message: string;
+  readonly forkSource?: { readonly title: string; readonly history: string } | undefined;
+  readonly linkedContext?: string | undefined;
+  readonly attachments?: ReadonlyArray<{ readonly name: string }> | undefined;
+}): string =>
+  [
+    input.message,
+    input.forkSource?.title,
+    input.forkSource?.history,
+    input.linkedContext,
+    ...(input.attachments ?? []).map((attachment) => attachment.name),
+  ]
+    .filter((part) => part !== undefined)
+    .join("\n");
+
+/** A title that names the titling task: "Thread Title Generation", "Generate Chat Title". */
+const TITLES_THE_TITLING =
+  /\b(?:thread|chat|conversation)\s+(?:title|titling|naming)\b|\btitle\s+(?:generation|generator|request)\b|\bgenerat\w*\s+(?:an?\s+|the\s+)?(?:thread\s+|chat\s+)?title\b/iu;
+const MENTIONS_TITLES = /titl|\b(?:re)?nam(?:e|ed|ing)\b|عنوان|عناوين/iu;
+
+/**
+ * The title a model returned, when it is one. `thread` is what the thread says: its message, and
+ * what a fork or a link brought. A thread that never mentions titles cannot be about titling.
+ */
+export const generatedThreadTitle = (raw: string, thread = "") => {
   const title = sanitizeThreadTitle(raw);
   // Some models echo the output schema's key instead of a title.
-  return title.toLowerCase() === "title"
+  if (title.toLowerCase() === "title") {
+    return Effect.fail(
+      new TextGenerationError({
+        operation: "generateThreadTitle",
+        detail: 'The model returned the placeholder title "title".',
+      }),
+    );
+  }
+  // Given a message with no subject ("Reply OK"), a model titles the one task it can see: its own.
+  return TITLES_THE_TITLING.test(title) && !MENTIONS_TITLES.test(thread)
     ? Effect.fail(
         new TextGenerationError({
           operation: "generateThreadTitle",
-          detail: 'The model returned the placeholder title "title".',
+          detail: "The model titled its own instruction instead of the thread.",
         }),
       )
     : Effect.succeed(title);
@@ -166,7 +201,7 @@ export function fromRunner(name: string, run: Runner): ProviderTextGeneration {
       }),
     });
     return {
-      title: yield* generatedThreadTitle(generated.title),
+      title: yield* generatedThreadTitle(generated.title, threadTitleSource(input)),
       ...(generated.needsRefinement ? { needsRefinement: true } : {}),
     };
   });

@@ -7,6 +7,7 @@ import { SymbolView } from "../../../components/ui/AppSymbol";
 import { PR_ROW_EXIT, PR_ROW_LAYOUT } from "../pullRequestAnimations";
 import { guideNoticeState } from "./reviewGuideState";
 import type { useReviewGuide } from "./useReviewGuide";
+import { formatAppDateTime } from "../../../lib/dateTimeFormat";
 
 const NOTICE_ENTER = FadeIn.delay(180).duration(120).reduceMotion(ReduceMotion.System);
 
@@ -63,7 +64,7 @@ export function GuideNotice({ state }: { readonly state: ReturnType<typeof useRe
             <T>
               Started{" "}
               <Var>
-                {new Date(state.data.run.startedAt).toLocaleTimeString([], {
+                {formatAppDateTime(new Date(state.data.run.startedAt), {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}

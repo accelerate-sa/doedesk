@@ -1,3 +1,5 @@
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
+
 /** Compose calendars exchange calendar days at UTC midnight, not local instants. */
 export function snoozeDateToPickerDate(date: Date): string {
   return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
@@ -18,11 +20,11 @@ export function applySnoozePickerTime(date: Date, selected: Date): Date {
 /** Format the segment labels without changing the device's hour-cycle setting. */
 export function snoozePickerLabels(date: Date, locale: string, is24Hour: boolean) {
   return {
-    date: date.toLocaleDateString(locale, { month: "short", day: "numeric" }),
-    time: date.toLocaleTimeString(locale, {
-      hour: "numeric",
-      minute: "2-digit",
-      hourCycle: is24Hour ? "h23" : "h12",
-    }),
+    date: formatAppDateTime(date, { month: "short", day: "numeric" }, locale),
+    time: formatAppDateTime(
+      date,
+      { hour: "numeric", minute: "2-digit", hourCycle: is24Hour ? "h23" : "h12" },
+      locale,
+    ),
   };
 }

@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { setActiveLocale } from "./i18n/messages";
 import {
   formatChatTimestampTooltip,
+  formatClockTimeWithSeconds,
+  formatDateTimeTimestamp,
+  formatDateTimeWith,
   formatDayAwareTimestamp,
+  formatLongDate,
+  formatShortTimestamp,
+  formatTimeOfDay,
   formatUpcomingTimestamp,
 } from "./timestampFormat";
 
@@ -84,5 +91,30 @@ describe("timestamps after the system time zone changes", () => {
     expect(formatChatTimestampTooltip(monthEnd, "12-hour")).toBe(
       `${timeIn(monthEnd, "Asia/Bangkok")}, 1st November 2026`,
     );
+  });
+});
+
+describe("timestamps when the app is in Arabic", () => {
+  const inArabic = (): Disposable => {
+    setActiveLocale("ar");
+    return { [Symbol.dispose]: () => setActiveLocale("en") };
+  };
+  // 20:05 on 24 November 2026 in the computer's own zone, whichever that is.
+  const evening = new Date(2026, 10, 24, 20, 5, 9).toISOString();
+
+  it("writes ص and م with Western digits, and keeps the person's 12 or 24 hours", () => {
+    using _arabic = inArabic();
+    expect(formatShortTimestamp(evening, "12-hour")).toBe("8:05 م");
+    expect(formatShortTimestamp(evening, "24-hour")).toBe("20:05");
+    expect(formatClockTimeWithSeconds(evening, "12-hour")).toBe("8:05:09 م");
+    expect(formatTimeOfDay("07:30", "12-hour")).toBe("7:30 ص");
+    // A date beside the time, and a date alone, in the same digits.
+    expect(formatDateTimeTimestamp(evening, "12-hour").replace(/[\u200e\u200f]/gu, "")).toBe(
+      "24/11/2026، 8:05 م",
+    );
+    expect(formatLongDate(evening)).toBe("24 نوفمبر 2026");
+    expect(
+      formatDateTimeWith(new Date(evening), { weekday: "long", month: "short", day: "numeric" }),
+    ).toBe("الثلاثاء، 24 نوفمبر");
   });
 });

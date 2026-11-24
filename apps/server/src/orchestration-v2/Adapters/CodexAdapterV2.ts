@@ -131,7 +131,11 @@ import {
 } from "../../provider/EventNdjsonLogger.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import { codexAppServerArgs, resolveCodexLaunchArgs } from "../../provider/codexLaunchArgs.ts";
-import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
+import {
+  mergeProviderInstanceEnvironment,
+  providerRequestsMasked,
+  sealedValuesInUse,
+} from "@t3tools/provider-core/server/instanceEnvironment";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import {
@@ -165,7 +169,10 @@ import {
 } from "@t3tools/provider-core/server/subagentProjection";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
-import { buildWorkspaceInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
+import {
+  buildWorkspaceInstructions,
+  privacyStandInInstructions,
+} from "@t3tools/provider-core/server/runtimeInstructions";
 
 const CODEX_PROVIDER = ProviderDriverKind.make("codex");
 const CODEX_CAPACITY_MAX_RETRIES = 5;
@@ -906,12 +913,22 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
       workspaceInstructions === ""
         ? undefined
         : { t3_code_workspace: { kind: "application" as const, value: workspaceInstructions } };
+    // Its own entry too: masking applies with or without DoeDesk's MCP tools.
+    const privacyContext = providerRequestsMasked(CODEX_PROVIDER)
+      ? {
+          t3_code_privacy: {
+            kind: "application" as const,
+            value: privacyStandInInstructions(sealedValuesInUse()),
+          },
+        }
+      : undefined;
     const additionalContext =
       t3Context === undefined &&
       workspaceContext === undefined &&
+      privacyContext === undefined &&
       Object.keys(appContext).length === 0
         ? undefined
-        : { ...t3Context, ...workspaceContext, ...appContext };
+        : { ...t3Context, ...workspaceContext, ...privacyContext, ...appContext };
     return yield* decodeCodexTurnStartParams({
       threadId: input.nativeThreadId,
       input: input.codexInput,
@@ -2549,6 +2566,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   status: "completed",
                   title: `MCP server ${name} failed to start`,
                   message: failure.message,
+                  mcpServer: name,
                   ...(failure.signIn ? { mcpSignIn: { server: name } } : {}),
                   startedAt,
                   completedAt: startedAt,

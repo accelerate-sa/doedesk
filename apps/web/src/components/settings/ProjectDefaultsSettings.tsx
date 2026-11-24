@@ -443,7 +443,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               </Select>
             }
           />
-          {workspaceRow}
+          {/* A worktree is a git checkout: the choice is for people who use programming tools. */}
+          {clientSettings.developerMode ? workspaceRow : null}
         </>
       ) : (
         <>

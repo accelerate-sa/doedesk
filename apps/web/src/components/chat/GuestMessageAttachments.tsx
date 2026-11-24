@@ -58,7 +58,7 @@ export function GuestMessageAttachments(props: {
                   </button>
                 ) : (
                   <div className="flex size-full items-center justify-center px-2 text-center text-2xs text-muted-foreground/70">
-                    {image.name}
+                    <bdi>{image.name}</bdi>
                   </div>
                 )}
               </div>
@@ -70,7 +70,9 @@ export function GuestMessageAttachments(props: {
         const identity = (
           <>
             <PierreEntryIcon pathValue={file.name} kind="file" theme={resolvedTheme} />
-            <span className="min-w-0 truncate">{file.name}</span>
+            <span dir="auto" className="file-name min-w-0 truncate">
+              {file.name}
+            </span>
             <span className="shrink-0 text-xs text-muted-foreground">
               {formatAttachmentSize(file.sizeBytes, messages)}
             </span>

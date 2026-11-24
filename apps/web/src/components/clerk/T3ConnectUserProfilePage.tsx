@@ -30,8 +30,11 @@ import {
 } from "./ClerkUserProfilePage";
 import { m, type MessageResolver } from "../../i18n/messages";
 import { useT3ChatLink } from "./useT3ChatLink";
+import { formatDateTimeWith } from "~/timestampFormat";
 
-const linkedAtFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const linkedAtFormatter = {
+  format: (date: Date) => formatDateTimeWith(date, { dateStyle: "medium" }),
+};
 
 function linkedAtLabel(value: string, resolve: MessageResolver): string {
   const linkedAt = new Date(value);

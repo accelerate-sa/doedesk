@@ -56,7 +56,8 @@ const isStep = (value: string): value is OnboardingStep =>
 export function readOnboardingState(stored: OnboardingProgress | null): OnboardingState {
   if (stored === null) return INITIAL_ONBOARDING_STATE;
   return {
-    step: isStep(stored.step) ? stored.step : "welcome",
+    // "sealed" was a step that explained sealed documents; setup left there goes on after it.
+    step: isStep(stored.step) ? stored.step : stored.step === "sealed" ? "agents" : "welcome",
     seen: stored.seen.filter(isStep),
     locale: stored.locale === "en" || stored.locale === "ar" ? stored.locale : null,
     masking:
@@ -69,8 +70,7 @@ export function readOnboardingState(stored: OnboardingProgress | null): Onboardi
 const privacyDecided = (facts: OnboardingFacts) =>
   facts.privacyMode !== null && facts.privacyMode !== "unconfigured";
 
-// Until another way is chosen, the account is assumed: it is the recommended one, and the count
-// then only ever shrinks when the person picks their own service.
+// Until another way is chosen, the account is assumed: it is the recommended one.
 const usesAccount = (state: OnboardingState, facts: OnboardingFacts) =>
   facts.privacyMode === "cloud" ||
   (!privacyDecided(facts) && state.masking !== "ownService" && state.masking !== "off");
@@ -169,12 +169,15 @@ export function onboardingView(state: OnboardingState, facts: OnboardingFacts) {
   const steps = visibleSteps(state, facts);
   const step = currentStep(state, facts);
   const index = steps.indexOf(step);
+  // A choice not yet committed must not move the count: it assumes the account until then, so
+  // the count shrinks once, when the person goes on with their own service or without masking.
+  const counted = privacyDecided(facts) ? steps : visibleSteps({ ...state, masking: null }, facts);
   return {
     steps,
     step,
     /** One-based, for "Step 2 of 6". */
     position: index + 1,
-    count: steps.length,
+    count: counted.length,
     isFirst: index === 0,
     isLast: index === steps.length - 1,
     canContinue: canContinue(step, state, facts),

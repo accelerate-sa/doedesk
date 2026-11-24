@@ -13,10 +13,16 @@ const NO_TERMINAL_LABELS: ReadonlyMap<string, string> = new Map();
 function DraftBlock(props: {
   routeDraftId?: string | null;
   terminalLabels?: ReadonlyMap<string, string>;
+  chatlessProjectKeys?: ReadonlySet<string>;
 }) {
   const routeDraftId = props.routeDraftId ?? null;
   const terminalLabels = props.terminalLabels ?? NO_TERMINAL_LABELS;
-  const { draftIds, routeDraftComposer } = useSidebarDrafts(null, routeDraftId, terminalLabels);
+  const { draftIds, routeDraftComposer } = useSidebarDrafts(
+    null,
+    routeDraftId,
+    terminalLabels,
+    props.chatlessProjectKeys,
+  );
   return (
     <SidebarDraftBlock
       draftIds={draftIds}
@@ -124,9 +130,13 @@ it("lists empty drafts by terminal label while their terminal exists, active or 
   );
 
   const terminalLabels = new Map([[`${environmentId}:terminal-thread`, "dev"]]);
-  const block = (routeDraftId: string | null) => (
+  const block = (routeDraftId: string | null, chatlessProjectKeys?: ReadonlySet<string>) => (
     <ul>
-      <DraftBlock routeDraftId={routeDraftId} terminalLabels={terminalLabels} />
+      <DraftBlock
+        routeDraftId={routeDraftId}
+        terminalLabels={terminalLabels}
+        {...(chatlessProjectKeys ? { chatlessProjectKeys } : {})}
+      />
     </ul>
   );
   await using screen = await render(block(terminalDraftId));
@@ -137,4 +147,9 @@ it("lists empty drafts by terminal label while their terminal exists, active or 
   await screen.rerender(block(null));
   await expect.element(rows).toHaveAccessibleName("dev, Unsent draft");
   expect(rows.elements()).toHaveLength(1);
+
+  // A folder just added has no chat to stand for it in the list, so its empty draft does.
+  await screen.rerender(block(null, new Set([`${environmentId}:idle-project`])));
+  await expect.element(rows.nth(1)).toHaveAccessibleName("New chat, Unsent draft");
+  expect(rows.elements()).toHaveLength(2);
 });

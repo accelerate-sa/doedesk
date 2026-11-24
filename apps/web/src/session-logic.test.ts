@@ -184,6 +184,23 @@ describe("V2 session presentation", () => {
     expect(recoveredEntry.entry.label).toBe("Provider recovered (2/10 retries)");
     expect(recoveredEntry.entry.sourceActivityKind).not.toBe("runtime.warning");
     expect(workEntryDisplayIndicatesToolFailure(recoveredEntry.entry)).toBe(false);
+    // A request DoeDesk refused is headed as that, and its retries are not counted as the
+    // provider's: the provider never saw it.
+    expect(
+      providerErrorPresentation({
+        ...retryItem,
+        status: "failed",
+        failure: {
+          ...retryItem.failure,
+          code: "doedesk_not_sent",
+          message:
+            "The proxy this computer is set to use refused the connection (it answered 403).",
+        },
+      }),
+    ).toEqual({
+      label: "DoeDesk did not send this request",
+      detail: "The proxy this computer is set to use refused the connection (it answered 403).",
+    });
     expect(providerErrorPresentation(retryItem)).toEqual({
       label: "Retrying provider (2/10)",
       detail: "Claude API overloaded. Retrying in 1.5s.",
@@ -1424,6 +1441,23 @@ describe("HTML renders in the timeline", () => {
       turnDiffSummaries: [],
       supportsConversationRollback: false,
     }).map((row) => row.kind);
+
+  it("keeps a file fill_sealed finished in the reply, outside the folded work", () => {
+    const fill = (filled: number, unknownMarkers: Array<string>): OrchestrationV2TurnItem => ({
+      ...base("fill", 2),
+      status: "completed",
+      type: "dynamic_tool",
+      toolName: "mcp__t3-code__fill_sealed",
+      input: { name: "letter.txt" },
+      output: { structuredContent: { name: "letter.txt", filled, unknownMarkers, note: "" } },
+    });
+    const finished = turn(fill(2, []));
+    expect(finished.find((entry) => entry.id === "fill")?.kind).toBe("event");
+    expect(rowsFor(finished, false)).toEqual(["message", "turn-fold", "event", "message"]);
+    // A call that left markers unfilled is ordinary work: the agent calls again.
+    const unfinished = turn(fill(0, ["{{DOC_1.fee}}"]));
+    expect(unfinished.find((entry) => entry.id === "fill")?.kind).toBe("work");
+  });
 
   it("shows a completed render in place, above the reply, through the turn fold", () => {
     const entries = turn(

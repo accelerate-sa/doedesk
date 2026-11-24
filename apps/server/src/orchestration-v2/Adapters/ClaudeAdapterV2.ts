@@ -223,6 +223,11 @@ import {
 } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import {
+  providerRequestsMasked,
+  sealedFolderWriteRefusal,
+  sealedValuesInUse,
+} from "@t3tools/provider-core/server/instanceEnvironment";
+import {
   mcpToolPresentation,
   normalizeMcpText,
 } from "@t3tools/provider-core/server/mcpToolPresentation";
@@ -2301,6 +2306,34 @@ const subagentDeviceInstructions: HookCallback = () =>
     },
   });
 
+const CLAUDE_FILE_WRITING_TOOLS = "Write|Edit|MultiEdit|NotebookEdit";
+
+// A sealed folder's files are sealed as they arrive, so a write there is refused before it runs.
+// Shell commands are not covered: what one writes there is sealed by the folder's next sweep.
+const refuseSealedFolderWrites =
+  (cwd: string | null): HookCallback =>
+  (hookInput) => {
+    const toolInput: { readonly file_path?: unknown; readonly notebook_path?: unknown } =
+      hookInput.hook_event_name === "PreToolUse" &&
+      typeof hookInput.tool_input === "object" &&
+      hookInput.tool_input !== null
+        ? hookInput.tool_input
+        : {};
+    const path = toolInput.file_path ?? toolInput.notebook_path;
+    const refusal = typeof path === "string" ? sealedFolderWriteRefusal(path, cwd) : undefined;
+    return Promise.resolve(
+      refusal === undefined
+        ? {}
+        : {
+            hookSpecificOutput: {
+              hookEventName: "PreToolUse" as const,
+              permissionDecision: "deny" as const,
+              permissionDecisionReason: refusal,
+            },
+          },
+    );
+  };
+
 export function makeClaudeQueryOptions(input: {
   readonly modelSelection: ModelSelection;
   readonly modelCatalog?: ClaudeModelCatalog;
@@ -2478,6 +2511,8 @@ export function makeClaudeQueryOptions(input: {
         buildRuntimeInstructions({
           harness: "Claude Code",
           runtimePolicy: { cwd: input.cwd, workspace: input.workspace },
+          privacyMasking: providerRequestsMasked(CLAUDE_PROVIDER),
+          sealedValues: sealedValuesInUse(),
         }) +
           (input.mcpServers === undefined
             ? ""
@@ -2490,16 +2525,13 @@ export function makeClaudeQueryOptions(input: {
         ...launchAppendSystemPrompt,
       ].join("\n\n"),
     },
-    ...(deviceInstructions || input.onStop !== undefined
-      ? {
-          hooks: {
-            ...(deviceInstructions
-              ? { SubagentStart: [{ hooks: [subagentDeviceInstructions] }] }
-              : {}),
-            ...(input.onStop === undefined ? {} : { Stop: [{ hooks: [input.onStop] }] }),
-          },
-        }
-      : {}),
+    hooks: {
+      PreToolUse: [
+        { matcher: CLAUDE_FILE_WRITING_TOOLS, hooks: [refuseSealedFolderWrites(input.cwd)] },
+      ],
+      ...(deviceInstructions ? { SubagentStart: [{ hooks: [subagentDeviceInstructions] }] } : {}),
+      ...(input.onStop === undefined ? {} : { Stop: [{ hooks: [input.onStop] }] }),
+    },
     ...(pluginDirectories.length === 0
       ? {}
       : { plugins: pluginDirectories.map((path) => ({ type: "local" as const, path })) }),
@@ -8897,6 +8929,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 status: "completed",
                 title: `MCP server ${status.name} needs a sign-in`,
                 message: `The ${status.name} MCP server needs a sign-in before Claude can use it.`,
+                mcpServer: status.name,
                 mcpSignIn: { server: status.name },
                 startedAt: now,
                 completedAt: now,

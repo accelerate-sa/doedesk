@@ -1,14 +1,15 @@
-import type {
-  NodeId,
-  OrchestrationV2ProviderFailure,
-  OrchestrationV2ProviderFailureClass,
-  OrchestrationV2ProviderRetry,
-  OrchestrationV2TurnItem,
-  ProviderDriverKind,
-  ProviderThreadId,
-  ProviderTurnId,
-  RunId,
-  ThreadId,
+import {
+  PROVIDER_FAILURE_NOT_SENT_CODE,
+  type NodeId,
+  type OrchestrationV2ProviderFailure,
+  type OrchestrationV2ProviderFailureClass,
+  type OrchestrationV2ProviderRetry,
+  type OrchestrationV2TurnItem,
+  type ProviderDriverKind,
+  type ProviderThreadId,
+  type ProviderTurnId,
+  type RunId,
+  type ThreadId,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Cause from "effect/Cause";
@@ -300,6 +301,39 @@ function boundedText(value: string, maxLength: number): string {
   return `${redacted.slice(0, end)}…`;
 }
 
+/**
+ * The privacy gateway's refusal as a provider's program reports it: wrapped in the program's own
+ * words and in JSON, with an address or an id added after. The gateway opens and closes what it
+ * says with fixed sentences; the reason between them is what the person needs, shown alone.
+ */
+const GATEWAY_REFUSAL =
+  /DoeDesk did not send this request\.\s+([\s\S]{1,2000}?)\s+Nothing of it was sent\./u;
+
+/**
+ * The reason as the gateway wrote it. A program that quotes the JSON body escapes its quotes,
+ * and one that wraps that in JSON of its own escapes them again.
+ */
+const unescaped = (text: string): string => {
+  let current = text;
+  for (let depth = 0; depth < 4; depth += 1) {
+    const next = current.replace(/\\(["\\/])/gu, "$1");
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+};
+
+let gatewayRefusal: () => string | undefined = () => undefined;
+
+/**
+ * Where to ask why the privacy gateway is sending nothing right now. A program's own request
+ * (Codex's, before its first model request) is refused like any other, and its error says so in
+ * words of its own: the failure then takes the gateway's reason.
+ */
+export const setGatewayRefusalSource = (source: (() => string | undefined) | undefined): void => {
+  gatewayRefusal = source ?? (() => undefined);
+};
+
 export function makeProviderFailure(input: {
   readonly cause?: unknown;
   readonly message?: string | undefined;
@@ -312,11 +346,27 @@ export function makeProviderFailure(input: {
   const requestTooLarge =
     input.message !== undefined &&
     (REQUEST_TOO_LARGE_STATUS.test(input.message) || REQUEST_TOO_LARGE_REASON.test(input.message));
+  const refused = GATEWAY_REFUSAL.exec(
+    input.message ?? stringField(input.cause, "message") ?? "",
+  )?.[1];
+  const refusal =
+    refused === undefined
+      ? requestTooLarge
+        ? undefined
+        : gatewayRefusal()
+      : unescaped(refused).trim();
   const rawMessage = requestTooLarge
     ? REQUEST_TOO_LARGE_MESSAGE
-    : (input.message ?? curated.known ?? curated.category ?? DEFAULT_PROVIDER_FAILURE_MESSAGE);
+    : (refusal ??
+      input.message ??
+      curated.known ??
+      curated.category ??
+      DEFAULT_PROVIDER_FAILURE_MESSAGE);
   const message = boundedText(rawMessage, MAX_PROVIDER_FAILURE_MESSAGE_LENGTH);
-  const rawCode = input.code ?? stringField(input.cause, "code") ?? null;
+  const rawCode =
+    refusal === undefined
+      ? (input.code ?? stringField(input.cause, "code") ?? null)
+      : PROVIDER_FAILURE_NOT_SENT_CODE;
   const code =
     rawCode === null ? null : boundedText(rawCode, MAX_PROVIDER_FAILURE_CODE_LENGTH) || null;
 
@@ -324,7 +374,8 @@ export function makeProviderFailure(input: {
     class: input.class ?? "unknown",
     message: message || DEFAULT_PROVIDER_FAILURE_MESSAGE,
     code,
-    retryable: requestTooLarge ? false : (input.retryable ?? null),
+    // Asked again, a request DoeDesk refused is refused again.
+    retryable: requestTooLarge || refusal !== undefined ? false : (input.retryable ?? null),
     ...(input.class === "usage_limit" &&
     input.resetAt != null &&
     Number.isFinite(Date.parse(input.resetAt))

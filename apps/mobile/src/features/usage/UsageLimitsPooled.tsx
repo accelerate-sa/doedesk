@@ -34,6 +34,7 @@ import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { environmentPresentations } from "../../state/presentation";
 import { refillLabel, ResetCredits, resetLabels } from "./UsageLimitsSection";
 import { usageProviderKind, useProviderColors } from "./usageProviders";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
 
 const PACE_LABEL = {
   ahead: msg("Ahead of pace"),
@@ -667,7 +668,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
                   <T>
                     Resets{" "}
                     <Var>
-                      {new Date(window.resetsAt).toLocaleString(undefined, {
+                      {formatAppDateTime(new Date(window.resetsAt), {
                         dateStyle: "medium",
                         timeStyle: "short",
                       })}

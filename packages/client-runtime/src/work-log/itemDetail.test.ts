@@ -2,7 +2,12 @@ import { describe, expect, it } from "vite-plus/test";
 import { ThreadId, TurnItemId, type OrchestrationV2TurnItem } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 
-import { isJsonToolText, turnItemOutputImages, turnItemOutputText } from "./itemDetail.ts";
+import {
+  isJsonToolText,
+  turnItemOutputImages,
+  turnItemOutputText,
+  withoutMcpServerNotices,
+} from "./itemDetail.ts";
 
 describe("isJsonToolText", () => {
   it.each([
@@ -180,5 +185,31 @@ describe("MCP app tool output", () => {
       ],
     });
     expect(turnItemOutputText(bounded)).toBe("chart\n[image]");
+  });
+});
+
+describe("withoutMcpServerNotices", () => {
+  const notice = (id: string, extra: object): { readonly item: OrchestrationV2TurnItem } => ({
+    item: {
+      ...toolItem(null),
+      id: TurnItemId.make(id),
+      type: "system_notice",
+      message: id,
+      ...extra,
+    } as OrchestrationV2TurnItem,
+  });
+
+  it("drops only the notices about an MCP server's own state", () => {
+    const failedStart = notice("failed-start", { mcpServer: "godot" });
+    const olderSignIn = notice("sign-in", { mcpSignIn: { server: "slack" } });
+    const aboutTheTurn = notice("usage-limit", {});
+    const tool = { item: toolItem("done") };
+
+    expect(withoutMcpServerNotices([failedStart, tool, olderSignIn, aboutTheTurn])).toEqual([
+      tool,
+      aboutTheTurn,
+    ]);
+    const untouched = [tool, aboutTheTurn];
+    expect(withoutMcpServerNotices(untouched)).toBe(untouched);
   });
 });

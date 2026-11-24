@@ -1,5 +1,7 @@
+import { withoutMcpServerNotices } from "@t3tools/client-runtime/work-log/item-detail";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { type ComponentProps, useLayoutEffect } from "react";
+import { useDeveloperMode } from "~/doedesk/product";
 import { useIncrementalTimelineEntries } from "../../hooks/useIncrementalTimelineEntries";
 import type { TimelineEntriesInput, TimelineEntry } from "../../session-logic";
 import { useTimelineVisibleTurnItems } from "../../state/entities";
@@ -35,7 +37,10 @@ export function ThreadTimeline({
   syncing: boolean;
   detailLoading: boolean;
 }) {
-  const visibleTurnItems = useTimelineVisibleTurnItems(threadDetailRef);
+  const allTurnItems = useTimelineVisibleTurnItems(threadDetailRef);
+  const developerMode = useDeveloperMode();
+  // Other programs' MCP servers failing or wanting a sign-in say nothing about this chat's work.
+  const visibleTurnItems = developerMode ? allTurnItems : withoutMcpServerNotices(allTurnItems);
   const serverEntries = useIncrementalTimelineEntries(activeThreadKey, {
     ...entriesInput,
     visibleTurnItems,

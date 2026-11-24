@@ -176,12 +176,18 @@
     },
     "packages/privacy-gateway": {
       // Maintainers run the conformance session by path; it starts the planted MCP server by path.
-      // The evaluation repository runs the redaction corpus by path; the live check is run by hand.
+      // The evaluation repository runs the redaction corpus and the worker bench by path; the
+      // live check is run by hand.
       "entry": [
         "scripts/conformance-real.ts",
         "scripts/planted-mcp-server.mjs",
         "scripts/redaction-corpus.ts",
         "scripts/redaction-live.ts",
+        "scripts/routes-seen.ts",
+        "scripts/through-proxy.ts",
+        "scripts/worker-bench.ts",
+        "scripts/ask-bench.ts",
+        "scripts/masking-bench.ts",
       ],
     },
     "packages/issue-tracker-linear": {

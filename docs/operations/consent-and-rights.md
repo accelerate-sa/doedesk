@@ -100,6 +100,25 @@ device. Events from a person who agreed carry `properties.consent = { wordingId,
 identifier, the state, the time, the wording, the rule and signal, and the language. A report that
 cannot be sent waits in `usage-data.json` for the next change or the next start.
 
+## The notice about masking for a provider
+
+"What DoeDesk changes in what OpenAI receives", and the same for each AI company, tells a person
+that DoeDesk alters the requests their own sign-in sends, and that the company can tell. Its
+sentences are in [providerConnections.ts](../../apps/web/src/doedesk/providerConnections.ts) and
+go through the interface translations.
+
+- **When.** Once per provider, when a chat with that provider starts: the first Send to it opens
+  the notice and the message goes only after "I understand". A provider that already has a chat on
+  this computer (one an agent or a schedule started, or one from the phone) gets its notice the
+  next time the app is open. Providers a person is signed in to and has not used get none. It
+  can be read again from Settings, Privacy, Advanced, AI companies.
+- **What is recorded.** The provider and `PROVIDER_NOTICE_VERSION`, in `privacy/config.json` on
+  this computer. Nothing is sent to DoeDesk Cloud. Raise the version when the meaning of the
+  notice changes, and it is shown again.
+- **What must hold.** No message leaves this window for a masked provider before its notice was
+  read. Do not turn the notice into a line the person can miss, and do not record it as read
+  without showing it.
+
 ## Account rights
 
 Settings, under Privacy, for a signed-in account:

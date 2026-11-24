@@ -427,6 +427,10 @@
       "types": "./src/state/threadCheckpoints.ts",
       "default": "./src/state/threadCheckpoints.ts"
     },
+    "./state/thread-privacy": {
+      "types": "./src/state/threadPrivacy.ts",
+      "default": "./src/state/threadPrivacy.ts"
+    },
     "./state/thread-repositories": {
       "types": "./src/state/threadRepositories.ts",
       "default": "./src/state/threadRepositories.ts"
@@ -606,6 +610,10 @@
     "./pull-request-editing": {
       "types": "./src/pullRequestEditing.ts",
       "default": "./src/pullRequestEditing.ts"
+    },
+    "./list-format": {
+      "types": "./src/listFormat.ts",
+      "default": "./src/listFormat.ts"
     },
     "./pull-request-reactions": {
       "types": "./src/pullRequestReactions.ts",

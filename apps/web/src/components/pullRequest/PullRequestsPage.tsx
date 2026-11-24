@@ -127,6 +127,7 @@ import {
 } from "~/state/pullRequests";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { cn } from "~/lib/utils";
+import { WORKSPACE_CONTROLS_END_CLASS } from "~/workspaceTitlebar";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
 import {
@@ -1230,7 +1231,8 @@ export function PullRequestsPage() {
   const openPanelControls = (
     <div
       className={cn(
-        "absolute top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] z-50 me-px flex h-[var(--workspace-topbar-height)] items-center gap-1 [-webkit-app-region:no-drag]",
+        "absolute top-[var(--workspace-controls-top)] z-50 me-px flex h-[var(--workspace-topbar-height)] items-center gap-1 [-webkit-app-region:no-drag]",
+        WORKSPACE_CONTROLS_END_CLASS,
         mobileSidebarSheetMounted && "hidden",
       )}
       data-workspace-titlebar-controls

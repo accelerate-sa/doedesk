@@ -34,6 +34,7 @@ export interface FileSaveSessionDeps {
 }
 
 interface FileSaveSession {
+  readonly target: FileSaveTarget;
   readonly coordinator: FileSaveCoordinator;
   /** Lease count per listener; surfaces may share one listener. */
   readonly listeners: Map<FilePendingListener, number>;
@@ -84,6 +85,7 @@ export function createFileSaveSessions(deps: FileSaveSessionDeps) {
     });
     const unsubscribeWritable = deps.subscribeWritable(target, () => recover(target, coordinator));
     const session: FileSaveSession = {
+      target,
       coordinator,
       listeners,
       unsubscribeWritable,
@@ -124,6 +126,19 @@ export function createFileSaveSessions(deps: FileSaveSessionDeps) {
   return {
     /** Holds the file's session open until the returned release runs. */
     acquire,
+    /**
+     * Whether a write of the file at this absolute path is still to come, a closed file's last
+     * one included. Sealing moves the file out of the folder, and such a write would put it back.
+     */
+    hasUnsavedAt(absolutePath: string): boolean {
+      const wanted = withForwardSlashes(absolutePath);
+      for (const { target, coordinator } of sessions.values()) {
+        if (coordinator.unconfirmedContents === null) continue;
+        const root = withForwardSlashes(target.cwd).replace(/\/+$/, "");
+        if (`${root}/${withForwardSlashes(target.relativePath)}` === wanted) return true;
+      }
+      return false;
+    },
     /** Edits for a file nobody holds open are dropped, so retired editors stay inert. */
     change(target: FileSaveTarget, contents: string): void {
       const session = sessions.get(fileSaveKey(target));
@@ -131,6 +146,8 @@ export function createFileSaveSessions(deps: FileSaveSessionDeps) {
     },
   };
 }
+
+const withForwardSlashes = (path: string) => path.replaceAll("\\", "/");
 
 function fileSaveKey({ environmentId, cwd, relativePath }: FileSaveTarget): string {
   return `${environmentId}\u0000${cwd}\u0000${relativePath}`;
@@ -172,6 +189,9 @@ export function useFileSaveSession(
     [environmentId, cwd, relativePath, onPendingChange],
   );
 }
+
+export const fileHasUnsavedEdits = (absolutePath: string): boolean =>
+  fileSaveSessions.hasUnsavedAt(absolutePath);
 
 export function changeFileSaveSession(target: FileSaveTarget, contents: string): void {
   fileSaveSessions.change(target, contents);

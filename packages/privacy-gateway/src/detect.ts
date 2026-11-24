@@ -1,13 +1,16 @@
 import * as NodeCrypto from "node:crypto";
 
-import { type EntityKind, isEntityKind } from "./placeholders.ts";
+import {
+  type DetectedEntity,
+  findFixedFormats,
+  isReferenceNumber,
+  numberContexts,
+  toLatinDigits,
+} from "./fixedFormats.ts";
+import { isEntityKind } from "./placeholders.ts";
+import { ProxyError } from "./upstream.ts";
 
-/** A span of personal data inside one text. Offsets are UTF-16 code units, as in JS strings. */
-export interface DetectedEntity {
-  readonly start: number;
-  readonly end: number;
-  readonly kind: EntityKind;
-}
+export type { DetectedEntity };
 
 export interface Detector {
   /** One result list per input text, in order. Rejects when the text could not be checked. */
@@ -16,268 +19,37 @@ export interface Detector {
   ) => Promise<ReadonlyArray<ReadonlyArray<DetectedEntity>>>;
 }
 
-export class DetectorUnavailableError extends Error {
-  override readonly name = "DetectorUnavailableError";
+/** Why a detection service gave no answer, for an app that words the failure itself. */
+export interface DetectorProblem {
+  readonly kind:
+    | "unreachable"
+    | "timeout"
+    | "busy"
+    | "allowance"
+    | "failing"
+    | "signIn"
+    | "refused"
+    | "unreadable";
+  readonly host: string;
+  readonly status?: number;
 }
 
-const DIGIT = "[0-9٠-٩]";
-const SEPARATOR = "[\\s.-]?";
-
-const PATTERNS: ReadonlyArray<{ readonly kind: EntityKind; readonly source: string }> = [
-  { kind: "EMAIL", source: "[\\p{L}\\p{N}._%+-]+@[\\p{L}\\p{N}.-]+\\.[\\p{L}]{2,}" },
-  // Saudi mobile numbers in local and international form.
-  {
-    kind: "PHONE",
-    source: `(?<!${DIGIT})(?:\\+|00)?(?:966|٩٦٦)${SEPARATOR}5${DIGIT}${SEPARATOR}${DIGIT}{3}${SEPARATOR}${DIGIT}{4}(?!${DIGIT})`,
-  },
-  {
-    kind: "PHONE",
-    source: `(?<!${DIGIT})[0٠][5٥]${DIGIT}${SEPARATOR}${DIGIT}{3}${SEPARATOR}${DIGIT}{4}(?!${DIGIT})`,
-  },
-  {
-    kind: "PHONE",
-    source: `(?<![\\p{L}${DIGIT.slice(1, -1)}])\\+${DIGIT}{1,3}(?:${SEPARATOR}${DIGIT}{2,4}){2,4}(?!${DIGIT})`,
-  },
-];
-
-const toLatinDigits = (value: string): string =>
-  value.replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660));
+export class DetectorUnavailableError extends Error {
+  override readonly name = "DetectorUnavailableError";
+  readonly problem: DetectorProblem | undefined;
+  constructor(message: string, options?: ErrorOptions & { readonly problem?: DetectorProblem }) {
+    super(message, options);
+    this.problem = options?.problem;
+  }
+}
 
 /**
- * An IBAN written whole or in groups of four. Groups are split by one space only, never by a tab
- * or a line break: in a table the next cell is another value, not more of the account.
+ * Structured identifiers that follow a fixed format. Runs on the machine, with no network.
+ * Payment card numbers have no rule here, with a right check digit or a wrong one: they are left
+ * to the detection service, as thirteen to nineteen digits alone are as often a timestamp or a key.
  */
-const IBAN_CANDIDATE =
-  /(?<![\p{L}\p{N}])[A-Z]{2}[0-9٠-٩]{2}[0-9٠-٩A-Z]*(?:[ \u00A0][0-9٠-٩A-Z]+)*(?![\p{L}\p{N}])/gu;
-const IBAN_MIN_LENGTH = 15;
-const IBAN_MAX_LENGTH = 34;
-
-const ibanChecks = (compact: string): boolean => {
-  let remainder = 0;
-  for (const character of compact.slice(4) + compact.slice(0, 4)) {
-    const value = Number.parseInt(character, 36);
-    remainder = (remainder * (value > 9 ? 100 : 10) + value) % 97;
-  }
-  return remainder === 1;
-};
-
-/**
- * IBANs whose check digits are right. A candidate that runs on into a following number (an
- * amount after a space) is cut back to the longest run of its groups that checks.
- */
-const findIbans = (text: string): ReadonlyArray<DetectedEntity> => {
-  const found: Array<DetectedEntity> = [];
-  for (const match of text.matchAll(IBAN_CANDIDATE)) {
-    const groups = [...match[0].matchAll(/[^ \u00A0]+/g)];
-    let compact = "";
-    const ends: Array<{ readonly length: number; readonly end: number }> = [];
-    for (const group of groups) {
-      compact += toLatinDigits(group[0]);
-      ends.push({ length: compact.length, end: match.index + group.index + group[0].length });
-    }
-    const longest = ends.findLast(
-      ({ length }) =>
-        length >= IBAN_MIN_LENGTH &&
-        length <= IBAN_MAX_LENGTH &&
-        ibanChecks(compact.slice(0, length)),
-    );
-    if (longest !== undefined) found.push({ start: match.index, end: longest.end, kind: "IBAN" });
-  }
-  return found;
-};
-
-/*
- * A ten-digit number starting with 1 or 2 has the shape of a Saudi ID, and so do many amounts and
- * references: the words of its clause, a currency after it, or its column's header decide. The
- * check digit is not used: people's documents carry IDs with a wrong one, and they are still IDs.
- */
-const IDENTIFIER_WORDS = new RegExp(
-  [
-    "هوي[ةته]",
-    "[إا]قام[ةته]",
-    "سجل(?:ه|ها)? المدني",
-    "سجل مدني",
-    "الحدود",
-    "سجل(?:ها|ه)? تجاري",
-    "السجل التجاري",
-    "س\\s?\\.\\s?ت",
-    "ضريبي",
-    "القيمة المضافة",
-    "الوطني الموحد",
-    "بطاق[ةته]",
-    "(?<![a-z])(?:national|civil|resident|residence|identity|iqama|id|border|commercial|registration|unified national|c\\.\\s?r|cr|vat|trn|tin|tax)(?![a-z])",
-  ].join("|"),
-  "giu",
-);
-const READABLE_WORDS = new RegExp(
-  [
-    "ريال",
-    "ر\\s?\\.\\s?س",
-    "مبلغ",
-    "قيم[ةته]",
-    "رأس ?مال",
-    "رصيد",
-    "إجمالي",
-    "اجمالي",
-    "سعر",
-    "فاتور[ةه]",
-    "حوال[ةه]",
-    "تحويل",
-    "مرجع",
-    "أمر (?:ال)?(?:شراء|صرف|عمل)",
-    "طلب",
-    "عقد",
-    "إيجار",
-    "شحن[ةه]",
-    "دعوى",
-    "قضي[ةه]",
-    "صك",
-    "كشف حساب",
-    "العميل",
-    "عملي[ةه]",
-    "معامل[ةه]",
-    "سند",
-    "بوليص[ةه]",
-    "(?<![a-z])(?:amount|value|total|balance|price|capital|sar|sr|riyals?|usd|invoice|inv|transfer|transaction|reference|ref|order|po|purchase|receipt|contract|case|shipment|tracking|statement|customer|payment|deed|policy|ticket)(?![a-z])",
-  ].join("|"),
-  "giu",
-);
-/** Words for a way to reach someone: the number after them is a phone number, never readable. */
-const CONTACT_WORDS =
-  /جوال|هاتف|تواصل|اتصال|واتس|فاكس|(?<![a-z])(?:phone|mobile|tel|call|fax|whatsapp|contact)(?![a-z])/giu;
-const CURRENCY_AFTER = /^\s*(?:ريال|ر\s?\.\s?س|SAR|SR|riyals?|USD|dollars?)(?![a-z])/iu;
-const CONTEXT_REACH = 48;
-
-type NumberContext = "identifier" | "contact" | "readable" | undefined;
-
-const lastMatchEnd = (pattern: RegExp, text: string): number => {
-  let end = -1;
-  for (const match of text.matchAll(pattern)) end = match.index + match[0].length;
-  return end;
-};
-
-const contextOfWords = (words: string): NumberContext => {
-  const nearest = (
-    [
-      ["identifier", lastMatchEnd(IDENTIFIER_WORDS, words)],
-      ["contact", lastMatchEnd(CONTACT_WORDS, words)],
-      ["readable", lastMatchEnd(READABLE_WORDS, words)],
-    ] as const
-  ).reduce((best, next) => (next[1] > best[1] ? next : best));
-  // The nearer word wins: "transfer to the holder of ID 1…" is an ID.
-  return nearest[1] === -1 ? undefined : nearest[0];
-};
-
-/** What a text says about the numbers in it. Each table column's header is looked up once. */
-const numberContexts = (text: string) => {
-  // Keyed by the end of a line and a column: the header found above that line, if any.
-  const headers = new Map<string, string | undefined>();
-  const headerOfColumn = (lineStart: number, column: number): string | undefined => {
-    const visited: Array<string> = [];
-    let header: string | undefined;
-    for (let end = lineStart - 1; end > 0;) {
-      const key = `${end}:${column}`;
-      if (headers.has(key)) {
-        header = headers.get(key);
-        break;
-      }
-      visited.push(key);
-      const start = text.lastIndexOf("\n", end - 1) + 1;
-      const line = text.slice(start, end);
-      if (!line.includes("\t")) break;
-      const cell = line.split("\t")[column]?.trim() ?? "";
-      if (/\p{L}/u.test(cell) && !/[0-9٠-٩]/.test(cell)) {
-        header = cell;
-        break;
-      }
-      end = start - 1;
-    }
-    for (const key of visited) headers.set(key, header);
-    return header;
-  };
-
-  return (start: number, end: number): NumberContext => {
-    const lineStart = text.lastIndexOf("\n", start - 1) + 1;
-    const lineBreak = text.indexOf("\n", end);
-    const lineEnd = lineBreak === -1 ? text.length : lineBreak;
-    const cellStart = Math.max(lineStart, text.lastIndexOf("\t", start - 1) + 1);
-    // The words of the number's own clause: a comma ends what an earlier word can say about it.
-    const clause = text.slice(Math.max(cellStart, start - CONTEXT_REACH), start).split(/[,،;؛]/u);
-    const before = contextOfWords(clause[clause.length - 1] ?? "");
-    if (before !== undefined) return before;
-    const tab = text.indexOf("\t", end);
-    const after = text.slice(end, tab === -1 || tab > lineEnd ? lineEnd : tab);
-    if (CURRENCY_AFTER.test(after)) return "readable";
-    const cells = text.slice(lineStart, lineEnd).split("\t");
-    if (cells.length === 1) return undefined;
-    const column = text.slice(lineStart, start).split("\t").length - 1;
-    // A two-cell row is a label and its value ("Customer no. <tab> 1…"); a wider row is a record
-    // under a header row.
-    if (cells.length === 2 && column === 1) return contextOfWords(cells[0] ?? "");
-    const header = headerOfColumn(lineStart, column);
-    return header === undefined ? undefined : contextOfWords(header);
-  };
-};
-
-const TEN_DIGITS = new RegExp(`(?<!${DIGIT})${DIGIT}{10}(?!${DIGIT})`, "gu");
-const FIFTEEN_DIGITS = new RegExp(`(?<!${DIGIT})${DIGIT}{15}(?!${DIGIT})`, "gu");
-/** Digits in groups split by single spaces or dashes ("1087-654-321", "300 123 456 789 003"). */
-const GROUPED_DIGITS = new RegExp(
-  `(?<!${DIGIT}[ -]?)${DIGIT}+(?:[ -]${DIGIT}+)+(?![ -]?${DIGIT})`,
-  "gu",
-);
-
-/**
- * National IDs and iqamas, commercial registration numbers (ten digits, any first digit, named
- * as such), VAT numbers (fifteen digits starting and ending with 3), and ten-digit numbers
- * written after a phone word.
- */
-const findIdentifiers = (text: string): ReadonlyArray<DetectedEntity> => {
-  const found: Array<DetectedEntity> = [];
-  const contextOfNumber = numberContexts(text);
-  for (const match of text.matchAll(TEN_DIGITS)) {
-    const end = match.index + match[0].length;
-    const context = contextOfNumber(match.index, end);
-    const idShaped = /^[12]/.test(toLatinDigits(match[0]));
-    if (context === "identifier" || (context === undefined && idShaped)) {
-      found.push({ start: match.index, end, kind: "ID" });
-    } else if (context === "contact") {
-      found.push({ start: match.index, end, kind: "PHONE" });
-    }
-  }
-  // Written in groups, an identifier is masked only where the text names it as one: grouped
-  // digits are as often a phone number or an amount.
-  for (const match of text.matchAll(GROUPED_DIGITS)) {
-    const digits = match[0].replace(/[ -]/g, "").length;
-    const end = match.index + match[0].length;
-    if ((digits === 10 || digits === 15) && contextOfNumber(match.index, end) === "identifier") {
-      found.push({ start: match.index, end, kind: "ID" });
-    }
-  }
-  for (const match of text.matchAll(FIFTEEN_DIGITS)) {
-    const end = match.index + match[0].length;
-    const vatShaped = /^3[0-9]{13}3$/.test(toLatinDigits(match[0]));
-    if (vatShaped || contextOfNumber(match.index, end) === "identifier") {
-      found.push({ start: match.index, end, kind: "ID" });
-    }
-  }
-  return found;
-};
-
-/** Structured identifiers that follow a fixed format. Runs on the machine, with no network. */
 export const patternDetector: Detector = {
-  detect: (texts) =>
-    Promise.resolve(
-      texts.map((text) => {
-        const entities: Array<DetectedEntity> = [...findIbans(text), ...findIdentifiers(text)];
-        for (const { kind, source } of PATTERNS) {
-          for (const match of text.matchAll(new RegExp(source, "gu"))) {
-            entities.push({ start: match.index, end: match.index + match[0].length, kind });
-          }
-        }
-        return entities;
-      }),
-    ),
+  detect: (texts) => Promise.resolve(texts.map(findFixedFormats)),
 };
 
 export interface RemoteDetectorOptions {
@@ -286,11 +58,54 @@ export interface RemoteDetectorOptions {
   readonly token?: string | undefined;
   readonly fetch?: typeof fetch | undefined;
   readonly timeoutMs?: number | undefined;
+  /** Waits between tries. Tests pass one that does not wait. */
+  readonly sleep?: ((milliseconds: number) => Promise<void>) | undefined;
+  /** The person runs this service themselves: the advice says to check it, not the connection. */
+  readonly ownService?: boolean | undefined;
+  /** False for a connection test, which should say at once that the service is not there. */
+  readonly retry?: boolean | undefined;
 }
+
+/**
+ * How long to wait before each further try when the service could not be reached or answered
+ * that it is overloaded: six seconds in all, which covers a dropped connection, a laptop waking
+ * up and a service restarting. The request is refused after the last one; nothing is sent unmasked.
+ */
+const RETRY_WAITS_MS = [500, 1500, 4000];
+/** A try that ran into the time limit already cost half a minute: one more, not three. */
+const MAX_TRIES_AFTER_TIMEOUT = 2;
+/** Answers that say "not now": a wait can change them. Any other refusal stands. */
+const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+/**
+ * DoeDesk Cloud's codes for an allowance that is used up. It answers them with 429, but no wait
+ * of seconds changes them, so they are not tried again.
+ */
+export const ALLOWANCE_ENDED_CODES: ReadonlySet<string> = new Set([
+  "quota_exceeded",
+  "org_allowance_ended",
+]);
+
+/** One failed call: what happened, what the person can do, and whether trying again could help. */
+interface FailedAttempt {
+  readonly kind: DetectorProblem["kind"];
+  readonly status?: number;
+  readonly happened: string;
+  readonly advice: string;
+  readonly transient: boolean;
+  readonly timedOut?: boolean;
+  readonly cause?: unknown;
+}
+
+const wait = (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 
 /** Longest text sent in one piece. Longer texts are split at line or word boundaries. */
 const MAX_CHUNK_LENGTH = 4000;
 const MAX_CHUNKS_PER_REQUEST = 25;
+/** Calls open at once for one long text. More would only queue at the service. */
+const MAX_CALLS_AT_ONCE = 4;
 
 const splitIntoChunks = (
   text: string,
@@ -324,7 +139,11 @@ export const makeRemoteDetector = (options: RemoteDetectorOptions): Detector => 
   const fetchImpl = options.fetch ?? fetch;
   const url = `${options.endpoint.replace(/\/+$/, "")}/v1/detect`;
 
-  const detectChunks = async (chunks: ReadonlyArray<string>) => {
+  const sleep = options.sleep ?? wait;
+  const host = new URL(url).host;
+
+  const sendAgain = "then send your message again";
+  const attempt = async (chunks: ReadonlyArray<string>): Promise<Response | FailedAttempt> => {
     let response: Response;
     try {
       response = await fetchImpl(url, {
@@ -337,23 +156,140 @@ export const makeRemoteDetector = (options: RemoteDetectorOptions): Detector => 
         signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
       });
     } catch (cause) {
-      throw new DetectorUnavailableError(`The detection service could not be reached at ${url}.`, {
+      // The person's proxy turned the call away: its own words say what to do, and a wait will not.
+      if (cause instanceof ProxyError) {
+        return {
+          kind: "unreachable",
+          happened: `The detection service at ${host} could not be asked. ${cause.message.replace(/\.$/, "")}`,
+          advice: `Then send your message again.`,
+          transient: false,
+          cause,
+        };
+      }
+      if (cause instanceof Error && cause.name === "TimeoutError") {
+        return {
+          kind: "timeout",
+          happened: `The detection service at ${host} did not answer in time`,
+          advice: `Wait a minute, ${sendAgain}.`,
+          transient: true,
+          timedOut: true,
+          cause,
+        };
+      }
+      return {
+        kind: "unreachable",
+        happened: `The detection service at ${host} could not be reached`,
+        advice:
+          options.ownService === true
+            ? `Check that your detection service is running, ${sendAgain}.`
+            : `Check your internet connection, ${sendAgain}.`,
+        transient: true,
         cause,
-      });
+      };
     }
-    if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).slice(0, 300);
-      throw new DetectorUnavailableError(
-        `The detection service answered ${response.status}${detail ? `: ${detail}` : "."}`,
-      );
+    if (response.ok) return response;
+    const { status } = response;
+    if (status === 429) {
+      const error = (
+        (await response.json().catch(() => undefined)) as
+          | { readonly error?: Record<string, unknown> }
+          | undefined
+      )?.error;
+      if (typeof error?.code === "string" && ALLOWANCE_ENDED_CODES.has(error.code)) {
+        const said =
+          typeof error.message === "string" && error.message.trim() !== ""
+            ? error.message.trim().slice(0, 300).replace(/\.$/, "")
+            : undefined;
+        const organization = error.code === "org_allowance_ended";
+        return {
+          kind: "allowance",
+          status,
+          happened:
+            said ??
+            (organization
+              ? `Your organization's allowance at ${host} is used up`
+              : `This account's allowance at ${host} is used up`),
+          // The organization's own sentence already says who can add more.
+          advice:
+            organization && said !== undefined
+              ? ""
+              : organization
+                ? "Your DoeDesk administrator can add more."
+                : "Text can be checked again when the allowance renews next month.",
+          transient: false,
+        };
+      }
     }
-    const body = (await response.json()) as {
+    if (TRANSIENT_STATUSES.has(status)) {
+      return {
+        kind: status === 429 ? "busy" : "failing",
+        status,
+        happened:
+          status === 429
+            ? `The detection service at ${host} is receiving too many requests (it answered 429)`
+            : `The detection service at ${host} has a problem of its own (it answered ${status})`,
+        advice: `Wait a minute, ${sendAgain}.`,
+        transient: true,
+      };
+    }
+    if (status === 401) {
+      return {
+        kind: "signIn",
+        status,
+        happened: `The detection service at ${host} no longer accepts this sign-in`,
+        advice: "Open Settings, then Privacy, and sign in again.",
+        transient: false,
+      };
+    }
+    const detail = (await response.text().catch(() => "")).slice(0, 300);
+    return {
+      kind: "refused",
+      status,
+      happened: `The detection service at ${host} refused the request (it answered ${status}${detail ? `: ${detail}` : ""})`,
+      advice: "Check the service in Settings, under Privacy.",
+      transient: false,
+    };
+  };
+
+  /** Tries again after a failure that a short wait can cure, then gives up for good. */
+  const reach = async (chunks: ReadonlyArray<string>): Promise<Response> => {
+    for (let tries = 1; ; tries += 1) {
+      const result = await attempt(chunks);
+      if (result instanceof Response) return result;
+      const delay = RETRY_WAITS_MS[tries - 1];
+      const again =
+        options.retry !== false &&
+        result.transient &&
+        delay !== undefined &&
+        (result.timedOut !== true || tries < MAX_TRIES_AFTER_TIMEOUT);
+      if (!again) {
+        const counted = tries === 1 ? "" : ` after ${tries} tries`;
+        const advice = result.advice === "" ? "" : ` ${result.advice}`;
+        throw new DetectorUnavailableError(`${result.happened}${counted}.${advice}`, {
+          cause: result.cause,
+          problem: {
+            kind: result.kind,
+            host,
+            ...(result.status === undefined ? {} : { status: result.status }),
+          },
+        });
+      }
+      await sleep(delay);
+    }
+  };
+
+  const detectChunks = async (chunks: ReadonlyArray<string>) => {
+    const response = await reach(chunks);
+    const body = (await response.json().catch(() => ({}))) as {
       readonly results?: ReadonlyArray<{
         readonly entities?: ReadonlyArray<Record<string, unknown>>;
       }>;
     };
     if (!Array.isArray(body.results) || body.results.length !== chunks.length) {
-      throw new DetectorUnavailableError("The detection service returned an unexpected answer.");
+      throw new DetectorUnavailableError(
+        `The detection service at ${host} returned an answer DoeDesk could not read. If it is your own service, check that it follows the detection contract.`,
+        { problem: { kind: "unreadable", host } },
+      );
     }
     return body.results.map((result, index) => {
       const length = chunks[index]?.length ?? 0;
@@ -373,12 +309,28 @@ export const makeRemoteDetector = (options: RemoteDetectorOptions): Detector => 
       const pieces = texts.flatMap((text, textIndex) =>
         splitIntoChunks(text).map((chunk) => ({ ...chunk, textIndex })),
       );
-      const results: Array<Array<DetectedEntity>> = texts.map(() => []);
+      const batches: Array<typeof pieces> = [];
       for (let start = 0; start < pieces.length; start += MAX_CHUNKS_PER_REQUEST) {
-        const batch = pieces.slice(start, start + MAX_CHUNKS_PER_REQUEST);
-        const detected = await detectChunks(batch.map((piece) => piece.text));
+        batches.push(pieces.slice(start, start + MAX_CHUNKS_PER_REQUEST));
+      }
+      // Each worker takes the next batch until none is left. One failure rejects the whole text.
+      const detected: Array<Awaited<ReturnType<typeof detectChunks>>> = [];
+      let next = 0;
+      const worker = async () => {
+        while (next < batches.length) {
+          const index = next;
+          next += 1;
+          detected[index] = await detectChunks((batches[index] ?? []).map((piece) => piece.text));
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(MAX_CALLS_AT_ONCE, batches.length) }, () => worker()),
+      );
+      // Written out in the order of the text, whatever order the answers came in.
+      const results: Array<Array<DetectedEntity>> = texts.map(() => []);
+      batches.forEach((batch, batchIndex) => {
         batch.forEach((piece, index) => {
-          for (const entity of detected[index] ?? []) {
+          for (const entity of detected[batchIndex]?.[index] ?? []) {
             results[piece.textIndex]?.push({
               start: entity.start + piece.offset,
               end: entity.end + piece.offset,
@@ -386,7 +338,7 @@ export const makeRemoteDetector = (options: RemoteDetectorOptions): Detector => 
             });
           }
         });
-      }
+      });
       return results;
     },
   };
@@ -428,11 +380,14 @@ export const normalizeSpans = (
 };
 
 const BARE_NUMBER = /^[1-9١-٩][0-9٠-٩]*(?:[,.٫٬][0-9٠-٩]+)*$/u;
+/** Letters joined to the number, as in `POL-857713407`: a record's own number, never an amount. */
+const LETTERS_BEFORE = /[A-Za-z]-?$/u;
 
 /**
- * A number the text calls an amount or a reference is not personal data, whatever a detector took
- * it for (a phone, an ID, the tail of an account). Phone numbers (0 or + first) and VAT numbers
- * are left alone.
+ * A number the text calls an amount, or a reference too short to point to anyone (an ordinal, a
+ * year), is not personal data, whatever a detector took it for (a phone, an ID, the tail of an
+ * account). Phone numbers (0 or + first) and VAT numbers are left alone, and so is the number part
+ * of a lettered record number.
  */
 const dropReadableNumbers = (
   text: string,
@@ -442,7 +397,10 @@ const dropReadableNumbers = (
   return entities.filter((entity) => {
     const surface = text.slice(entity.start, entity.end);
     if (!BARE_NUMBER.test(surface) || /^3[0-9]{13}3$/.test(toLatinDigits(surface))) return true;
-    return contextOfNumber(entity.start, entity.end) !== "readable";
+    if (LETTERS_BEFORE.test(text.slice(Math.max(0, entity.start - 2), entity.start))) return true;
+    const context = contextOfNumber(entity.start, entity.end);
+    if (context === "reference") return isReferenceNumber(surface);
+    return context !== "readable";
   });
 };
 
@@ -460,6 +418,25 @@ export const combineDetectors = (detectors: ReadonlyArray<Detector>): Detector =
           ),
         ),
       ),
+    );
+  },
+});
+
+/**
+ * Adds what a second detector finds to what the first found. The second runs only while
+ * `second()` returns one, and it is not subject to the rule that drops numbers the text calls a
+ * reference: references are what it is for.
+ */
+export const withSecondPass = (first: Detector, second: () => Detector | undefined): Detector => ({
+  detect: async (texts) => {
+    const extra = second();
+    if (extra === undefined) return first.detect(texts);
+    const [found, more] = await Promise.all([
+      first.detect(texts),
+      ignoreAppAuthoredBlocks(extra).detect(texts),
+    ]);
+    return texts.map((text, index) =>
+      resolveOverlaps([...(found[index] ?? []), ...normalizeSpans(text, more[index] ?? [])]),
     );
   },
 });

@@ -8,7 +8,12 @@ import {
   usePrivacyStatus,
   useUsageDataState,
 } from "~/privacy/privacyClient";
-import { NOT_WORKED, UNREACHABLE, usePrivacyMessage } from "~/doedesk/privacyMessages";
+import {
+  NOT_WORKED,
+  UNREACHABLE,
+  usePrivacyMessage,
+  useServiceProblemMessage,
+} from "~/doedesk/privacyMessages";
 import { settleUsageDataFirstRun, usageDataChoiceDue } from "../privacy/UsageData";
 import { termsAcceptanceDue } from "../privacy/TermsAcceptanceSheet";
 import { useDeveloperMode } from "~/doedesk/product";
@@ -184,6 +189,7 @@ export function WelcomePage({
   const developerMode = useDeveloperMode();
   const gt = useGT();
   const privacyMessages = usePrivacyMessage();
+  const serviceProblemMessage = useServiceProblemMessage();
   const { environments } = useEnvironments();
   const environmentLabel = environments.find(
     (environment) => environment.environmentId === environmentId,
@@ -401,7 +407,11 @@ export function WelcomePage({
       }
       setPrivacyStatus(result.status);
       if (!result.ok) {
-        setMaskingError(result.message ?? privacyMessages(NOT_WORKED));
+        setMaskingError(
+          result.problem === undefined
+            ? (result.message ?? privacyMessages(NOT_WORKED))
+            : serviceProblemMessage(result.problem),
+        );
         setAdvancing(false);
         return;
       }

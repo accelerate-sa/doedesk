@@ -639,6 +639,14 @@
       "types": "./src/toolActivityCopy.ts",
       "import": "./src/toolActivityCopy.ts"
     },
+    "./dateTimeFormat": {
+      "types": "./src/dateTimeFormat.ts",
+      "import": "./src/dateTimeFormat.ts"
+    },
+    "./serverSentencesCopy": {
+      "types": "./src/serverSentencesCopy.ts",
+      "import": "./src/serverSentencesCopy.ts"
+    },
     "./promptLinksCopy": {
       "types": "./src/promptLinksCopy.ts",
       "import": "./src/promptLinksCopy.ts"
@@ -654,6 +662,10 @@
     "./threadFindBlockTags": {
       "types": "./src/threadFindBlockTags.ts",
       "import": "./src/threadFindBlockTags.ts"
+    },
+    "./privacyKnownValues": {
+      "types": "./src/privacyKnownValues.ts",
+      "import": "./src/privacyKnownValues.ts"
     },
     "./assistantInsights": {
       "types": "./src/assistantInsights.ts",

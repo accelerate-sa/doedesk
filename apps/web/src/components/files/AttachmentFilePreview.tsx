@@ -41,6 +41,7 @@ import { PreviewImage } from "./PreviewImage";
 import { AudioPreview } from "./AudioPreview";
 import { BrowserDocumentFrame } from "./BrowserDocumentFrame";
 import { DelimitedTablePreview } from "./DelimitedTablePreview";
+import { FileValueMarksNotice, FileValueMarksToggle } from "../privacy/FileValueMarks";
 import {
   FILE_SURFACE_SUBHEADER_CLASS,
   FileSurfaceAction,
@@ -485,6 +486,7 @@ export function AttachmentFilePreview(props: {
             {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
           </FileSurfaceAction>
         ) : null}
+        <FileValueMarksToggle />
         {url ? (
           <FileSurfaceAction
             label={saving ? gt("Preparing file…") : gt("Save file")}
@@ -508,6 +510,7 @@ export function AttachmentFilePreview(props: {
           </FileSurfaceAction>
         ) : null}
       </div>
+      <FileValueMarksNotice />
       {content?.truncated ? (
         <FileSurfaceNotice>
           {props.sizeBytes > 0

@@ -25,6 +25,32 @@ it("puts machine notices first, whatever order the notices arrive in", async () 
   expect(screen.container.textContent).toBe("OfflineBranch changed");
 });
 
+it.each([
+  ["en", "Sealed files: your AI can look up facts, not read them whole or use them in commands."],
+  [
+    "ar",
+    "ملفات مختومة: يمكن للذكاء الاصطناعي استخراج معلومات منها، دون قراءتها كاملة أو استخدامها في الأوامر.",
+  ],
+  // Too long for the line: cut, with the close button still beside it.
+  ["en", `Sealed files: ${"your AI can look up facts, not read them whole. ".repeat(4)}`.trim()],
+])(
+  "keeps a notice and its close button on one line at a message box's width (%s)",
+  async (lang, title) => {
+    await using screen = await render(
+      <div lang={lang} dir={lang === "ar" ? "rtl" : "ltr"} style={{ width: "700px" }}>
+        <ComposerBannerStack items={[{ ...notice(title), onDismiss: () => {} }]} />
+      </div>,
+    );
+
+    const close = screen.getByRole("button", { name: "Dismiss warning" }).element();
+    const text = screen.getByText(title).element();
+    const closeBox = close.getBoundingClientRect();
+    const textBox = text.getBoundingClientRect();
+    expect(closeBox.top).toBeLessThan(textBox.bottom);
+    expect(closeBox.bottom).toBeGreaterThan(textBox.top);
+  },
+);
+
 it("leaves the next attachment its own top edge when there are no notices", async () => {
   await using screen = await render(
     <ComposerBanner.Column>

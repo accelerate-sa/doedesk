@@ -162,52 +162,31 @@ const freshBootstrap = {
   serverCwd: "/projects/current",
   bootstrapProjectId: bootstrapProject.id,
   bootstrapThreadId: bootstrapThread.id,
-  bootstrapProjectCreated: true,
-  bootstrapThreadCreated: true,
   projects: [bootstrapProject],
   threads: [bootstrapThread],
 };
 
 describe("isFreshFirstRunWorkspace", () => {
-  it("accepts only the unused project and thread created from the server cwd", () => {
+  it("accepts only the unused project and thread started from the server cwd", () => {
     expect(
       isFreshFirstRunWorkspace({
         primaryEnvironmentId,
         serverCwd: "/projects/current/",
         bootstrapProjectId: bootstrapProject.id,
         bootstrapThreadId: bootstrapThread.id,
-        bootstrapProjectCreated: true,
-        bootstrapThreadCreated: true,
         projects: [bootstrapProject],
         threads: [bootstrapThread],
       }),
     ).toBe(true);
   });
 
-  it("rejects an existing unused cwd project and thread reused by startup", () => {
+  it("rejects a sole project the server did not name as its cwd bootstrap", () => {
     expect(
       isFreshFirstRunWorkspace({
         primaryEnvironmentId,
         serverCwd: "/projects/current",
-        bootstrapProjectId: bootstrapProject.id,
-        bootstrapThreadId: bootstrapThread.id,
-        bootstrapProjectCreated: false,
-        bootstrapThreadCreated: false,
         projects: [bootstrapProject],
-        threads: [bootstrapThread],
-      }),
-    ).toBe(false);
-  });
-
-  it("rejects a nonempty workspace when an older server omits creation provenance", () => {
-    expect(
-      isFreshFirstRunWorkspace({
-        primaryEnvironmentId,
-        serverCwd: "/projects/current",
-        bootstrapProjectId: bootstrapProject.id,
-        bootstrapThreadId: bootstrapThread.id,
-        projects: [bootstrapProject],
-        threads: [bootstrapThread],
+        threads: [],
       }),
     ).toBe(false);
   });
@@ -219,8 +198,6 @@ describe("isFreshFirstRunWorkspace", () => {
         serverCwd: "C:\\Projects\\Current\\",
         bootstrapProjectId: bootstrapProject.id,
         bootstrapThreadId: bootstrapThread.id,
-        bootstrapProjectCreated: true,
-        bootstrapThreadCreated: true,
         projects: [{ ...bootstrapProject, workspaceRoot: "c:/projects/current" }],
         threads: [bootstrapThread],
       }),

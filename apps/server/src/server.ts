@@ -238,8 +238,11 @@ import * as ProjectionStoreV2 from "./orchestration-v2/ProjectionStore.ts";
 import { makePersistedServerRuntimeState } from "./serverRuntimeState.ts";
 import { closeNonPrivateNetworkConnections, loopbackUrlHostForAddress } from "./startupAccess.ts";
 import * as OrchestrationHttp from "./orchestration-v2/http.ts";
+import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as PrivacyGateway from "./privacy/PrivacyGateway.ts";
+import * as PrivacyTurnRecorder from "./privacy/PrivacyTurnRecorder.ts";
 import * as PrivacyHttp from "./privacy/http.ts";
+import * as SealedHistory from "./privacy/sealedHistory.ts";
 import * as ProjectHttp from "./project/http.ts";
 import * as NetService from "@t3tools/shared/Net";
 import * as RelayClient from "@t3tools/shared/relayClient";
@@ -761,6 +764,14 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ReplayMarkers.layer,
   Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),
   PrivacyGateway.layerRoutingWatcher,
+  SealedHistory.layer.pipe(Layer.provide(layerCheckpointStore)),
+  Layer.effectDiscard(
+    PrivacyTurnRecorder.make.pipe(Effect.flatMap((service) => service.start())),
+  ).pipe(
+    Layer.provide(ProjectionStoreV2.layer),
+    Layer.provide(RuntimeLayer.layerEventSink),
+    Layer.provide(IdAllocator.layer),
+  ),
 ).pipe(
   Layer.provideMerge(layerOrchestrationApplication),
   Layer.provideMerge(layerTaskFolders),
@@ -887,7 +898,7 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(OrchestrationHttp.layer),
       Layer.provide(PullRequestHttp.layer),
       Layer.provide(ProjectHttp.layer),
-      Layer.provide(PrivacyHttp.layer),
+      Layer.provide(PrivacyHttp.layer.pipe(Layer.provide(layerCheckpointStore))),
       Layer.provide(speechHttpApiLayer),
       Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
       Layer.provide(WebhookRoute.layer.pipe(Layer.provide(RelayDeliveryProof.layer))),

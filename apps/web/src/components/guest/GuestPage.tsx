@@ -671,7 +671,9 @@ function GuestComposer({
               ) : (
                 <span className="flex min-w-0 items-center gap-2 ps-2 text-sm">
                   <PierreEntryIcon pathValue={staged.file.name} kind="file" theme={resolvedTheme} />
-                  <span className="max-w-40 truncate">{staged.file.name}</span>
+                  <span dir="auto" className="file-name max-w-40 truncate">
+                    {staged.file.name}
+                  </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {formatAttachmentSize(staged.file.size, m)}
                   </span>

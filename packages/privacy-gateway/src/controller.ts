@@ -1,8 +1,15 @@
+import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
-import { type Detector, DetectorUnavailableError, makeRemoteDetector } from "./detect.ts";
-import type { GatewayRecord } from "./gateway.ts";
+import {
+  type Detector,
+  type DetectorProblem,
+  DetectorUnavailableError,
+  makeRemoteDetector,
+} from "./detect.ts";
+import type { EgressPolicy, GatewayOptions, GatewayRecord } from "./gateway.ts";
+import { fetchThrough, readHostNetwork } from "./upstream.ts";
 import {
   MASKED_SESSION_SWITCHES,
   type PrivacyGateway,
@@ -13,6 +20,52 @@ import type { ImageHandling } from "./attachments.ts";
 import { cacheReader, makeRemoteReader, type Reader, type ReaderUsage } from "./reader.ts";
 import { type ImageRedactor, makeImageRedactor } from "./redaction/redactImage.ts";
 import { type RedactionFile, type RedactionRecord, RedactionStore } from "./redaction/store.ts";
+import { ProxyRefusal } from "./refusals.ts";
+import { kindOfStandIn, TurnLedger, type TurnTally } from "./turns.ts";
+import {
+  probeWorker,
+  type StructuredOutput,
+  type WorkerDriver,
+  type WorkerEndpoint,
+} from "./worker/client.ts";
+import type { FieldSpec } from "./worker/fields.ts";
+import { DEFAULT_SEAL_POLICY, type SealPolicy } from "./worker/seal.ts";
+import { makeSecondPassDetector } from "./worker/secondPass.ts";
+import {
+  type ReadForSealing,
+  sealFile,
+  type SealFileResult,
+  unsealFile,
+  type UnsealFileResult,
+} from "./sealedFiles.ts";
+import {
+  comparablePath,
+  makeSealedFolders,
+  type SealChange,
+  type SealedFolderGate,
+  type SealedFolderHold,
+  type SealedFolders,
+  type SealFolderResult,
+  type SealTargetsInspection,
+  type UnsealFolderResult,
+} from "./sealedFolders.ts";
+import type { FileLabel, FileLabels } from "./fileLabels.ts";
+import { type FolderCopies, findFolderCopies } from "./folderCopies.ts";
+import { recordNumbersIn } from "./knownParts.ts";
+import { maskedLabels, neutralLabel } from "./sealedLabels.ts";
+import { type AskAnswer, makeSealedWorker, type SealedWorker } from "./worker/sealedWorker.ts";
+import { WITHHELD_SEALED_NOTE } from "./worker/tripwire.ts";
+import {
+  localText,
+  readLocally,
+  type SealedDocumentInfo,
+  type SealedFolderInfo,
+  type RecordedClearAnswer,
+  type SealedOutputInfo,
+  SealedStore,
+  type SealedTurnActivity,
+} from "./worker/store.ts";
+import { sealedTurn, takeSealedTurn } from "./worker/turnActivity.ts";
 
 /**
  * Images go redacted: the image with a labelled box over each detected value (owner's decision,
@@ -42,8 +95,84 @@ export type ProfileField = (typeof PROFILE_FIELDS)[number];
 export const PROFILE_WORKPLACES = ["self", "small_company", "large_company", "government"] as const;
 export type ProfileWorkplace = (typeof PROFILE_WORKPLACES)[number];
 
+/**
+ * The model that reads sealed documents. `cloud`: the one DoeDesk Cloud hosts, at the upstream for
+ * the account's region. `custom`: the person's own server, which is any address that speaks Chat
+ * Completions or Responses. `off`: none.
+ */
+export type WorkerKind = "off" | "cloud" | "custom";
+
+/** Where DoeDesk Cloud runs the hosted worker for an account. Only DoeDesk Cloud maps it to a host. */
+export const ACCOUNT_REGIONS = ["sa", "eu", "global"] as const;
+export type AccountRegion = (typeof ACCOUNT_REGIONS)[number];
+
+/** DoeDesk Cloud's worker for the account's region, as it last described it. */
+interface HostedWorker {
+  /** False: the region has no worker now. DoeDesk Cloud sends its requests to no other region. */
+  readonly available: boolean;
+  readonly model: string | null;
+  readonly structured: StructuredOutput | null;
+  /** Calls the region takes at once, for everyone, and the longest one waits there for its turn. */
+  readonly parallel: number | null;
+  readonly maxWaitSeconds: number | null;
+  /** Who runs the region's model and where, in DoeDesk Cloud's words. */
+  readonly hostLabel?: string;
+  readonly locationLabel?: string;
+}
+
+/** The name sent as the model to DoeDesk Cloud, which replaces it with the region's own. */
+const HOSTED_WORKER_MODEL = "doedesk-worker";
+/** Told to the person who asks for DoeDesk Cloud's worker on an account that does not have it. */
+const HOSTED_WORKER_NOT_INCLUDED =
+  "DoeDesk Cloud's worker is not included in this account. Connect your own server to read sealed files.";
+
+interface StoredWorker {
+  readonly kind: "custom";
+  readonly baseUrl: string;
+  readonly apiKey?: string;
+  readonly model: string;
+  readonly driver?: WorkerDriver;
+  readonly reasoningEffort?: string;
+  /** How this server takes a request for JSON, as found when it was connected. */
+  readonly structured?: StructuredOutput;
+}
+
+/** A sealed document may be this long: about the context a 128K-token worker can hold. */
+const MAX_SEALED_CHARACTERS = 320_000;
+const MAX_SEALED_BYTES = 20 * 1024 * 1024;
+
+const READER_MEDIA_TYPES: Readonly<Record<string, string>> = {
+  ".pdf": "application/pdf",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+};
+
 interface StoredConfig {
   readonly mode: PrivacyMode;
+  /** The person's own server that reads sealed documents. Unset: they have connected none. */
+  readonly worker?: StoredWorker;
+  /**
+   * Who the person chose to read sealed documents. Unset, they have not chosen: their own server
+   * when one is stored, DoeDesk Cloud's worker when an account is signed in, nobody otherwise.
+   */
+  readonly workerChoice?: WorkerKind;
+  /** The signed-in account's region, as DoeDesk Cloud last said. */
+  readonly accountRegion?: AccountRegion;
+  /** DoeDesk Cloud last said its hosted worker is included for this account. Unset: it is not. */
+  readonly hostedWorkerEntitled?: boolean;
+  readonly hostedWorker?: HostedWorker;
+  /** Which hosts other than model hosts agents may reach. Unset: all of them. */
+  readonly egress?: { readonly policy: EgressPolicy; readonly hosts: ReadonlyArray<string> };
+  /** Limits on what may be revealed about sealed documents. Unset: the defaults. */
+  readonly sealing?: Partial<SealPolicy>;
+  /** True: the worker also checks every text for references and names the first check missed. */
+  readonly secondPass?: boolean;
+  /** True: public web pages and search results are checked for new values too. Unset: not. */
+  readonly checkWebResults?: boolean;
   readonly endpoint?: string;
   readonly token?: string;
   /** The email, or the phone number with its middle hidden, of the signed-in account. */
@@ -113,8 +242,99 @@ export interface PrivacyAccountDeleted {
 /** Raised when the notice's meaning changes, so that it is shown again. */
 export const PROVIDER_NOTICE_VERSION = 1;
 
+/** The worker as the settings screen shows it. The key is never part of it. */
+export interface PrivacyWorkerStatus {
+  readonly kind: WorkerKind;
+  /** The address documents are sent to. Null when no worker is connected. */
+  readonly address: string | null;
+  readonly model: string | null;
+  readonly driver: WorkerDriver | null;
+  readonly reasoningEffort: string | null;
+  /** A worker is connected and has not stopped answering. */
+  readonly available: boolean;
+  /** Where the worker's server said it handled the last call, when it says so. */
+  readonly servedFrom: string | null;
+  /** `cloud` only: the account region whose worker is used. Null until DoeDesk Cloud has said. */
+  readonly region: AccountRegion | null;
+  /** The worker's server last said it was busy, with this many calls waiting. Not a failure. */
+  readonly busy: { readonly waiting: number } | null;
+  /** DoeDesk Cloud's worker was the one in use, and the signed-in account does not have it. */
+  readonly notIncluded: boolean;
+}
+
+export type PrivacyWorkerInput =
+  | { readonly kind: "off" }
+  | { readonly kind: "cloud" }
+  | {
+      readonly kind: "custom";
+      readonly baseUrl: string;
+      readonly apiKey?: string | undefined;
+      readonly model: string;
+      readonly driver: WorkerDriver;
+      readonly reasoningEffort?: string | undefined;
+    };
+
+/** What the person chose a provider is told a file is called. Masked names unless neutral. */
+export interface SealLabelChoice {
+  /** Send the handle and the file type alone. */
+  readonly neutralLabel?: boolean;
+}
+
+export interface SealedForAgents {
+  readonly files: ReadonlyArray<{
+    readonly handle: string;
+    /** The masked name, or the handle and type. */
+    readonly name: string;
+    /** Where the file was, masked. Unset for a file sent by handle and type that was in no sealed folder. */
+    readonly path?: string;
+    /** No text to ask about yet. */
+    readonly unread: boolean;
+  }>;
+  /** Sealed folders whose paths were checked, masked. */
+  readonly folders: ReadonlyArray<string>;
+}
+
+export interface PrivacySealedListing {
+  /** `label` is always set here: what a provider is told the file is called. */
+  readonly documents: ReadonlyArray<SealedDocumentInfo>;
+  readonly outputs: ReadonlyArray<SealedOutputInfo>;
+  /** Subfolders whose files are sealed as they arrive. */
+  readonly folders: ReadonlyArray<SealedFolderInfo>;
+  /** Answers given in clear about the most-asked document, and how many each may give. */
+  readonly clear: { readonly mostOnOneDocument: number; readonly perDocument: number };
+}
+
+export interface PrivacyAskInput {
+  readonly project: string;
+  readonly caller: string;
+  readonly handles: ReadonlyArray<string>;
+  readonly files?: ReadonlyArray<{ readonly name: string; readonly text: string }> | undefined;
+  readonly instruction: string;
+  readonly fields: ReadonlyArray<FieldSpec>;
+  readonly program?: string | undefined;
+}
+
 export interface PrivacyControllerStatus {
   readonly mode: PrivacyMode;
+  readonly worker: PrivacyWorkerStatus;
+  /** The rule the person chose for hosts that are not AI hosts. Sealing does not change it. */
+  readonly egress: {
+    readonly policy: EgressPolicy;
+    readonly hosts: ReadonlyArray<string>;
+    /** Hosts the rule refused since the app started and that are still refused, newest first. */
+    readonly refused: ReadonlyArray<{ readonly host: string; readonly at: string }>;
+  };
+  /** Sealed documents held on this device, over all projects. */
+  readonly sealedDocuments: number;
+  /** Turns that have not started because a file is still arriving in a sealed folder. */
+  readonly sealingBeforeTurn: ReadonlyArray<SealedFolderHold>;
+  /** Whether the worker also checks every text for references and names. */
+  readonly secondPass: boolean;
+  /**
+   * Whether public web pages and search results are checked for new personal data. False: only
+   * values already known are replaced in them (see `webResults.ts`).
+   */
+  readonly webResultsChecked: boolean;
   readonly active: boolean;
   readonly accountLabel: string | null;
   readonly endpoint: string | null;
@@ -134,11 +354,39 @@ export interface PrivacyControllerStatus {
   /** The vendor switches DoeDesk sets for a masked session, exactly as set. */
   readonly sessionSwitches: Readonly<Record<string, string>>;
   readonly accountId: string | null;
+  /** The signed-in account's region. Null when signed out, or DoeDesk Cloud has not yet said. */
+  readonly accountRegion: AccountRegion | null;
+  /** DoeDesk Cloud's hosted worker is included for the signed-in account. */
+  readonly hostedWorkerEntitled: boolean;
+  /** False: the account has it, and DoeDesk Cloud offers none in the account's region yet. */
+  readonly hostedWorkerOffered: boolean;
+  /** Who runs the worker for the account's region and where, as DoeDesk Cloud names them. */
+  readonly hostedWorker: { readonly host: string; readonly location: string } | null;
   /** Null when no account is signed in, or DoeDesk Cloud has not yet said where it stands. */
   readonly acceptance: PrivacyAcceptanceStatus | null;
   /** Null until DoeDesk Cloud has been asked. */
   readonly legal: PrivacyLegal | null;
   readonly profile: PrivacyProfileAnswers | null;
+}
+
+export interface PrivacyTurnValue {
+  readonly token: string;
+  readonly kind: string;
+  /** The real value. Null when the vault no longer holds the stand-in. */
+  readonly value: string | null;
+  /** The value comes from a sealed document. */
+  readonly sealed: boolean;
+}
+
+/** Stand-ins with every spelling of their values, and the turns that wrote them. */
+export interface PrivacyKnownValues {
+  readonly values: ReadonlyArray<{
+    readonly token: string;
+    readonly surfaces: ReadonlyArray<string>;
+    /** A spelling held both ways is found under the stand-in that is not sealed. */
+    readonly sealed: boolean;
+  }>;
+  readonly turns: ReadonlyArray<{ readonly runId: string; readonly tokens: ReadonlyArray<string> }>;
 }
 
 /** A choice that is separate from which detection service is used. */
@@ -147,7 +395,16 @@ export type PrivacyPreferenceInput =
   | { readonly kind: "noticeRead"; readonly provider: string }
   | { readonly kind: "usageReports"; readonly send: boolean }
   | { readonly kind: "imageHandling"; readonly handling: ImageHandling }
-  | { readonly kind: "readingTool"; readonly offered: boolean };
+  | { readonly kind: "readingTool"; readonly offered: boolean }
+  | {
+      readonly kind: "egress";
+      readonly policy: EgressPolicy;
+      readonly hosts: ReadonlyArray<string>;
+    }
+  | { readonly kind: "secondPass"; readonly on: boolean }
+  /** Lets one refused host through: until the app closes, or for good by adding it to the list. */
+  | { readonly kind: "allowHost"; readonly host: string; readonly lasting: boolean }
+  | { readonly kind: "webResults"; readonly check: boolean };
 
 /** What the masked-text reading tool answers. */
 export type PrivacyReadMaskedResult =
@@ -159,6 +416,13 @@ export type PrivacyConfigureInput =
   | { readonly mode: "selfHosted"; readonly endpoint: string; readonly token?: string }
   | { readonly mode: "off" }
   | { readonly mode: "unconfigured" };
+
+/** `problem` says why one's own detection service could not be connected, for the app to word. */
+export interface PrivacyConfigureOutcome {
+  readonly ok: boolean;
+  readonly message: string | null;
+  readonly problem?: DetectorProblem | { readonly kind: "address" };
+}
 
 /** Why a sign-in is started. Deleting the account needs a sign-in made minutes before. */
 export type PrivacySignInPurpose = "signIn" | "deleteAccount";
@@ -205,7 +469,8 @@ export type PrivacyAccountInput =
   | { readonly action: "accept"; readonly acceptance: PrivacyAcceptanceInput }
   | { readonly action: "refresh" }
   | { readonly action: "export" }
-  | { readonly action: "delete" };
+  | { readonly action: "delete" }
+  | { readonly action: "setRegion"; readonly region: AccountRegion };
 
 export interface PrivacyAccountResult {
   readonly ok: boolean;
@@ -224,9 +489,7 @@ export interface PrivacyProfileInput {
 
 export interface PrivacyController {
   readonly status: () => PrivacyControllerStatus;
-  readonly configure: (
-    input: PrivacyConfigureInput,
-  ) => Promise<{ readonly ok: boolean; readonly message: string | null }>;
+  readonly configure: (input: PrivacyConfigureInput) => Promise<PrivacyConfigureOutcome>;
   readonly signIn: (input: PrivacySignInInput) => Promise<PrivacySignInResult>;
   readonly account: (input: PrivacyAccountInput) => Promise<PrivacyAccountResult>;
   readonly saveProfile: (input: PrivacyProfileInput) => Promise<void>;
@@ -255,7 +518,196 @@ export interface PrivacyController {
     readonly token: string;
     readonly kind: string;
     readonly value: string;
+    /** False for a value of a sealed document, which is never sent as written. */
+    readonly removable: boolean;
   }>;
+  /** The values the person stopped masking, each with the stand-in it had. */
+  readonly unmaskedValues: () => ReadonlyArray<{
+    readonly token: string;
+    readonly kind: string;
+    readonly value: string;
+  }>;
+  /**
+   * Stops masking a value, or masks it again (see `Vault.release`). False when no such entry
+   * exists or it belongs to a sealed document.
+   */
+  readonly setValueMasked: (token: string, masked: boolean) => boolean;
+  /**
+   * What the gateway did for the chats that go by these names since it was last asked, or
+   * undefined when it did nothing. The stand-ins are kept under `id` for `turnValues`.
+   */
+  readonly takeTurn: (id: string, sessions: ReadonlyArray<string>) => TurnTally | undefined;
+  /**
+   * Why no request is getting out right now: what the computer's proxy last refused, when
+   * nothing has been sent since. For a failure whose own words do not say it.
+   */
+  readonly refusingNow: () => string | undefined;
+  /** A kept turn's stand-ins beside their real values. Undefined when the turn is not kept. */
+  readonly turnValues: (id: string) => ReadonlyArray<PrivacyTurnValue> | undefined;
+  /**
+   * What the thread's agent asked of sealed documents since its last turn, kept under `id` for
+   * `sealedTurn`. Undefined when it asked nothing.
+   */
+  readonly takeSealedTurn: (id: string, thread: string) => SealedTurnActivity | undefined;
+  /** A kept turn's sealed files and clear answers. Undefined when it asked nothing or is gone. */
+  readonly sealedTurn: (id: string) => SealedTurnActivity | undefined;
+  /**
+   * What a client needs to mark replaced values where the person reads them: the stand-ins of
+   * these kept turns, or with no turns named every value `Vault.findKnown` looks for. Nothing
+   * while masking is off.
+   */
+  readonly knownValues: (runIds?: ReadonlyArray<string>) => PrivacyKnownValues;
+  /** Connects, changes or removes the worker. Connecting asks it one question that holds nothing confidential. */
+  readonly configureWorker: (
+    input: PrivacyWorkerInput,
+  ) => Promise<{ readonly ok: boolean; readonly message: string | null }>;
+  /** Whether agents are offered the tools that ask about sealed documents. */
+  readonly workerOffered: () => boolean;
+  /** Evaluation only: the worker answers in free text, with no checks. */
+  readonly workerFreeText: () => boolean;
+  /**
+   * A file's text, unmasked, for the worker. Text and Word files are read here; a PDF or an image
+   * goes to the reading service.
+   */
+  readonly documentText: (name: string, bytes: Buffer) => ReturnType<ReadForSealing>;
+  /**
+   * Seals a file: keeps its text where agents cannot read it. With `origin`, the path the caller
+   * is about to remove the file from, the file itself is kept too, so it can be put back.
+   */
+  readonly sealDocument: (
+    project: string,
+    name: string,
+    bytes: Buffer,
+    origin?: string,
+    label?: SealLabelChoice,
+  ) => Promise<SealFileResult>;
+  /**
+   * What `root`, a project's folder, holds of a file that came as a copy with no path: the file
+   * itself when exactly one has the same bytes and name, and otherwise the files that would stay
+   * readable were the copy alone sealed.
+   */
+  readonly attachedFileInFolder: (
+    root: string,
+    name: string,
+    sha256: string,
+    size: number,
+  ) => Promise<FolderCopies>;
+  /**
+   * Seals a file that came as a copy. Where the folder holds the file itself, that file is sealed
+   * where it lies (`original`); otherwise the copy is, and `readable` names what stays in the
+   * folder for an agent to open. Without `root` the copy is sealed and nothing is looked for.
+   */
+  readonly sealAttached: (
+    project: string,
+    root: string | null,
+    name: string,
+    bytes: Buffer,
+    label?: SealLabelChoice,
+  ) => Promise<
+    (Extract<SealFileResult, { ok: true }> & FolderCopies) | Extract<SealFileResult, { ok: false }>
+  >;
+  /**
+   * Seals the file at a path on this machine and moves it out of its folder, whether or not its
+   * text can be read: one that cannot is kept all the same, and cannot be asked about yet.
+   */
+  readonly sealFile: (
+    project: string,
+    filePath: string,
+    label?: SealLabelChoice,
+  ) => Promise<SealFileResult>;
+  /**
+   * Reads a sealed file that has no text yet, from the copy that was kept. Resolves `ok` once it
+   * can be asked about.
+   */
+  readonly readSealed: (
+    project: string,
+    handle: string,
+  ) => Promise<{ readonly ok: boolean; readonly message: string | null }>;
+  /** Seals each file where it lies. One that fails leaves the others sealed. */
+  readonly sealFiles: (
+    project: string,
+    filePaths: ReadonlyArray<string>,
+    label?: SealLabelChoice,
+  ) => Promise<{
+    readonly sealed: number;
+    /** Of `sealed`: kept with no text yet, so nothing can be asked about them. */
+    readonly unread: number;
+    readonly failed: ReadonlyArray<{ readonly name: string; readonly message: string }>;
+  }>;
+  /** Puts a sealed file back where it was and forgets its sealed copy. */
+  readonly unsealFile: (project: string, handle: string) => Promise<UnsealFileResult>;
+  /**
+   * Whether a turn has started in the project since one of these files, or a file of this folder,
+   * was unsealed back into it. The copies kept for undo cannot say: a file that was sealed once is
+   * never copied again.
+   */
+  readonly openedToTurns: (
+    project: string,
+    target: { readonly folder: string } | { readonly files: ReadonlyArray<string> },
+  ) => boolean;
+  /** Before sealing a folder or several files: how many, and what the person has to be told. */
+  readonly inspectSealTargets: (
+    target: { readonly folder: string } | { readonly files: ReadonlyArray<string> },
+  ) => Promise<SealTargetsInspection>;
+  /**
+   * Seals a subfolder of `root`, the project's folder: every file in it, and every file that
+   * appears in it later.
+   */
+  readonly sealFolder: (
+    project: string,
+    root: string,
+    folder: string,
+    options?: { readonly neutralLabels?: boolean },
+  ) => Promise<SealFolderResult>;
+  /**
+   * What a provider would be told each of these file names is: the name with the values found in
+   * it replaced by stand-ins. Null for a name that cannot be checked now, which is then sent as
+   * its handle and type. Shown to the person before they confirm sealing.
+   */
+  readonly sealLabels: (names: ReadonlyArray<string>) => Promise<ReadonlyArray<string | null>>;
+  /**
+   * The person's choice for a sealed file: its handle and type alone, or its name with the values
+   * in it masked. False when no such file is sealed.
+   */
+  readonly setSealedLabel: (project: string, handle: string, neutral: boolean) => Promise<boolean>;
+  /**
+   * A project's sealed files and folders as an agent, and so a provider, is told them: never a
+   * file's own name. Paths are written from `cwd`, the agent's working folder, where they lie
+   * below it.
+   */
+  readonly sealedForAgents: (project: string, cwd: string | null) => SealedForAgents;
+  /** Stops sealing a folder and puts its files back as they were. */
+  readonly unsealFolder: (project: string, folder: string) => Promise<UnsealFolderResult>;
+  /**
+   * Run before an agent's turn starts: seals what has appeared in the project's sealed folders,
+   * waiting a bounded time for a file still being written. The turn starts only on `ok`.
+   */
+  readonly sealedFoldersBeforeTurn: (
+    project: string,
+    signal?: AbortSignal,
+  ) => Promise<SealedFolderGate>;
+  /** Sweeps a project's sealed folders soon: after an agent's tool call that can write. */
+  readonly sweepSealedFoldersSoon: (project: string) => void;
+  /** The sealed folder that holds this path: an agent must not write there. */
+  readonly sealedFolderContaining: (path: string) => string | undefined;
+  /** Every sealed folder, of any project: nothing in one is to be copied for undo. */
+  readonly sealedFolderPaths: () => ReadonlyArray<string>;
+  readonly sealedListing: (project: string) => PrivacySealedListing;
+  readonly resetSealedLimits: (project: string) => void;
+  /** Every answer the remote model was given in clear about a project's sealed documents. */
+  readonly sealedClearAnswers: (project: string) => ReadonlyArray<RecordedClearAnswer>;
+  /** A finished file that holds sealed values, for the person. Never returned to an agent. */
+  readonly sealedOutput: (project: string, name: string) => string | undefined;
+  /** What the `ask_documents` tool answers. */
+  readonly askDocuments: (input: PrivacyAskInput) => Promise<AskAnswer>;
+  /** Evaluation only. See `workerFreeText`. */
+  readonly askDocumentsFreeText: (input: PrivacyAskInput) => Promise<AskAnswer>;
+  /** What the `fill_sealed` tool does: nothing of the finished file is returned. */
+  readonly fillSealed: (
+    project: string,
+    name: string,
+    template: string,
+  ) => ReturnType<SealedWorker["fill"]>;
   readonly close: () => Promise<void>;
 }
 
@@ -276,6 +728,17 @@ export interface PrivacyEvaluationOptions {
    * detection service, each file read, and the vault when the gateway closes.
    */
   readonly eventsPath?: string | undefined;
+  /**
+   * Receives everything sent to the worker and everything it wrote back, one JSON object per
+   * line. Sealed documents are in it, unmasked.
+   */
+  readonly workerPath?: string | undefined;
+  /** Receives every connection to a host that is not a model host, and whether it passed. */
+  readonly otherHostsPath?: string | undefined;
+  /** The worker's answers are not checked against the document, and not asked for again. */
+  readonly workerUnchecked?: boolean | undefined;
+  /** Agents get a tool that returns the worker's own words about each document, unchecked. */
+  readonly workerFreeText?: boolean | undefined;
 }
 
 const ATTACHMENTS_ONLY_WARNING =
@@ -293,15 +756,37 @@ export interface PrivacyControllerOptions {
   readonly cloudUrl?: string;
   /**
    * Called when the answer of `environmentFor` changed for some provider. Agent processes keep
-   * the environment they were started with, so the caller restarts them.
+   * the environment they were started with, so the caller restarts those of the providers for
+   * which `changed` is true, and leaves the turns of the others running.
    */
-  readonly onRoutingChange?: (() => void) | undefined;
+  readonly onRoutingChange?:
+    | ((changed: (provider: string | undefined) => boolean) => void)
+    | undefined;
   readonly fetch?: typeof fetch;
+  /** Waits between tries of the detection service. Tests pass one that does not wait. */
+  readonly sleep?: ((milliseconds: number) => Promise<void>) | undefined;
   /** The host's `process.platform`, for naming this computer to the person signing in. */
   readonly platform?: string;
   /** This app's version, recorded with an acceptance of the Terms. */
   readonly appVersion?: string | undefined;
+  /** The folders agents work in. See `PrivacyGatewayConfig.workspaceRoots`. */
+  readonly workspaceRoots?: (() => ReadonlyArray<string>) | undefined;
+  /** The person's own proxy and certificates. See `PrivacyGatewayConfig.hostEnvironment`. */
+  readonly hostEnvironment?: NodeJS.ProcessEnv | undefined;
+  /** Where an AI company's host is reached. Tests point this at a local server. */
+  readonly upstream?: GatewayOptions["upstream"];
   readonly evaluation?: PrivacyEvaluationOptions | undefined;
+  /**
+   * Told, once for each action, which files left a folder by being sealed or came back by being
+   * unsealed, however that happened: one file, several, a folder, or a sweep of a sealed folder.
+   * Awaited, so the host can remove the copies it keeps of a sealed file before anything goes on.
+   */
+  readonly onSealChange?: ((change: SealChange) => Promise<void>) | undefined;
+  /**
+   * Told whenever what a project's sealed listing shows has changed, however it happened: a file
+   * sealed or put back, a folder's sweep, an answer given, a finished file written, limits reset.
+   */
+  readonly onSealedListingChange?: (() => void) | undefined;
 }
 
 export const DEFAULT_DOEDESK_CLOUD_URL = "https://api.doedesk.com";
@@ -372,6 +857,71 @@ const readDeleted = (body: Record<string, unknown>): PrivacyAccountDeleted | nul
 /** What DoeDesk Cloud accepts as a label: letters, digits and `. _ + -`, at most 64. */
 const isLabel = (value: string): boolean => /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(value);
 
+const readRegion = (value: unknown): AccountRegion | null =>
+  ACCOUNT_REGIONS.find((region) => region === value) ?? null;
+
+/** The `worker` object DoeDesk Cloud sends with an account. Null when it is missing or malformed. */
+const readHostedWorker = (value: unknown): HostedWorker | null => {
+  const worker = asRecord(value);
+  if (worker === undefined || typeof worker.available !== "boolean") return null;
+  const structured = (["jsonSchema", "jsonObject", "none"] as const).find(
+    (candidate) => candidate === worker.structured,
+  );
+  const whole = (candidate: unknown): number | null =>
+    typeof candidate === "number" && Number.isFinite(candidate) && candidate >= 1
+      ? Math.floor(candidate)
+      : null;
+  return {
+    available: worker.available,
+    model: asText(worker.model),
+    structured: structured ?? null,
+    parallel: whole(worker.parallel),
+    maxWaitSeconds: whole(worker.maxWaitSeconds),
+    ...(typeof worker.hostLabel === "string" ? { hostLabel: worker.hostLabel } : {}),
+    ...(typeof worker.locationLabel === "string" ? { locationLabel: worker.locationLabel } : {}),
+  };
+};
+
+/** DoeDesk Cloud's worker can be used: an account is signed in and DoeDesk Cloud includes it. */
+const hostedIncluded = (config: StoredConfig): boolean =>
+  config.mode === "cloud" && config.token !== undefined && config.hostedWorkerEntitled === true;
+
+/**
+ * Who reads sealed documents now. DoeDesk Cloud's worker needs a signed-in account that has it;
+ * for any other it is never the default, and a stored choice of it reads as none, not as the
+ * person's own server: sealed files go nowhere the person did not choose.
+ */
+const workerKindOf = (config: StoredConfig): WorkerKind => {
+  const choice =
+    config.workerChoice ??
+    (config.worker !== undefined ? "custom" : hostedIncluded(config) ? "cloud" : "off");
+  if (choice === "custom") return config.worker === undefined ? "off" : "custom";
+  if (choice === "cloud") return hostedIncluded(config) ? "cloud" : "off";
+  return "off";
+};
+
+/** Which worker answers now, as the record of clear answers names it. Null: none. */
+const workerRouteOf = (config: StoredConfig): string | null => {
+  const kind = workerKindOf(config);
+  if (kind === "cloud") return config.accountRegion ?? "cloud";
+  if (kind !== "custom" || config.worker === undefined) return null;
+  try {
+    return `custom:${new URL(config.worker.baseUrl).host}`;
+  } catch {
+    return "custom";
+  }
+};
+
+/**
+ * The person's own server as stored. Test builds could store a vendor preset, which has the
+ * person's own key: it reads as their own server. Anything without an address reads as none.
+ */
+const readWorker = (value: unknown): StoredWorker | undefined => {
+  const worker = asRecord(value);
+  if (typeof worker?.baseUrl !== "string" || typeof worker.model !== "string") return undefined;
+  return { ...(worker as unknown as StoredWorker), kind: "custom" };
+};
+
 const readConfig = (filePath: string): StoredConfig => {
   try {
     const parsed = JSON.parse(NodeFS.readFileSync(filePath, "utf8")) as Partial<StoredConfig>;
@@ -381,7 +931,9 @@ const readConfig = (filePath: string): StoredConfig => {
       parsed.mode === "off" ||
       parsed.mode === "unconfigured"
     ) {
-      return parsed as StoredConfig;
+      const { worker: stored, ...rest } = parsed as StoredConfig;
+      const worker = readWorker(stored);
+      return worker === undefined ? rest : { ...rest, worker };
     }
   } catch {
     // Missing or unreadable: start unconfigured, which sends nothing.
@@ -396,7 +948,9 @@ const readConfig = (filePath: string): StoredConfig => {
 export const startPrivacyController = async (
   options: PrivacyControllerOptions,
 ): Promise<PrivacyController> => {
-  const fetchImpl = options.fetch ?? fetch;
+  // Detection, reading, the worker and DoeDesk Cloud: through the person's proxy, as the gateway.
+  const fetchImpl =
+    options.fetch ?? fetchThrough(readHostNetwork(options.hostEnvironment ?? process.env));
   const configPath = NodePath.join(options.dataDirectory, "config.json");
   const cloudUrl = (
     options.cloudUrl ??
@@ -405,6 +959,9 @@ export const startPrivacyController = async (
   let config = readConfig(configPath);
   let problem: string | null = null;
   const activity: Array<GatewayRecord> = [];
+  // Stand-ins and counts of recent turns, never a value. See turns.ts.
+  const turns = new TurnLedger(NodePath.join(options.dataDirectory, "turns.json"));
+  const proxyRefusal = new ProxyRefusal();
   const evaluation = options.evaluation ?? {};
   const logEvent = (event: { readonly type: string } & Record<string, unknown>) => {
     if (evaluation.eventsPath === undefined) return;
@@ -442,15 +999,23 @@ export const startPrivacyController = async (
     return response;
   };
 
-  const detectorFor = (current: StoredConfig): Detector => {
+  const detectorFor = (current: StoredConfig, retry = true): Detector => {
     if (current.mode === "cloud" && current.token !== undefined) {
-      return makeRemoteDetector({ endpoint: cloudUrl, token: current.token, fetch: cloudFetch });
+      return makeRemoteDetector({
+        endpoint: cloudUrl,
+        token: current.token,
+        fetch: cloudFetch,
+        sleep: options.sleep,
+      });
     }
     if (current.mode === "selfHosted" && current.endpoint !== undefined) {
       return makeRemoteDetector({
         endpoint: current.endpoint,
         token: current.token,
         fetch: fetchImpl,
+        sleep: options.sleep,
+        ownService: true,
+        retry,
       });
     }
     return { detect: () => Promise.reject(new DetectorUnavailableError(NOT_SET_UP)) };
@@ -480,11 +1045,78 @@ export const startPrivacyController = async (
   // Redacted images and masked texts of recent attachments, for the user to download. A store
   // on disk that this feature adds: see redaction/store.ts for what it holds and for how long.
   const redactionStore = new RedactionStore(NodePath.join(options.dataDirectory, "redactions"));
+  let fileLabels: FileLabels | undefined;
+  const sealedStore = new SealedStore(NodePath.join(options.dataDirectory, "sealed"), () => {
+    fileLabels?.changed();
+    options.onSealedListingChange?.();
+  });
+  /** Every sealed file and folder with what a provider is told for it: see `FileLabels`. */
+  const sealedFileLabels = (): ReadonlyArray<FileLabel> => [
+    ...sealedStore.allDocuments().flatMap((document): ReadonlyArray<FileLabel> => {
+      // Not checked yet, or the person's choice: the handle and the type stand for the name.
+      if (document.neutralLabel === true || document.label === undefined) {
+        const label = neutralLabel(document.handle, document.name);
+        return [{ name: document.name, label, neutral: true }];
+      }
+      return [
+        { name: document.name, label: document.label },
+        ...(document.origin === undefined || document.originLabel === undefined
+          ? []
+          : [{ name: document.origin, label: document.originLabel }]),
+      ];
+    }),
+    ...sealedStore
+      .allFolders()
+      .flatMap((folder) =>
+        folder.pathLabel === undefined ? [] : [{ name: folder.path, label: folder.pathLabel }],
+      ),
+  ];
+  const sealedCount = () => sealedStore.tripwire.size;
+  // A sealed value is never restored in a tool call, so sealing leaves this rule as chosen.
+  const egressPolicy = (): EgressPolicy => config.egress?.policy ?? "open";
+  const hostsUntilClose = new Set<string>();
+  const refusedHosts = new Map<string, string>();
+  const MAX_REFUSED_HOSTS = 20;
   let redactor: ImageRedactor | undefined;
   let gateway: PrivacyGateway | undefined;
+  // Built once the worker's settings can be read, further down.
+  let secondPass: Detector | undefined;
   try {
     gateway = await startPrivacyGateway({
       dataDirectory: options.dataDirectory,
+      workspaceRoots: options.workspaceRoots,
+      hostEnvironment: options.hostEnvironment,
+      upstream: options.upstream,
+      webResults: () => (config.checkWebResults === true ? "detect" : "known"),
+      secondPass: () => (config.secondPass === true ? secondPass : undefined),
+      egress: () => ({
+        policy: egressPolicy(),
+        hosts: config.egress?.hosts ?? [],
+        untilClose: [...hostsUntilClose],
+      }),
+      // Evaluation only: with the worker answering in free prose, its answers are let through
+      // whole, so that what is measured is the prose and not this check on it.
+      withholdSealedText: (text, typed) =>
+        evaluation.workerFreeText === true
+          ? undefined
+          : typed
+            ? sealedStore.tripwire.withoutPassages(text)
+            : sealedStore.tripwire.flags(text)
+              ? WITHHELD_SEALED_NOTE
+              : undefined,
+      onOtherHost: (host, port, outcome) => {
+        const at = new Date().toISOString();
+        if (outcome === "blocked") {
+          refusedHosts.delete(host);
+          refusedHosts.set(host, at);
+          for (const oldest of [...refusedHosts.keys()].slice(0, -MAX_REFUSED_HOSTS)) {
+            refusedHosts.delete(oldest);
+          }
+        }
+        if (evaluation.otherHostsPath !== undefined) {
+          appendLine(evaluation.otherHostsPath, { at, host, port, outcome });
+        }
+      },
       attachments: () => ({
         images: config.imageHandling ?? DEFAULT_IMAGE_HANDLING,
         // A reader that cannot say where words are leaves `redacted` to be carried out as text.
@@ -531,12 +1163,18 @@ export const startPrivacyController = async (
             onSentBody: (host: string, path: string, body: string) =>
               appendLine(sentBodiesPath, { at: new Date().toISOString(), host, path, body }),
           }),
+      onRestored: ({ sessions, tokens }) => turns.restored(sessions, tokens),
       onRecord: (record) => {
+        proxyRefusal.note(record, Date.now());
         activity.push(record);
         if (activity.length > MAX_ACTIVITY) activity.splice(0, activity.length - MAX_ACTIVITY);
-        logEvent({ type: "request", ...record });
+        turns.add(record);
+        const { replaced: _replaced, sessions: _sessions, ...logged } = record;
+        logEvent({ type: "request", ...logged });
       },
     });
+    fileLabels = gateway.vault.fileLabels;
+    fileLabels.from(sealedFileLabels);
     redactor = makeImageRedactor({
       pseudonymizer: gateway.pseudonymizer,
       // Looked up on every call: signing in or out changes the reader.
@@ -588,15 +1226,17 @@ export const startPrivacyController = async (
     ...MASKED_SESSION_SWITCHES,
     ...(current.usageReports === false ? USAGE_REPORTS_OFF_SWITCHES : {}),
   });
-  const environmentFor = (
+  const environmentOf = (
+    current: StoredConfig,
     provider: string | undefined,
   ): Readonly<Record<string, string>> | undefined => {
-    if (config.mode === "off") return undefined;
-    if (provider !== undefined && config.directProviders?.includes(provider) === true) {
+    if (current.mode === "off") return undefined;
+    if (provider !== undefined && current.directProviders?.includes(provider) === true) {
       return undefined;
     }
-    return { ...gatewayEnvironment, ...sessionSwitches(config) };
+    return { ...gatewayEnvironment, ...sessionSwitches(current) };
   };
+  const environmentFor = (provider: string | undefined) => environmentOf(config, provider);
   /** Everything `environmentFor` depends on, to tell when agents need a restart. */
   const routingKey = (current: StoredConfig): string =>
     JSON.stringify([
@@ -617,16 +1257,34 @@ export const startPrivacyController = async (
     ...(config.usageReports === undefined ? {} : { usageReports: config.usageReports }),
     ...(config.imageHandling === undefined ? {} : { imageHandling: config.imageHandling }),
     ...(config.readingTool === undefined ? {} : { readingTool: config.readingTool }),
+    ...(config.worker === undefined ? {} : { worker: config.worker }),
+    ...(config.workerChoice === undefined ? {} : { workerChoice: config.workerChoice }),
+    ...(config.egress === undefined ? {} : { egress: config.egress }),
+    ...(config.sealing === undefined ? {} : { sealing: config.sealing }),
+    ...(config.secondPass === undefined ? {} : { secondPass: config.secondPass }),
+    ...(config.checkWebResults === undefined ? {} : { checkWebResults: config.checkWebResults }),
   });
 
+  // Set once the worker exists, further down.
+  let onWorkerRouteChange: () => void = () => undefined;
   const apply = (next: StoredConfig) => {
+    const before = config;
     const routingBefore = routingKey(config);
+    const workerRouteBefore = workerRouteOf(config);
     config = next;
     detector = detectorFor(next);
     reader = readerFor(next);
     NodeFS.mkdirSync(options.dataDirectory, { recursive: true, mode: 0o700 });
     NodeFS.writeFileSync(configPath, JSON.stringify(next), { mode: 0o600 });
-    if (routingKey(next) !== routingBefore) options.onRoutingChange?.();
+    if (routingKey(next) !== routingBefore) {
+      options.onRoutingChange?.(
+        (provider) =>
+          JSON.stringify(environmentOf(before, provider)) !==
+          JSON.stringify(environmentOf(next, provider)),
+      );
+    }
+    // Another worker answers from now on: what the last one answered and how it failed do not carry over.
+    if (workerRouteOf(next) !== workerRouteBefore) onWorkerRouteChange();
   };
 
   const DEVICE_NAMES: Readonly<Record<string, string>> = {
@@ -767,6 +1425,21 @@ export const startPrivacyController = async (
       id: asText(account.id),
       label: asText(account.email) ?? asText(account.phone),
       profileAnswered: account.profileAnswered === true,
+      region: readRegion(account.region),
+    };
+  };
+  /**
+   * The account's region, whether the hosted worker is included and the worker there, as an
+   * answer of DoeDesk Cloud's states them. An answer that does not say it is included (an older
+   * DoeDesk Cloud, or one without the worker) means it is not.
+   */
+  const hostedOf = (region: AccountRegion | null, worker: unknown): Partial<StoredConfig> => {
+    const entitled = asRecord(worker)?.entitled === true;
+    const hostedWorker = entitled ? readHostedWorker(worker) : null;
+    return {
+      ...(region === null ? {} : { accountRegion: region }),
+      hostedWorkerEntitled: entitled,
+      ...(hostedWorker === null ? {} : { hostedWorker }),
     };
   };
 
@@ -781,6 +1454,7 @@ export const startPrivacyController = async (
       token: body.token,
       ...(account.label === null ? {} : { accountLabel: account.label }),
       ...(account.id === null ? {} : { accountId: account.id }),
+      ...hostedOf(account.region, body.worker),
       ...(acceptance === null ? {} : { acceptance }),
       ...(legal === null ? {} : { legal }),
       profileAnswered: account.profileAnswered || config.profileAnswered === true,
@@ -957,11 +1631,12 @@ export const startPrivacyController = async (
     const legal = readLegal(answer.body.legal);
     const field = asText(answer.body.field);
     const workplace = asText(answer.body.workplace);
-    const { profile: _profile, ...rest } = config;
+    const { profile: _profile, hostedWorker: _hostedWorker, ...rest } = config;
     apply({
       ...rest,
       ...(label === undefined ? {} : { accountLabel: label }),
       ...(account.id === null ? {} : { accountId: account.id }),
+      ...hostedOf(account.region, answer.body.worker),
       ...(acceptance === null ? {} : { acceptance }),
       ...(legal === null ? {} : { legal }),
       ...(field === null && workplace === null ? {} : { profile: { field, workplace } }),
@@ -1034,12 +1709,25 @@ export const startPrivacyController = async (
         if (config.token === token) forgetAccount();
         return { ...accountDone, deleted: answer.deleted };
       }
+      case "setRegion": {
+        const answer = await cloud("/v1/me/region", { region: input.region }, token);
+        if (!answer.ok) return refusal(answer);
+        // Sealed files stay as they are. `apply` forgets what the last region's worker answered.
+        if (config.token === token) {
+          const { hostedWorker: _hostedWorker, ...rest } = config;
+          apply({
+            ...rest,
+            ...hostedOf(readRegion(answer.body.region) ?? input.region, answer.body.worker),
+          });
+        }
+        return accountDone;
+      }
     }
   };
 
   const connectSelfHosted = async (
     input: Extract<PrivacyConfigureInput, { mode: "selfHosted" }>,
-  ) => {
+  ): Promise<PrivacyConfigureOutcome> => {
     let endpoint: URL;
     try {
       endpoint = new URL(input.endpoint.trim());
@@ -1047,6 +1735,7 @@ export const startPrivacyController = async (
       return {
         ok: false,
         message: "Enter the service address as a full URL, such as http://localhost:8080.",
+        problem: { kind: "address" },
       };
     }
     const next: StoredConfig = {
@@ -1056,11 +1745,14 @@ export const startPrivacyController = async (
       ...keptAnswers(),
     };
     try {
-      await detectorFor(next).detect(["Connection test."]);
+      await detectorFor(next, false).detect(["Connection test."]);
     } catch (cause) {
       return {
         ok: false,
         message: cause instanceof Error ? cause.message : "The detection service did not answer.",
+        ...(cause instanceof DetectorUnavailableError && cause.problem !== undefined
+          ? { problem: cause.problem }
+          : {}),
       };
     }
     await signOut();
@@ -1070,9 +1762,578 @@ export const startPrivacyController = async (
 
   const signedIn = () => config.mode === "cloud";
 
+  const endpointOf = (worker: StoredWorker): WorkerEndpoint => ({
+    baseUrl: worker.baseUrl,
+    apiKey: worker.apiKey,
+    model: worker.model,
+    driver: worker.driver ?? "chatCompletions",
+    structured: worker.structured ?? "jsonSchema",
+    ...(worker.reasoningEffort === undefined ? {} : { reasoningEffort: worker.reasoningEffort }),
+  });
+  /** The worker to call now: DoeDesk Cloud's, the person's own server, or none. */
+  const workerEndpoint = (): WorkerEndpoint | undefined => {
+    const kind = workerKindOf(config);
+    if (kind === "custom")
+      return config.worker === undefined ? undefined : endpointOf(config.worker);
+    if (kind !== "cloud") return undefined;
+    // DoeDesk Cloud sends it on to the upstream for the account's region, which it alone knows.
+    return {
+      baseUrl: `${cloudUrl}/v1/worker`,
+      apiKey: config.token,
+      model: HOSTED_WORKER_MODEL,
+      driver: "chatCompletions",
+      structured: config.hostedWorker?.structured ?? "jsonSchema",
+      // DoeDesk Cloud queues calls for everyone in the region and says how many it takes at once.
+      ...(typeof config.hostedWorker?.parallel === "number"
+        ? {
+            queue: {
+              parallel: config.hostedWorker.parallel,
+              maxWaitMs: (config.hostedWorker.maxWaitSeconds ?? 0) * 1000,
+            },
+          }
+        : {}),
+    };
+  };
+  secondPass = makeSecondPassDetector({
+    endpoint: () => workerEndpoint(),
+    cachePath: NodePath.join(options.dataDirectory, "second-pass-cache.json"),
+    fetch: fetchImpl,
+    onCall: (call) => logEvent({ type: "second_pass", ...call }),
+  });
+  const sealPolicy = (): SealPolicy => ({ ...DEFAULT_SEAL_POLICY, ...config.sealing });
+  let servedFrom: string | null = null;
+  /**
+   * DoeDesk Cloud described the account's region as one with no worker: not available, and no
+   * model named. A region whose worker is only not answering still names its model.
+   */
+  const regionHasNoWorker = (): boolean =>
+    hostedIncluded(config) &&
+    config.hostedWorker?.available === false &&
+    config.hostedWorker.model === null;
+  const hostedNotInRegion = (): boolean => workerKindOf(config) === "cloud" && regionHasNoWorker();
+  let regionAskedAt = 0;
+  const sealedWorker = makeSealedWorker({
+    store: sealedStore,
+    vault: () => (config.mode === "off" ? undefined : gateway?.vault),
+    endpoint: () => workerEndpoint(),
+    route: () => workerRouteOf(config),
+    // DoeDesk Cloud can change a region's model without the region changing.
+    model: () => (workerKindOf(config) === "cloud" ? (config.hostedWorker?.model ?? null) : null),
+    policy: sealPolicy,
+    fetch: fetchImpl,
+    readLater: (project, handle) => readSealed(project, handle).then(() => undefined),
+    // Nothing is sent for a region with no worker. DoeDesk Cloud may have begun to offer one since
+    // the account was last read, so it is read again first, once a minute at most.
+    notInRegion: async () => {
+      if (!hostedNotInRegion()) return false;
+      if (Date.now() - regionAskedAt > 60_000) {
+        regionAskedAt = Date.now();
+        await refreshAccount();
+      }
+      return hostedNotInRegion();
+    },
+    // DoeDesk Cloud said so before the account was read again: from now on nothing is sent to it.
+    onNotIncluded: () => {
+      if (workerKindOf(config) !== "cloud") return;
+      const { hostedWorker: _hostedWorker, ...rest } = config;
+      apply({ ...rest, hostedWorkerEntitled: false });
+    },
+    onCall: (record) => {
+      servedFrom = record.jobs.find((job) => job.servedFrom !== null)?.servedFrom ?? servedFrom;
+      logEvent({ type: "worker", ...record });
+    },
+    ...(evaluation.workerPath === undefined
+      ? {}
+      : {
+          onExchange: (exchange) =>
+            appendLine(evaluation.workerPath ?? "", { at: new Date().toISOString(), ...exchange }),
+        }),
+    ...(evaluation.workerUnchecked === true ? { checks: { evidence: false } } : {}),
+  });
+  onWorkerRouteChange = () => {
+    sealedWorker.reset();
+    servedFrom = null;
+  };
+
+  const configureWorker = async (
+    input: PrivacyWorkerInput,
+  ): Promise<{ readonly ok: boolean; readonly message: string | null }> => {
+    if (input.kind === "off" || input.kind === "cloud") {
+      if (input.kind === "cloud" && !signedIn()) {
+        return { ok: false, message: "Sign in to DoeDesk Cloud first to use its worker." };
+      }
+      if (input.kind === "cloud" && !hostedIncluded(config)) {
+        return { ok: false, message: HOSTED_WORKER_NOT_INCLUDED };
+      }
+      const { worker: _worker, ...rest } = config;
+      apply({ ...rest, workerChoice: input.kind });
+      return { ok: true, message: null };
+    }
+    let address: URL;
+    try {
+      address = new URL(input.baseUrl.trim());
+    } catch {
+      return {
+        ok: false,
+        message: "Enter the worker address as a full URL, such as http://localhost:11434/v1.",
+      };
+    }
+    if (input.model.trim().length === 0) return { ok: false, message: "Enter the model's name." };
+    const next: StoredWorker = {
+      kind: "custom",
+      baseUrl: address.toString().replace(/\/+$/, ""),
+      ...(input.apiKey?.trim() ? { apiKey: input.apiKey.trim() } : {}),
+      model: input.model.trim(),
+      driver: input.driver,
+      ...(input.reasoningEffort?.trim() ? { reasoningEffort: input.reasoningEffort.trim() } : {}),
+    };
+    const { structured: _structured, ...unprobed } = endpointOf(next);
+    const probe = await probeWorker(unprobed, fetchImpl);
+    if (!probe.ok) return { ok: false, message: probe.message };
+    // The server refused the reasoning setting typed and took another: that one is kept.
+    const { reasoningEffort: _refused, ...withoutEffort } = next;
+    const taken =
+      probe.reasoningEffort === undefined
+        ? next
+        : probe.reasoningEffort === null
+          ? withoutEffort
+          : { ...withoutEffort, reasoningEffort: probe.reasoningEffort };
+    apply({
+      ...config,
+      workerChoice: "custom",
+      worker: { ...taken, structured: probe.structured },
+    });
+    return { ok: true, message: null };
+  };
+
+  /**
+   * DoeDesk Cloud's worker was the one in use and the account does not have it: the person chose
+   * it, or sealed files while it was the default and connected no server since.
+   */
+  const hostedNotIncluded = (): boolean =>
+    signedIn() &&
+    !hostedIncluded(config) &&
+    (config.workerChoice === "cloud" ||
+      (config.workerChoice === undefined && config.worker === undefined && sealedCount() > 0));
+
+  const workerStatus = (): PrivacyWorkerStatus => {
+    const endpoint = workerEndpoint();
+    const hosted = workerKindOf(config) === "cloud";
+    return {
+      kind: workerKindOf(config),
+      address: endpoint?.baseUrl ?? null,
+      // The hosted worker's model is DoeDesk Cloud's to choose, and to name.
+      model: hosted ? (config.hostedWorker?.model ?? null) : (endpoint?.model ?? null),
+      driver: endpoint?.driver ?? null,
+      reasoningEffort: endpoint?.reasoningEffort ?? null,
+      available: sealedWorker.available() && !(hosted && config.hostedWorker?.available === false),
+      servedFrom,
+      region: hosted ? (config.accountRegion ?? null) : null,
+      busy: sealedWorker.busy(),
+      notIncluded: hostedNotIncluded(),
+    };
+  };
+
+  const documentText: PrivacyController["documentText"] = async (name, bytes) => {
+    if (bytes.length === 0 || bytes.length > MAX_SEALED_BYTES) {
+      return {
+        ok: false,
+        kind: bytes.length === 0 ? "noText" : "tooLarge",
+        message: "The file is empty or larger than 20 MB.",
+      };
+    }
+    let text = localText(bytes, name);
+    const mediaType = READER_MEDIA_TYPES[NodePath.extname(name).toLowerCase()];
+    if (text === undefined && mediaType !== undefined) {
+      // A PDF or an image has to be read first, and only the reading service can do that.
+      if (reader === undefined) {
+        return {
+          ok: false,
+          kind: "service",
+          message:
+            "A PDF or an image has to be read first, and no reading service is connected. Use a text or Word file, or connect a reading service.",
+        };
+      }
+      try {
+        text = await reader.read(bytes, mediaType);
+      } catch (cause) {
+        return {
+          ok: false,
+          kind: "service",
+          message: `The file could not be read (${cause instanceof Error ? cause.message : "unknown reason"}).`,
+        };
+      }
+    }
+    if (text === undefined) {
+      return {
+        ok: false,
+        kind: "unsupported",
+        message:
+          "This kind of file cannot be read by the worker yet. Text, Markdown, CSV, JSON, HTML, Word, PDF and images can.",
+      };
+    }
+    if (text.trim().length === 0) {
+      return { ok: false, kind: "noText", message: "No text was found in the file." };
+    }
+    if (text.length > MAX_SEALED_CHARACTERS) {
+      return {
+        ok: false,
+        kind: "tooLarge",
+        message: "The file is too long for the worker to read in one piece. Split it into parts.",
+      };
+    }
+    return { ok: true, text, mediaType: mediaType ?? "text/plain" };
+  };
+
+  /** Names as a provider may be told them, or undefined when they cannot be checked now. */
+  const checkedLabels = async (
+    names: ReadonlyArray<string>,
+    /** For each name, the record numbers its file's own text holds. */
+    ownRecords: ReadonlyArray<ReadonlyArray<string>> = [],
+  ): Promise<ReadonlyArray<string> | undefined> => {
+    if (names.length === 0) return [];
+    const pseudonymizer = gateway?.pseudonymizer;
+    if (pseudonymizer === undefined) return undefined;
+    try {
+      return await maskedLabels(pseudonymizer, names, ownRecords);
+    } catch {
+      return undefined;
+    }
+  };
+  /**
+   * Checks the names of a project's sealed files that have no label yet, and with `folders` the
+   * paths of its sealed folders. Until a name is checked, its handle and type are sent.
+   */
+  const labelPending = async (project: string, folders: boolean): Promise<void> => {
+    const documents = sealedStore
+      .list(project)
+      .filter((document) => document.neutralLabel !== true && document.label === undefined);
+    const unchecked = folders
+      ? sealedFolders.list(project).filter((folder) => folder.pathLabel === undefined)
+      : [];
+    if (documents.length === 0 && unchecked.length === 0) return;
+    const records = documents.map((document) =>
+      recordNumbersIn(sealedStore.read(project, document.handle) ?? ""),
+    );
+    const labels = await checkedLabels(
+      [
+        ...documents.map((document) => document.name),
+        ...documents.map((document) => document.origin ?? document.name),
+        ...unchecked.map((folder) => folder.path),
+      ],
+      [...records, ...records],
+    );
+    if (labels === undefined) return;
+    sealedStore.setLabels(
+      project,
+      documents.map((document, index) => ({
+        handle: document.handle,
+        label: labels[index] ?? neutralLabel(document.handle, document.name),
+        ...(document.origin === undefined
+          ? {}
+          : { originLabel: labels[documents.length + index] ?? "" }),
+      })),
+    );
+    for (const [index, folder] of unchecked.entries()) {
+      const pathLabel = labels[2 * documents.length + index];
+      if (pathLabel !== undefined) {
+        await sealedFolders.setPathLabel(project, folder.path, pathLabel);
+      }
+    }
+  };
+  /** After a file was sealed: records the person's choice, or checks its name. */
+  const labelled = async (
+    project: string,
+    result: SealFileResult,
+    neutral: boolean,
+  ): Promise<SealFileResult> => {
+    if (!result.ok) return result;
+    if (neutral) sealedStore.setNeutralLabel(project, result.document.handle, true);
+    // Folders are left to the next turn's check: this runs inside a sweep, which saves them.
+    else await labelPending(project, false);
+    return result;
+  };
+  const sealDocument: PrivacyController["sealDocument"] = async (
+    project,
+    name,
+    bytes,
+    origin,
+    label,
+  ) => {
+    const read = await documentText(name, bytes);
+    // A copy with nothing to ask about protects nothing: the file it was made from is elsewhere.
+    if (!read.ok) return { ok: false, message: read.message };
+    const original = origin === undefined ? undefined : { bytes, path: origin };
+    return labelled(
+      project,
+      { ok: true, document: sealedStore.add(project, name, read.text, read.mediaType, original) },
+      label?.neutralLabel === true,
+    );
+  };
+  const sealFileAt = (project: string, filePath: string, replaceSamePath = false) =>
+    sealFile(sealedStore, documentText, project, filePath, {
+      maxReadBytes: MAX_SEALED_BYTES,
+      replaceSamePath,
+    });
+  const readSealed: PrivacyController["readSealed"] = async (project, handle) => {
+    const info = sealedStore.list(project).find((document) => document.handle === handle);
+    if (info === undefined) return { ok: false, message: "No sealed document has that handle." };
+    if (info.unread === undefined) return { ok: true, message: null };
+    // A file kept for being too large was never held in memory, and is not read into it now.
+    const kept = sealedStore.originalWithin(project, handle, MAX_SEALED_BYTES);
+    if (kept === undefined) return { ok: false, message: info.unread.message };
+    const read = await documentText(info.name, kept);
+    if (!read.ok) {
+      sealedStore.setUnread(project, handle, { kind: read.kind, message: read.message });
+      return { ok: false, message: read.message };
+    }
+    sealedStore.setText(project, handle, read.text, read.mediaType);
+    return { ok: true, message: null };
+  };
+  const readFirst = (name: string) =>
+    !readLocally(name) && READER_MEDIA_TYPES[NodePath.extname(name).toLowerCase()] !== undefined;
+  /** Puts a sealed file back, and remembers that an agent can open it again from now on. */
+  const putBack = async (project: string, handle: string): Promise<UnsealFileResult> => {
+    const result = await unsealFile(sealedStore, project, handle);
+    if (result.ok && result.path !== null) sealedStore.notePutBack(project, [result.path]);
+    return result;
+  };
+  const comparable = comparablePath(options.platform);
+  const sealedFolders: SealedFolders = makeSealedFolders({
+    store: sealedStore,
+    // A document saved again into a sealed folder is one sealed file, on the handle it had. Its
+    // label follows the choice made for the folder.
+    sealFile: (project, filePath) =>
+      sealFileAt(project, filePath, true).then((result) =>
+        labelled(
+          project,
+          result,
+          sealedFolders
+            .list(project)
+            .some(
+              (folder) =>
+                folder.neutralLabels === true && folder.path === sealedFolders.containing(filePath),
+            ),
+        ),
+      ),
+    unsealFile: (project, handle) => putBack(project, handle),
+    canRead: (name) => readLocally(name) || (reader !== undefined && readFirst(name)),
+    readFirst,
+    platform: options.platform,
+    onSealChange: options.onSealChange,
+  });
+  const sealChanged = (change: SealChange): Promise<void> =>
+    change.paths.length === 0
+      ? Promise.resolve()
+      : (options.onSealChange?.(change).catch(() => undefined) ?? Promise.resolve());
+
+  const sealFileInPlace: PrivacyController["sealFile"] = async (project, filePath, label) => {
+    const result = await labelled(
+      project,
+      await sealFileAt(project, filePath),
+      label?.neutralLabel === true,
+    );
+    if (result.ok) await sealChanged({ kind: "sealed", paths: [filePath] });
+    return result;
+  };
+  /** A file's name is the same on this computer when its path would be. */
+  const sameFileName = (left: string, right: string): boolean =>
+    comparable(NodePath.join(NodePath.sep, left)) ===
+    comparable(NodePath.join(NodePath.sep, right));
+
   return {
+    documentText,
+    configureWorker,
+    // Where DoeDesk Cloud's worker is included it is there without a choice, so its tools wait for
+    // something to be sealed or for the person to choose it. A worker the person connected is
+    // offered at once.
+    workerOffered: () =>
+      gateway !== undefined &&
+      config.mode !== "off" &&
+      sealedWorker.connected() &&
+      (config.workerChoice !== undefined || config.worker !== undefined || sealedCount() > 0),
+    workerFreeText: () => evaluation.workerFreeText === true,
+    sealDocument,
+    sealedListing: (project) => {
+      const ledger = sealedStore.ledger(project);
+      return {
+        documents: sealedStore
+          .list(project)
+          .map((document) =>
+            document.neutralLabel !== true && document.label !== undefined
+              ? document
+              : { ...document, label: neutralLabel(document.handle, document.name) },
+          ),
+        outputs: sealedStore.outputs(project),
+        folders: sealedFolders.list(project),
+        clear: {
+          mostOnOneDocument: Math.max(0, ...Object.values(ledger.clearAnswers)),
+          perDocument: sealPolicy().clearAnswersPerDocument,
+        },
+      };
+    },
+    sealFile: sealFileInPlace,
+    attachedFileInFolder: (root, name, sha256, size) =>
+      findFolderCopies(root, { name, sha256, size }, sameFileName),
+    sealAttached: async (project, root, name, bytes, label) => {
+      const copies =
+        root === null
+          ? { readable: [], complete: true }
+          : await findFolderCopies(
+              root,
+              {
+                name,
+                sha256: NodeCrypto.createHash("sha256").update(bytes).digest("hex"),
+                size: bytes.length,
+              },
+              sameFileName,
+            );
+      if (copies.original !== undefined) {
+        const result = await sealFileInPlace(project, copies.original, label);
+        return result.ok
+          ? { ...result, original: copies.original, readable: [], complete: true }
+          : result;
+      }
+      const result = await sealDocument(project, name, bytes, undefined, label);
+      return result.ok
+        ? { ...result, readable: copies.readable, complete: copies.complete }
+        : result;
+    },
+    sealLabels: async (names) => (await checkedLabels(names)) ?? names.map(() => null),
+    setSealedLabel: async (project, handle, neutral) => {
+      if (!sealedStore.setNeutralLabel(project, handle, neutral)) return false;
+      if (!neutral) await labelPending(project, false);
+      return true;
+    },
+    sealedForAgents: (project, cwd) => {
+      const slashes = (value: string) => value.replaceAll("\\", "/");
+      const root = cwd === null ? null : `${slashes(cwd).replace(/\/+$/, "")}/`;
+      // As many of the label's last parts as the real path has below the working folder.
+      const fromCwd = (real: string, label: string): string => {
+        const path = slashes(real);
+        if (root === null || !path.startsWith(root)) return slashes(label);
+        const depth = path.slice(root.length).split("/").length;
+        return slashes(label).split("/").slice(-depth).join("/");
+      };
+      const folders = sealedFolders
+        .list(project)
+        .flatMap((folder) =>
+          folder.pathLabel === undefined
+            ? []
+            : [{ path: folder.path, told: fromCwd(folder.path, folder.pathLabel) }],
+        );
+      return {
+        folders: folders.map((folder) => folder.told),
+        files: sealedStore.list(project).map((document) => {
+          const unread = document.unread !== undefined;
+          if (document.neutralLabel !== true && document.label !== undefined) {
+            return {
+              handle: document.handle,
+              name: document.label,
+              ...(document.origin === undefined || document.originLabel === undefined
+                ? {}
+                : { path: fromCwd(document.origin, document.originLabel) }),
+              unread,
+            };
+          }
+          const name = neutralLabel(document.handle, document.name);
+          // Its sealed folder is told anyway; where in it the file lay is not.
+          const around =
+            document.origin === undefined ? undefined : sealedFolders.containing(document.origin);
+          const within = folders.find((folder) => folder.path === around);
+          return {
+            handle: document.handle,
+            name,
+            ...(within === undefined ? {} : { path: `${within.told}/${name}` }),
+            unread,
+          };
+        }),
+      };
+    },
+    readSealed,
+    sealFiles: async (project, filePaths, label) => {
+      const sealed: Array<string> = [];
+      let unread = 0;
+      const failed: Array<{ name: string; message: string }> = [];
+      for (const filePath of filePaths) {
+        const result = await labelled(
+          project,
+          await sealFileAt(project, filePath),
+          label?.neutralLabel === true,
+        );
+        if (!result.ok) {
+          failed.push({ name: NodePath.basename(filePath), message: result.message });
+          continue;
+        }
+        sealed.push(filePath);
+        if (result.document.unread !== undefined) unread += 1;
+      }
+      await sealChanged({ kind: "sealed", paths: sealed });
+      return { sealed: sealed.length, unread, failed };
+    },
+    unsealFile: async (project, handle) => {
+      const origin = sealedStore.list(project).find((info) => info.handle === handle)?.origin;
+      const folder = origin === undefined ? undefined : sealedFolders.containing(origin);
+      // Put back alone, the file would be sealed again by the folder's next sweep.
+      if (folder !== undefined) {
+        return {
+          ok: false,
+          message: `This file is in ${NodePath.basename(folder)}, a sealed folder. Unseal the folder to put its files back.`,
+        };
+      }
+      const result = await putBack(project, handle);
+      if (result.ok && result.path !== null) {
+        await sealChanged({ kind: "unsealed", paths: [result.path] });
+      }
+      return result;
+    },
+    openedToTurns: (project, target) => {
+      const opened = sealedStore.openedToTurns(project).map(comparable);
+      if ("files" in target) {
+        const files = new Set(target.files.map(comparable));
+        return opened.some((path) => files.has(path));
+      }
+      const folder = `${comparable(target.folder)}${NodePath.sep}`;
+      return opened.some((path) => path.startsWith(folder));
+    },
+    inspectSealTargets: (target) =>
+      "folder" in target
+        ? sealedFolders.inspectFolder(target.folder)
+        : sealedFolders.inspectFiles(target.files),
+    sealFolder: async (project, root, folder, sealOptions) => {
+      const result = await sealedFolders.seal(project, root, folder, sealOptions);
+      if (result.ok) await labelPending(project, true);
+      return result;
+    },
+    unsealFolder: sealedFolders.unseal,
+    sealedFoldersBeforeTurn: async (project, signal) => {
+      sealedStore.noteTurn(project);
+      const gate = await sealedFolders.beforeTurn(project, signal);
+      // A name that could not be checked when its file was sealed is checked before the turn.
+      await labelPending(project, true);
+      return gate;
+    },
+    sweepSealedFoldersSoon: sealedFolders.sweepSoon,
+    sealedFolderContaining: sealedFolders.containing,
+    sealedFolderPaths: sealedFolders.paths,
+    resetSealedLimits: (project) => sealedStore.resetLedger(project),
+    sealedClearAnswers: (project) => sealedStore.clearAnswers(project),
+    sealedOutput: (project, name) => sealedStore.readOutput(project, name),
+    askDocuments: (input) => sealedWorker.ask(input),
+    askDocumentsFreeText: (input) => sealedWorker.askFreeText(input),
+    fillSealed: (project, name, template) => sealedWorker.fill(project, name, template),
     status: () => ({
       mode: config.mode,
+      worker: workerStatus(),
+      egress: {
+        policy: egressPolicy(),
+        hosts: config.egress?.hosts ?? [],
+        refused: [...refusedHosts].map(([host, at]) => ({ host, at })).toReversed(),
+      },
+      sealedDocuments: sealedCount(),
+      sealingBeforeTurn: sealedFolders.holds(),
+      secondPass: config.secondPass === true,
+      webResultsChecked: config.checkWebResults === true,
       active: gateway !== undefined && config.mode !== "off",
       accountLabel: signedIn() ? (config.accountLabel ?? null) : null,
       endpoint: config.mode === "selfHosted" ? (config.endpoint ?? null) : null,
@@ -1092,6 +2353,15 @@ export const startPrivacyController = async (
       readingTool: config.readingTool !== false,
       sessionSwitches: sessionSwitches(config),
       accountId: signedIn() ? (config.accountId ?? null) : null,
+      accountRegion: signedIn() ? (config.accountRegion ?? null) : null,
+      hostedWorkerEntitled: hostedIncluded(config),
+      hostedWorkerOffered: !regionHasNoWorker(),
+      hostedWorker:
+        hostedIncluded(config) &&
+        config.hostedWorker?.hostLabel !== undefined &&
+        config.hostedWorker.locationLabel !== undefined
+          ? { host: config.hostedWorker.hostLabel, location: config.hostedWorker.locationLabel }
+          : null,
       acceptance: signedIn() ? (config.acceptance ?? null) : null,
       legal: config.legal ?? null,
       profile: signedIn() ? (config.profile ?? null) : null,
@@ -1122,6 +2392,40 @@ export const startPrivacyController = async (
         case "usageReports":
           apply({ ...config, usageReports: input.send });
           return;
+        case "secondPass":
+          apply({ ...config, secondPass: input.on });
+          return;
+        case "webResults":
+          apply({ ...config, checkWebResults: input.check });
+          return;
+        case "egress":
+          // A new rule is a new question: what the old one refused says nothing about it.
+          refusedHosts.clear();
+          apply({
+            ...config,
+            egress: {
+              policy: input.policy,
+              hosts: [...new Set(input.hosts.map((host) => host.trim().toLowerCase()))].filter(
+                (host) => /^[a-z0-9.-]+$/.test(host),
+              ),
+            },
+          });
+          return;
+        case "allowHost": {
+          const host = input.host.trim().toLowerCase();
+          if (!/^[a-z0-9.-]+$/.test(host)) return;
+          refusedHosts.delete(host);
+          // "AI hosts only" has no list to add to, so one click never loosens it for good.
+          if (!input.lasting || egressPolicy() !== "allowlist") {
+            hostsUntilClose.add(host);
+            return;
+          }
+          const hosts = config.egress?.hosts ?? [];
+          if (!hosts.includes(host)) {
+            apply({ ...config, egress: { policy: "allowlist", hosts: [...hosts, host] } });
+          }
+          return;
+        }
       }
     },
     configure: async (input) => {
@@ -1157,6 +2461,47 @@ export const startPrivacyController = async (
       return answer.ok && typeof answer.body.token === "string" ? answer.body.token : null;
     },
     activity: () => activity.toReversed(),
+    refusingNow: () => proxyRefusal.reason(Date.now()),
+    takeTurn: (id, sessions) => {
+      const tally = turns.take(sessions);
+      if (tally !== undefined) turns.keep(id, tally.replaced);
+      return tally;
+    },
+    turnValues: (id) => {
+      const vault = gateway?.vault;
+      return turns.kept(id)?.map((token) => ({
+        token,
+        kind: kindOfStandIn(token),
+        value: vault?.resolve(token) ?? null,
+        sealed: vault?.isSealed(token) === true,
+      }));
+    },
+    takeSealedTurn: (id, thread) => takeSealedTurn(sealedStore, thread, id),
+    sealedTurn: (id) => sealedTurn(sealedStore, id),
+    knownValues: (runIds) => {
+      const vault = gateway?.vault;
+      if (vault === undefined || config.mode === "off" || config.mode === "unconfigured") {
+        return { values: [], turns: [] };
+      }
+      const kept = (runIds ?? []).flatMap((runId) => {
+        const tokens = turns.kept(runId);
+        return tokens === undefined ? [] : [{ runId, tokens }];
+      });
+      const written = new Set(kept.flatMap((turn) => turn.tokens));
+      const values = vault
+        .entries()
+        .filter((entry) => entry.surfaces.length > 0)
+        // A sealed value is replaced in what the person types, never in a file a tool reads.
+        .filter((entry) =>
+          runIds === undefined ? entry.sealed !== true : written.has(entry.token),
+        )
+        .map((entry) => ({
+          token: entry.token,
+          surfaces: entry.surfaces,
+          sealed: entry.sealed === true,
+        }));
+      return { values, turns: kept };
+    },
     readMasked: async (bytes, mediaType) => {
       if (config.mode === "off" || config.mode === "unconfigured" || maskingGateway === undefined) {
         return { ok: false, message: "DoeDesk privacy is not active, so nothing was read." };
@@ -1204,9 +2549,26 @@ export const startPrivacyController = async (
         token: entry.token,
         kind: entry.kind,
         value: entry.value,
+        removable: entry.sealed !== true,
       })),
+    unmaskedValues: () =>
+      (gateway?.vault.released() ?? []).map((entry) => ({
+        token: entry.token,
+        kind: entry.kind,
+        value: entry.value,
+      })),
+    setValueMasked: (token, masked) => {
+      const vault = gateway?.vault;
+      if (vault === undefined) return false;
+      const changed = masked ? vault.restore(token) : vault.release(token) !== undefined;
+      // Written at once: a restart must not bring the stand-in back.
+      if (changed) vault.flush();
+      return changed;
+    },
     close: async () => {
       logEvent({ type: "vault", entries: gateway?.vault.entries() ?? [] });
+      turns.flush();
+      sealedFolders.close();
       await gateway?.close();
     },
   };

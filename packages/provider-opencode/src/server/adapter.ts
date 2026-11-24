@@ -64,7 +64,11 @@ import {
   structuralProtocolMethod,
   summarizeNativeProtocolPayload,
 } from "@t3tools/provider-core/server/nativeProtocolLogging";
-import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
+import {
+  mergeProviderInstanceEnvironment,
+  providerRequestsMasked,
+  sealedValuesInUse,
+} from "@t3tools/provider-core/server/instanceEnvironment";
 import { t3OrchestrationSystemPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import * as OpenCodeRuntime from "./OpenCodeRuntime.ts";
@@ -3516,6 +3520,8 @@ export const makeOpenCodeAdapterV2 = Effect.fn("makeOpenCodeAdapterV2")(function
                 harness: "OpenCode",
                 model: turn.modelSelection.model,
                 runtimePolicy: turn.runtimePolicy,
+                privacyMasking: providerRequestsMasked(OPENCODE_PROVIDER),
+                sealedValues: sealedValuesInUse(),
               }),
             ]
               .filter(Boolean)

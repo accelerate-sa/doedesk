@@ -109,6 +109,14 @@ describe("usage data at first run", () => {
         locale: "ar",
       }),
     );
+
+    // Turned off, the step no longer says usage data is on: it names the switch, as Settings does.
+    await screen.rerender(
+      <UsageDataChoice status={usage({ state: "off", basis: "notice", sending: false })} />,
+    );
+    await expect.element(screen.getByRole("switch")).not.toBeChecked();
+    await expect.element(screen.getByText("إرسال بيانات الاستخدام")).toBeVisible();
+    expect(screen.getByText("بيانات الاستخدام مفعّلة.").query()).toBeNull();
   });
 
   it("records what leaving the screen untouched means under each rule", async () => {

@@ -16,8 +16,6 @@ interface FirstRunWorkspaceInput {
   readonly serverCwd: string | null;
   readonly bootstrapProjectId?: string | undefined;
   readonly bootstrapThreadId?: string | undefined;
-  readonly bootstrapProjectCreated?: boolean | undefined;
-  readonly bootstrapThreadCreated?: boolean | undefined;
   readonly projects: ReadonlyArray<{
     readonly id: string;
     readonly environmentId: string;
@@ -78,7 +76,6 @@ export function isFreshFirstRunWorkspace(input: FirstRunWorkspaceInput): boolean
   const bootstrapProject = input.projects[0];
   if (bootstrapProject !== undefined) {
     if (
-      input.bootstrapProjectCreated !== true ||
       input.bootstrapProjectId !== bootstrapProject.id ||
       input.serverCwd === null ||
       bootstrapProject.environmentId !== input.primaryEnvironmentId ||
@@ -96,7 +93,6 @@ export function isFreshFirstRunWorkspace(input: FirstRunWorkspaceInput): boolean
 
   return (
     bootstrapProject !== undefined &&
-    input.bootstrapThreadCreated === true &&
     input.bootstrapThreadId === bootstrapThread.id &&
     bootstrapThread.environmentId === input.primaryEnvironmentId &&
     bootstrapThread.projectId === bootstrapProject.id &&

@@ -1,5 +1,8 @@
 import type { PrivacyImageHandling, PrivacyStatus } from "@t3tools/contracts";
 import { T, useGT, useMessages } from "gt-react";
+
+import { useClientSettings } from "~/hooks/useSettings";
+import { formatDateTimeTimestamp } from "~/timestampFormat";
 import { useState } from "react";
 
 import {
@@ -82,8 +85,6 @@ export function ImageHandlingSection({ status }: { readonly status: PrivacyStatu
   );
 }
 
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-
 const save = (fileName: string, blob: Blob): void => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -99,6 +100,7 @@ export function RedactionsSection() {
   const resolve = useMessages();
   const searchableSetting = useSearchableSetting();
   const records = usePrivacyRedactions();
+  const timestampFormat = useClientSettings((settings) => settings.timestampFormat);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const download = (id: string, part: "image" | "text") => {
@@ -159,7 +161,7 @@ export function RedactionsSection() {
                   {describeRedaction(record, resolve)}
                   <span className="text-xs text-muted-foreground tabular-nums">
                     {" "}
-                    · {DATE_FORMAT.format(new Date(record.at))}
+                    · {formatDateTimeTimestamp(record.at, timestampFormat)}
                   </span>
                 </span>
                 <span className="flex shrink-0 items-center gap-1">

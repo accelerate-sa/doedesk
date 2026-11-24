@@ -1,4 +1,11 @@
-import { decodeOptions, getReactI18nCache, gtFallback, type useMessages } from "gt-react-native";
+import { setUnnamedThreadTitle } from "@t3tools/client-runtime/state/models";
+import {
+  decodeOptions,
+  getReactI18nCache,
+  gtFallback,
+  msg,
+  type useMessages,
+} from "gt-react-native";
 
 import { DEFAULT_LOCALE } from "./locales";
 
@@ -9,6 +16,11 @@ let activeLocale = DEFAULT_LOCALE;
 /** I18nProvider calls this once the locale's catalog is in GT's cache. */
 export function setActiveLocale(locale: string): void {
   activeLocale = locale;
+}
+
+/** The app's language, for naming a weekday or a month outside React. */
+export function getActiveLocale(): string {
+  return activeLocale;
 }
 
 function resolve(message: string, variables: Parameters<MessageResolver>[1] = {}): string {
@@ -37,3 +49,6 @@ export const m = ((message, variables) =>
  * Only for helpers that pass a whole `msg()` string; display sites resolve the result.
  */
 export const keepMarked = ((message: string) => message) as MessageResolver;
+
+// The server's "New chat" on a chat with no name yet is said in the app's language.
+setUnnamedThreadTitle(() => m(msg("New chat")));

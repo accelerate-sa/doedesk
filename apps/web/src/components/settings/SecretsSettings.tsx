@@ -111,7 +111,7 @@ function EnvironmentSecretProviders({
           !readOnly ? (
             <Button size="xs" variant="outline" onClick={() => setDialog({ mode: "add" })}>
               <PlusIcon className="size-3" aria-hidden />
-              <T>Add provider</T>
+              <T>Add secret provider</T>
             </Button>
           ) : null
         }

@@ -32,6 +32,8 @@ import { __setClientSettingsForTests } from "~/hooks/useSettings";
 import stylesheet from "~/index.css?inline";
 import { environmentContextRecord } from "~/lib/composerContextRecords";
 import { startWorkspaceFocus } from "~/lib/workspaceFocus";
+import { refreshPrivacyStatus } from "~/privacy/privacyClient";
+import { closeSealPrompt, useSealPrompt } from "~/privacy/sealPrompt";
 import { usePromptStashStore } from "~/promptStashStore";
 import { useRightPanelStore } from "~/rightPanelStore";
 import { getRouter } from "~/router";
@@ -1048,4 +1050,189 @@ it("/side sends the draft's attachments and context, and keeps them when it does
       "/side what is this?",
     ]),
   );
+});
+
+/** What the privacy API answers when masking is on with a worker connected and nothing sealed. */
+const SEALING_OFFERED = {
+  "/api/privacy/status": {
+    mode: "selfHosted",
+    active: true,
+    accountLabel: null,
+    endpoint: "http://localhost:8080",
+    vaultSize: 0,
+    problem: null,
+    profileAnswered: true,
+    worker: {
+      kind: "custom",
+      address: "http://localhost:11434/v1",
+      model: "qwen3",
+      driver: "chatCompletions",
+      reasoningEffort: null,
+      available: true,
+      servedFrom: null,
+    },
+  },
+  "/api/privacy/sealed": {
+    ok: true,
+    message: null,
+    listing: { documents: [], outputs: [], clear: { mostOnOneDocument: 0, perDocument: 100 } },
+    // What a file is given when it is sealed; a listing ignores it.
+    handle: "DOC_7",
+    output: null,
+    answers: null,
+  },
+};
+
+/** Reads the privacy status the environment now answers, and again once it stops answering it. */
+function readPrivacyStatus(): Disposable {
+  refreshPrivacyStatus();
+  return {
+    [Symbol.dispose]: () => {
+      useSealPrompt.setState({ prompt: null, open: false });
+      refreshPrivacyStatus();
+    },
+  };
+}
+
+const PAYROLL_CSV = [
+  "employee_id,name,national_id,salary,iban,phone,email",
+  "E-1,Sara Example,1012345678,18500,SA0380000000608010167519,+966501234567,sara@example.com",
+  "E-2,Omar Example,2098765432,12500,SA4420000001234567891234,+966551234567,omar@example.com",
+].join("\n");
+
+it("offers to seal a file however it was attached, and suggests it for a payroll file", async () => {
+  await page.viewport(1400, 900);
+  const thread = threadWithHistory("seal-attached", 1);
+  using _environment = installFakeEnvironment([thread], {
+    acceptCommands: true,
+    fileAttachments: true,
+    api: SEALING_OFFERED,
+  });
+  using _status = readPrivacyStatus();
+  __setClientSettingsForTests({
+    ...DEFAULT_CLIENT_SETTINGS,
+    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+  });
+  // The folder's file the message will mention, and no other path.
+  using _metadata = answerRpc(
+    WS_METHODS.filesystemGetMetadata,
+    (input: { readonly paths: ReadonlyArray<string> }) =>
+      Effect.succeed({
+        entries: input.paths.map((path) =>
+          path.endsWith("/hr/register.csv") ? { kind: "file", byteLength: 240 } : null,
+        ),
+      }),
+  );
+  using _read = answerRpc(WS_METHODS.projectsReadFile, () =>
+    Effect.succeed({
+      relativePath: "hr/register.csv",
+      contents: PAYROLL_CSV,
+      byteLength: PAYROLL_CSV.length,
+      truncated: false,
+    }),
+  );
+  const router = getRouter(
+    createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${thread.id}`] }),
+  );
+  await router.load();
+  await using _app = await render(<AppRoot router={router} />, {
+    // AppRoot brings its own router.
+    router: false,
+  });
+  using _uploads = acceptAttachmentUploads();
+  await expect.element(page.getByText(`Answer 0 for ${thread.id}.`)).toBeVisible();
+  const editor = page.getByRole("textbox", { name: `Message ${thread.title}`, exact: true });
+  const sealButtons = page.getByRole("button", { name: "Seal", exact: true });
+  const suggestions = page.getByRole("note");
+
+  // Through the picker. The file becomes a chip in the text, and keeps a row that offers Seal.
+  await userEvent.click(editor);
+  await expect.element(page.getByRole("button", { name: "Attach files" })).toBeVisible();
+  const picker = document.querySelector<HTMLInputElement>('input[type="file"]');
+  if (picker === null) throw new Error("The composer has no file picker.");
+  const picked = new DataTransfer();
+  picked.items.add(new File([PAYROLL_CSV], "payroll_full_2026.csv", { type: "text/csv" }));
+  picker.files = picked.files;
+  await act(() => picker.dispatchEvent(new Event("change", { bubbles: true })));
+  await expect
+    .element(editor.getByRole("button", { name: /File attachment, payroll_full_2026\.csv/ }))
+    .toBeVisible();
+  // One on the file's row, one beside the suggestion.
+  await expect.element(sealButtons.first()).toBeVisible();
+  await expect
+    .element(
+      suggestions.getByText(
+        "This file has payroll or identity columns. Seal it instead? Checked on this computer; nothing was sent.",
+      ),
+    )
+    .toBeVisible();
+  await expect.element(sealButtons).toHaveLength(2);
+
+  // Sealed, the file leaves the message: its chip would name it, and the handle stands for it.
+  // It was all the message held, so the draft itself goes and comes back with the handle alone.
+  const draftText = () =>
+    useComposerDraftStore.getState().getComposerDraft(scopeThreadRef(ENVIRONMENT_ID, thread.id))
+      ?.prompt ?? "";
+  await sealButtons.nth(0).click();
+  // The dialog's own backdrop takes pointer events in the test page, so the button is pressed directly.
+  const confirm = page.getByRole("alertdialog").getByRole("button", { name: "Seal", exact: true });
+  // Enabled once the server has said what the folder holds of the attached file.
+  await expect.element(confirm).toBeEnabled();
+  await act(() => (confirm.element() as HTMLElement).click());
+  await vi.waitFor(() => expect(draftText()).toBe("DOC_7 "));
+  await expect.element(editor).toHaveTextContent("DOC_7");
+  await expect.element(sealButtons).toHaveLength(0);
+  // What the editor writes back once it has caught up is still the handle alone.
+  await userEvent.click(editor);
+  await insertText("and ");
+  await vi.waitFor(() => expect(draftText()).toBe("DOC_7 and "));
+
+  // Attached again for what follows.
+  const again = new DataTransfer();
+  again.items.add(new File([PAYROLL_CSV], "payroll_full_2026.csv", { type: "text/csv" }));
+  picker.files = again.files;
+  await act(() => picker.dispatchEvent(new Event("change", { bubbles: true })));
+  await expect
+    .element(editor.getByRole("button", { name: /File attachment, payroll_full_2026\.csv/ }))
+    .toBeVisible();
+  await expect.element(sealButtons).toHaveLength(2);
+
+  // Pasted. A spreadsheet's text cannot be read here, so it gets Seal and no suggestion.
+  await userEvent.click(editor);
+  const clipboardData = new DataTransfer();
+  clipboardData.items.add(
+    new File([new Uint8Array([80, 75, 3, 4])], "bonuses.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+  );
+  editor
+    .element()
+    .dispatchEvent(new ClipboardEvent("paste", { clipboardData, bubbles: true, cancelable: true }));
+  await expect
+    .element(editor.getByRole("button", { name: /File attachment, bonuses\.xlsx/ }))
+    .toBeVisible();
+  await expect.element(sealButtons).toHaveLength(3);
+  await expect.element(suggestions).toHaveLength(1);
+
+  // Mentioned. The agent would read the folder's file itself, so it is offered the same.
+  await userEvent.click(editor);
+  await insertText(" [register.csv](hr/register.csv) ");
+  await expect.element(suggestions).toHaveLength(2);
+  await expect.element(sealButtons).toHaveLength(5);
+
+  // Seal asks first, naming the file; the mention is sealed where it lies in the folder.
+  await sealButtons.nth(0).click();
+  expect(useSealPrompt.getState()).toMatchObject({
+    open: true,
+    prompt: { kind: "seal", request: { projectId: PROJECT_ID, name: "payroll_full_2026.csv" } },
+  });
+  await act(() => closeSealPrompt());
+  await sealButtons.nth(4).click();
+  expect(useSealPrompt.getState()).toMatchObject({
+    open: true,
+    prompt: {
+      kind: "seal",
+      request: { name: "register.csv", path: "/workspace/render/hr/register.csv" },
+    },
+  });
 });

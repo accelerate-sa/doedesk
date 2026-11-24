@@ -36,6 +36,9 @@ import {
   type Painted,
 } from "./sheet-paint";
 import { externalUrl } from "./links";
+import { useFileValueMarks } from "~/components/privacy/FileValueMarkSurface";
+import { ValueMarkTooltip } from "~/components/privacy/ValueMarks";
+import { cellKey, cellRect, cellStandIns, paintCellMarks, visibleRuns } from "./sheet-marks";
 import { bufferedViewport, cachedViewport, retainCachedViewport } from "./sheet-viewport";
 
 const isSupersededError = Schema.is(SupersededError);
@@ -184,6 +187,16 @@ function SpreadsheetGrid(props: {
   useEffect(() => {
     navigate.current = onNavigate;
   }, [onNavigate]);
+  // The values DoeDesk replaces, marked by cell. Null while the highlight is off.
+  const valueMarks = useFileValueMarks();
+  const [markHit, setMarkHit] = useState<{ tokens: readonly string[]; rect: DOMRect } | null>(null);
+  const marking = useRef({ ...valueMarks, restart: () => {} });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Hands the canvas engine the values to mark without restarting it, which would lose the scroll position.
+  useEffect(() => {
+    marking.current.matcher = valueMarks.matcher;
+    marking.current.report = valueMarks.report;
+    marking.current.restart();
+  }, [valueMarks.matcher, valueMarks.report]);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Own canvas painting, worker requests, resize observation, and native scroll, keyboard, and pointer listeners for this sheet.
   useEffect(() => {
     const root = scroller.current;
@@ -229,6 +242,72 @@ function SpreadsheetGrid(props: {
     let reachX = 0;
     let reachY = 0;
     let readController: AbortController | undefined;
+    // Cells already read that hold a known value, with its stand-ins. Read for what is on screen.
+    const marked = new Map<string, readonly string[]>();
+    let markedView = "";
+    let markTimer: ReturnType<typeof setTimeout> | undefined;
+    let markRest: ReturnType<typeof setTimeout> | undefined;
+    let markShown = "";
+    let markReported = "";
+    const markedRanges = () => {
+      if (!grid || marked.size === 0) return [];
+      const ranges = [];
+      for (const [top, bottom] of visibleRuns(grid.startRow, grid.rowIndices, grid.rowOffsets))
+        for (const [left, right] of visibleRuns(grid.startCol, grid.colIndices, grid.colOffsets))
+          for (let row = top; row <= bottom; row++)
+            for (let col = left; col <= right; col++)
+              if (marked.has(cellKey(row, col)))
+                ranges.push(
+                  coverMerges({ top: row, left: col, bottom: row, right: col }, layout.merges),
+                );
+      return ranges;
+    };
+    const readMarks = () => {
+      const matcher = marking.current.matcher;
+      if (!matcher || !grid || controller.signal.aborted) return;
+      const rows = visibleRuns(grid.startRow, grid.rowIndices, grid.rowOffsets);
+      const cols = visibleRuns(grid.startCol, grid.colIndices, grid.colOffsets);
+      const view = JSON.stringify([rows, cols]);
+      if (view === markedView) return;
+      markedView = view;
+      if (marked.size > 20_000) marked.clear();
+      const reads = rows.flatMap(([top, bottom]) =>
+        cols.map(([left, right]) =>
+          engine
+            .call(
+              "cells",
+              { sheet, range: { top, left, bottom, right } },
+              { signal: controller.signal },
+            )
+            .then((texts) => {
+              if (marking.current.matcher !== matcher) return;
+              texts.forEach((line, row) =>
+                line.forEach((text, col) => {
+                  const tokens = text.length < 3 ? [] : cellStandIns(matcher, text);
+                  if (tokens.length > 0) marked.set(cellKey(top + row, left + col), tokens);
+                }),
+              );
+            }),
+        ),
+      );
+      void Promise.all(reads)
+        .then(() => {
+          if (marking.current.matcher !== matcher || controller.signal.aborted) return;
+          const marks = markedRanges().length;
+          if (markReported !== `${marks > 0}`) {
+            markReported = `${marks > 0}`;
+            marking.current.report?.({ units: 1, marks, characters: 1 });
+          }
+          schedule();
+        })
+        .catch(() => undefined);
+    };
+    const hideMark = () => {
+      clearTimeout(markRest);
+      if (markShown === "") return;
+      markShown = "";
+      setMarkHit(null);
+    };
     const range = () => coverMerges(normalizeRange(selection), layout.merges);
     const at = (cell: { row: number; col: number }) => {
       const merge = layout.merges.find((item) => contains(item, cell));
@@ -350,6 +429,12 @@ function SpreadsheetGrid(props: {
           y: painted.frame.viewport.y - drawn.y,
         });
       if (!grid) return;
+      if (marking.current.matcher) {
+        // Read once the view has settled, so a scroll costs no read per frame.
+        clearTimeout(markTimer);
+        markTimer = setTimeout(readMarks, 120);
+        paintCellMarks(context, { grid, ratio, headers, ...size, ranges: markedRanges() });
+      }
       const anchor = selection.anchor;
       paintSelection(context, {
         grid,
@@ -535,6 +620,37 @@ function SpreadsheetGrid(props: {
       }
       const hovered = resizeHit(event);
       root.style.cursor = hovered ? (hovered.axis === "column" ? "col-resize" : "row-resize") : "";
+      if (marked.size > 0 && marking.current.matcher) {
+        const over = drag ? undefined : hit(event);
+        const cell = over && over.x >= 0 && over.y >= 0 ? at(over.cell).anchor : undefined;
+        const tokens = cell && marked.get(cellKey(cell.row, cell.col));
+        const place =
+          cell && grid
+            ? cellRect(
+                grid,
+                headers,
+                coverMerges(
+                  { top: cell.row, left: cell.col, bottom: cell.row, right: cell.col },
+                  layout.merges,
+                ),
+              )
+            : null;
+        if (!cell || !tokens || !place) hideMark();
+        else if (markShown !== cellKey(cell.row, cell.col)) {
+          const canvasBox = target.getBoundingClientRect();
+          const rect = new DOMRect(
+            canvasBox.left + place.x,
+            canvasBox.top + place.y,
+            place.w,
+            place.h,
+          );
+          clearTimeout(markRest);
+          markRest = setTimeout(() => {
+            markShown = cellKey(cell.row, cell.col);
+            setMarkHit({ tokens, rect });
+          }, 200);
+        }
+      }
       if (!drag) return;
       const found = hit(event);
       if (found && header !== "all")
@@ -677,8 +793,17 @@ function SpreadsheetGrid(props: {
       schedule();
     };
     const leave = () => {
+      hideMark();
       if (!drag && !resizing) root.style.cursor = "";
     };
+    marking.current.restart = () => {
+      marked.clear();
+      markedView = "";
+      markReported = "";
+      hideMark();
+      schedule();
+    };
+    root.addEventListener("scroll", hideMark, { passive: true });
     root.addEventListener("scroll", schedule);
     root.addEventListener("keydown", key);
     root.addEventListener("pointerdown", pointerDown);
@@ -700,6 +825,10 @@ function SpreadsheetGrid(props: {
     return () => {
       controller.abort();
       readController?.abort();
+      marking.current.restart = () => {};
+      clearTimeout(markTimer);
+      hideMark();
+      root.removeEventListener("scroll", hideMark);
       cancelAnimationFrame(raf);
       unobserve();
       window.removeEventListener("resize", schedule);
@@ -767,6 +896,14 @@ function SpreadsheetGrid(props: {
         >
           {notice}
         </div>
+      ) : null}
+      {markHit ? (
+        <ValueMarkTooltip
+          anchor={markHit.rect}
+          tokens={markHit.tokens}
+          tense="sends"
+          onClose={() => setMarkHit(null)}
+        />
       ) : null}
     </div>
   );

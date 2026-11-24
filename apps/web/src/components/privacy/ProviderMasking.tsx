@@ -16,6 +16,8 @@ import {
 } from "~/doedesk/providerConnections";
 import { useDeveloperMode } from "~/doedesk/product";
 import { setPrivacyPreference, usePrivacyStatus } from "~/privacy/privacyClient";
+import { useThreadShells } from "~/state/entities";
+import { usePrimaryEnvironmentId } from "~/state/environments";
 import { primaryServerProvidersAtom } from "~/state/server";
 import {
   AlertDialog,
@@ -28,7 +30,14 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
-import { type MaskedProvider, maskedProviders, pendingNotice } from "./ProviderMasking.logic";
+import {
+  driversInUse,
+  type MaskedProvider,
+  maskedProviders,
+  pendingNotice,
+  unreadNotices,
+} from "./ProviderMasking.logic";
+import { settleProviderNotice, useProviderNoticeGate } from "./providerNoticeGate";
 import { SettingsRow, SettingsSection } from "../settings/settingsLayout";
 
 function NoticeDialog({
@@ -71,20 +80,35 @@ function NoticeDialog({
 }
 
 /**
- * Shows the notice once for each provider, the first time masking is on while the user is signed
- * in to it. Mounted with the chat screens.
+ * Shows a provider's notice once, when a chat with that provider starts: at the first Send to
+ * it, before the message goes, or when a chat with it already exists. It is not shown for every
+ * signed-in provider on load. Reading it is recorded on the server.
  */
 export function ProviderMaskingNoticeOnce() {
   const state = usePrivacyStatus();
   const providers = useAtomValue(primaryServerProvidersAtom);
-  const pending = state.kind === "ready" ? pendingNotice(state.status, providers) : undefined;
+  const primary = usePrimaryEnvironmentId();
+  const asked = useProviderNoticeGate((gate) => gate.asked?.driver ?? null);
+  const unread = state.kind === "ready" ? unreadNotices(state.status, providers) : [];
+  // The list of chats changes often, so it is read only while a notice is still unread.
+  const chats = useThreadShells(unread.length > 0);
+  const pending =
+    state.kind === "ready"
+      ? pendingNotice(state.status, providers, driversInUse(chats, providers, primary), asked)
+      : undefined;
   if (pending === undefined) return null;
+  const { driver } = pending;
   return (
     <NoticeDialog
-      key={pending.driver}
+      key={driver}
       words={pending.words}
       open
-      onClose={() => void setPrivacyPreference({ kind: "noticeRead", provider: pending.driver })}
+      onClose={() =>
+        void setPrivacyPreference({ kind: "noticeRead", provider: driver }).then(
+          () => settleProviderNotice(driver, true),
+          () => settleProviderNotice(driver, false),
+        )
+      }
     />
   );
 }

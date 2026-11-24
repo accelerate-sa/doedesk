@@ -1,17 +1,22 @@
+import { getActiveLocale } from "../../i18n/messages";
+import { appDateTimeFormat } from "../../lib/dateTimeFormat";
+
 // Formatters pin the default zone when built, and Hermes keeps Date's local offset until a cold
 // start (react/react-native#59131), so formatting and day checks follow the zone Intl reports.
-function buildFormatters(timeZone: string) {
+function buildFormatters(timeZone: string, language: string) {
   return {
     timeZone,
-    time: new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone }),
-    date: new Intl.DateTimeFormat(undefined, { month: "numeric", day: "numeric", timeZone }),
-    dateWithYear: new Intl.DateTimeFormat(undefined, {
+    // The app's language is part of what was built: Arabic writes ص and م.
+    language,
+    time: appDateTimeFormat({ hour: "numeric", minute: "2-digit", timeZone }),
+    date: appDateTimeFormat({ month: "numeric", day: "numeric", timeZone }),
+    dateWithYear: appDateTimeFormat({
       month: "numeric",
       day: "numeric",
       year: "numeric",
       timeZone,
     }),
-    year: new Intl.DateTimeFormat(undefined, { year: "numeric", timeZone }),
+    year: appDateTimeFormat({ year: "numeric", timeZone }),
   };
 }
 
@@ -24,7 +29,10 @@ function currentFormatters() {
   if (formatters && Math.abs(now - zoneCheckedAt) < ZONE_RECHECK_MS) return formatters;
   zoneCheckedAt = now;
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (!formatters || formatters.timeZone !== timeZone) formatters = buildFormatters(timeZone);
+  const language = getActiveLocale();
+  if (!formatters || formatters.timeZone !== timeZone || formatters.language !== language) {
+    formatters = buildFormatters(timeZone, language);
+  }
   return formatters;
 }
 
@@ -46,18 +54,22 @@ export function formatMessageTimestamp(
 
 /** `is24Hour` overrides the locale's hour cycle with the system clock preference when known. */
 export function createMessageTimeFormatter(is24Hour: boolean | undefined, locale?: string) {
-  let cached: { timeZone: string; formatter: Intl.DateTimeFormat } | null = null;
+  let cached: { timeZone: string; language: string; formatter: Intl.DateTimeFormat } | null = null;
   return (input: string, nowMs?: number): string => {
-    const { timeZone } = currentFormatters();
-    if (cached?.timeZone !== timeZone) {
+    const { timeZone, language } = currentFormatters();
+    if (cached?.timeZone !== timeZone || cached.language !== language) {
       cached = {
         timeZone,
-        formatter: new Intl.DateTimeFormat(locale, {
-          hour: "numeric",
-          minute: "2-digit",
-          timeZone,
-          ...(is24Hour === undefined ? {} : { hourCycle: is24Hour ? "h23" : "h12" }),
-        }),
+        language,
+        formatter: appDateTimeFormat(
+          {
+            hour: "numeric",
+            minute: "2-digit",
+            timeZone,
+            ...(is24Hour === undefined ? {} : { hourCycle: is24Hour ? "h23" : "h12" }),
+          },
+          locale,
+        ),
       };
     }
     return formatMessageTimestamp(input, nowMs, cached.formatter);

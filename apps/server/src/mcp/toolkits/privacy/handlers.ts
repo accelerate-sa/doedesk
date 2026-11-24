@@ -37,19 +37,18 @@ const within = (path: Path.Path, parent: string, child: string): boolean => {
 };
 
 /**
- * The file a thread may have read for it. The server reads with the user's own rights and asks
- * nobody, so it reads only where the agent could read by itself without asking: anywhere for a
- * full-access thread, and otherwise inside the thread's own workspace. Links are resolved first.
+ * The bytes of a file a thread may have read for it. The server reads with the user's own rights
+ * and asks nobody, so it reads only where the agent could read by itself without asking: anywhere
+ * for a full-access thread, and otherwise inside the thread's own workspace. Links are resolved
+ * first.
  */
-export const readableFile = Effect.fn("PrivacyToolkit.readableFile")(function* (requested: string) {
+export const readableBytes = Effect.fn("PrivacyToolkit.readableBytes")(function* (
+  requested: string,
+) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   if (!path.isAbsolute(requested)) {
     return yield* refuse("invalid_request", "Pass an absolute path.");
-  }
-  const mediaType = MEDIA_TYPES[path.extname(requested).toLowerCase()];
-  if (mediaType === undefined) {
-    return yield* refuse("invalid_request", "Only image and PDF files can be read.");
   }
   const missing = () => refuse("invalid_request", "No readable file is at that path.");
   const real = yield* fs.realPath(requested).pipe(Effect.mapError(missing));
@@ -85,7 +84,21 @@ export const readableFile = Effect.fn("PrivacyToolkit.readableFile")(function* (
     }
   }
   const bytes = yield* fs.readFile(real).pipe(Effect.mapError(missing));
-  return { bytes: Buffer.from(bytes), mediaType };
+  return { bytes: Buffer.from(bytes), name: path.basename(real) };
+});
+
+/** An image or PDF a thread may have read for it. See `readableBytes`. */
+export const readableFile = Effect.fn("PrivacyToolkit.readableFile")(function* (requested: string) {
+  const path = yield* Path.Path;
+  if (!path.isAbsolute(requested)) {
+    return yield* refuse("invalid_request", "Pass an absolute path.");
+  }
+  const mediaType = MEDIA_TYPES[path.extname(requested).toLowerCase()];
+  if (mediaType === undefined) {
+    return yield* refuse("invalid_request", "Only image and PDF files can be read.");
+  }
+  const file = yield* readableBytes(requested);
+  return { bytes: file.bytes, mediaType };
 });
 
 const handlers = {

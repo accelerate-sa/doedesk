@@ -135,6 +135,18 @@ export const threadTitleEvaluationCases = [
     rubric: "Keep title generation as the subject. Do not focus on filing the PR.",
   },
   {
+    id: "no-subject",
+    source: 'Pass in the packaged app, 2026-11-24: two chats were titled "Thread Title Generation"',
+    request: "Reply with the single word OK. Do not use any tools.",
+    previousTitle: "New chat",
+    messages: [
+      { role: "user", text: "Reply with the single word OK. Do not use any tools." },
+      { role: "assistant", text: "OK" },
+    ],
+    rubric:
+      "Name what the message asks for, a one-word reply. Never title generation: the thread says nothing about titles.",
+  },
+  {
     id: "project-name",
     source: "https://github.com/pingdotgg/t3code/pull/33418",
     request: "Make hyperdrive init create a default config instead of crashing.",

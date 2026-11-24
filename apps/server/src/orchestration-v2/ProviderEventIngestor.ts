@@ -42,6 +42,20 @@ import { makeProviderFailureTurnItem } from "@t3tools/provider-core/server/failu
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import { stripUnservedToolOutputImageBytes } from "./toolOutputImageBytes.ts";
 import { boundFileChangeForStorage } from "./WireProjection.ts";
+import { noteAgentWrite } from "../privacy/agentWorkspaces.ts";
+
+/** The turn items through which an agent can write a file, whichever provider runs it. */
+const AGENT_WRITE_ITEMS: ReadonlySet<string> = new Set([
+  "file_change",
+  "command_execution",
+  "dynamic_tool",
+]);
+const ENDED_ITEM_STATUSES: ReadonlySet<string> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "interrupted",
+]);
 
 export class ProviderEventNormalizeError extends Schema.TaggedError<ProviderEventNormalizeError>()(
   "ProviderEventNormalizeError",
@@ -606,6 +620,14 @@ export const layer: Layer.Layer<
                 }),
               ];
             case "turn_item.updated":
+              // Every provider's commands and file changes pass here. One that has ended may
+              // have written into a sealed folder, which is swept at once.
+              if (
+                AGENT_WRITE_ITEMS.has(input.event.turnItem.type) &&
+                ENDED_ITEM_STATUSES.has(input.event.turnItem.status)
+              ) {
+                noteAgentWrite(input.event.turnItem.threadId);
+              }
               return [
                 yield* makeDomainEvent(input, {
                   type: "turn-item.updated",

@@ -46,6 +46,7 @@ import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as ServerConfig from "../config.ts";
+import { setSealedFilesSource, setSealedFolderChecks } from "../privacy/agentWorkspaces.ts";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
 import * as PreviewAgentActivity from "../preview/PreviewAgentActivity.ts";
 import * as CheckpointService from "./CheckpointService.ts";
@@ -2261,6 +2262,130 @@ effectIt.effect("sends new steering text when restarting a manual continuation",
     expect(harness.startTurn.mock.calls[0]?.[0].message.text).toBe("New steering instruction");
     expect(harness.startRootRun.mock.calls[0]?.[0].resume).toBe(false);
   }),
+);
+
+const NO_SEALED_FOLDERS = {
+  beforeTurn: () => Promise.resolve({ ok: true as const, sealed: 0 }),
+  sweepSoon: () => undefined,
+};
+
+effectIt.effect.each([
+  { folders: "hold nothing readable", starts: true },
+  { folders: "are still receiving a file", starts: false },
+  { folders: "could not be checked", starts: false },
+] as const)(
+  "starts the provider's turn only once the project's sealed folders $folders",
+  ({ folders, starts }) =>
+    Effect.gen(function* () {
+      const beforeTurn = vi.fn((_project: string) =>
+        folders === "could not be checked"
+          ? Promise.reject(new Error("disk"))
+          : Promise.resolve(
+              folders === "hold nothing readable"
+                ? { ok: true as const, sealed: 1 }
+                : {
+                    ok: false as const,
+                    reason: "receiving" as const,
+                    folder: "contracts",
+                    file: "export.csv",
+                    message: null,
+                  },
+            ),
+      );
+      setSealedFolderChecks({ ...NO_SEALED_FOLDERS, beforeTurn });
+      const harness = makeLocalCommandHarness({
+        text: "Summarise the contracts",
+        manualContinuation: true,
+        steeringRestart: true,
+        nativeResumeUnsupported: true,
+        sideChat: { contextRun: "delivered" },
+      });
+      yield* harness.start;
+      expect(beforeTurn.mock.calls.map(([project]) => project)).toEqual([
+        "project-native-account-command",
+      ]);
+      if (starts) {
+        expect(beforeTurn.mock.invocationCallOrder[0]).toBeLessThan(
+          harness.startTurn.mock.invocationCallOrder[0] ?? 0,
+        );
+        return;
+      }
+      // The agent is not started with a file readable: the run ends and says why.
+      expect(harness.startTurn).not.toHaveBeenCalled();
+      expect(harness.startRootRun).not.toHaveBeenCalled();
+      expect(harness.settledRuns).toEqual(["failed"]);
+      expect(harness.projection().turnItems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "error",
+            title:
+              folders === "could not be checked"
+                ? "The sealed folders could not be checked"
+                : "A sealed folder is still receiving a file",
+          }),
+        ]),
+      );
+    }).pipe(Effect.ensuring(Effect.sync(() => setSealedFolderChecks(NO_SEALED_FOLDERS)))),
+);
+
+effectIt.effect(
+  "an ordinary turn in a project with sealed files starts with the note about them",
+  () =>
+    Effect.gen(function* () {
+      setSealedFilesSource(() => ({
+        askOffered: true,
+        folders: [],
+        files: [{ handle: "DOC_7", name: "payroll.csv", unread: false }],
+      }));
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() =>
+          setSealedFilesSource(() => ({ askOffered: false, folders: [], files: [] })),
+        ),
+      );
+      // A turn with new text and nothing else pending, as an ordinary message is.
+      const harness = makeLocalCommandHarness({
+        text: "How many rows are in payroll.csv?",
+        manualContinuation: true,
+        steeringRestart: true,
+        sideChat: { contextRun: "delivered" },
+      });
+      yield* harness.start;
+      const [prompt] = harness.startTurn.mock.calls.map(([turn]) => turn.message.text);
+      expect(prompt?.startsWith("<doedesk_sealed_files>")).toBe(true);
+      expect(prompt).toContain("- DOC_7: payroll.csv");
+      expect(prompt?.endsWith("User message:\nHow many rows are in payroll.csv?")).toBe(true);
+    }).pipe(Effect.scoped),
+);
+
+effectIt.effect("a resume tells an agent of a file sealed since it was last prompted", () =>
+  Effect.gen(function* () {
+    setSealedFilesSource(() => ({
+      askOffered: true,
+      folders: [],
+      files: [{ handle: "DOC_1", name: "lease.md", unread: false }],
+    }));
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() =>
+        setSealedFilesSource(() => ({ askOffered: false, folders: [], files: [] })),
+      ),
+    );
+    const resume = () =>
+      makeLocalCommandHarness({
+        text: "",
+        manualContinuation: true,
+        sideChat: { contextRun: "delivered" },
+      });
+    const first = resume();
+    yield* first.start;
+    const [prompt] = first.startTurn.mock.calls.map(([turn]) => turn.message.text);
+    expect(prompt).toContain("- DOC_1: lease.md");
+    expect(prompt?.endsWith("User message:\nContinue where you left off.")).toBe(true);
+
+    // Told once, the same agent resumes natively: no prompt is made up for it.
+    const second = resume();
+    yield* second.start;
+    expect(second.startTurn.mock.calls.map(([turn]) => turn.message.text)).toEqual([""]);
+  }).pipe(Effect.scoped),
 );
 
 effectIt.effect("refuses unsupported resume instead of manufacturing a user prompt", () =>

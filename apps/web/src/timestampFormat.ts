@@ -1,4 +1,5 @@
 import { type TimestampFormat } from "@t3tools/contracts/settings";
+import { dateTimeFormat } from "@t3tools/shared/dateTimeFormat";
 import { msg } from "gt-react";
 
 import { DEFAULT_LOCALE } from "./i18n/locales";
@@ -14,14 +15,7 @@ function getTimestampFormatOptions(
     ...(includeSeconds ? { second: "2-digit" } : {}),
   };
 
-  if (timestampFormat === "locale") {
-    return baseOptions;
-  }
-
-  return {
-    ...baseOptions,
-    hour12: timestampFormat === "12-hour",
-  };
+  return { ...baseOptions, ...hourChoice(timestampFormat) };
 }
 
 function resolveTimestampLocale(systemLocale: string | null | undefined): string | undefined {
@@ -78,25 +72,48 @@ function wallClockAsUtc(date: Date): Date {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
 }
 
-const timestampFormatterCache = new Map<string, Intl.DateTimeFormat>();
+/**
+ * Every date and time of the app is written through here. The computer's region decides the
+ * form, except that an app in Arabic writes Arabic words, ص and م, with Western digits; the 12
+ * or 24 hours stay the person's choice, or the region's when they made none.
+ */
+function formatterFor(options: Intl.DateTimeFormatOptions, locale = timestampLocale) {
+  return dateTimeFormat(getActiveLocale(), locale, options);
+}
+
+const hourChoice = (timestampFormat: TimestampFormat): Intl.DateTimeFormatOptions =>
+  timestampFormat === "locale" ? {} : { hour12: timestampFormat === "12-hour" };
 
 function getTimestampFormatter(
   timestampFormat: TimestampFormat,
   includeSeconds: boolean,
   timeZone = "UTC",
 ): Intl.DateTimeFormat {
-  const cacheKey = `${timestampFormat}:${includeSeconds ? "seconds" : "minutes"}:${timeZone}`;
-  const cachedFormatter = timestampFormatterCache.get(cacheKey);
-  if (cachedFormatter) {
-    return cachedFormatter;
-  }
+  return formatterFor({ ...getTimestampFormatOptions(timestampFormat, includeSeconds), timeZone });
+}
 
-  const formatter = new Intl.DateTimeFormat(timestampLocale, {
-    ...getTimestampFormatOptions(timestampFormat, includeSeconds),
-    timeZone,
-  });
-  timestampFormatterCache.set(cacheKey, formatter);
-  return formatter;
+/**
+ * A date or a time in a form of the caller's own (`options`), written as the rest of the app
+ * writes them. With `timestampFormat` the clock follows the person's 12 or 24-hour choice.
+ */
+export function formatDateTimeWith(
+  date: Date | number,
+  options: Intl.DateTimeFormatOptions,
+  timestampFormat?: TimestampFormat,
+): string {
+  return formatterFor({
+    ...options,
+    ...(timestampFormat === undefined ? {} : hourChoice(timestampFormat)),
+  }).format(date);
+}
+
+/** A clock time with its seconds, for a log of what happened when. */
+export function formatClockTimeWithSeconds(
+  isoDate: string,
+  timestampFormat: TimestampFormat,
+): string {
+  const date = parseTimestampDate(isoDate);
+  return date ? getTimestampFormatter(timestampFormat, true).format(wallClockAsUtc(date)) : "";
 }
 
 function formatTime(date: Date, timestampFormat: TimestampFormat, timeZone?: string): string {
@@ -116,20 +133,15 @@ export function parseTimestampDate(isoDate: string): Date | null {
 
 // English keeps its ordinal day-before-month form; other UI languages use their own long date.
 const monthNameFormatter = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" });
-const longDateFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
 function getLongDateFormatter(locale: string): Intl.DateTimeFormat {
-  let formatter = longDateFormatterCache.get(locale);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      timeZone: "UTC",
-    });
-    longDateFormatterCache.set(locale, formatter);
-  }
-  return formatter;
+  return formatterFor({ day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }, locale);
+}
+
+/** A day written out in the app's language, such as "24 November 2026". */
+export function formatLongDate(isoDate: string): string {
+  const date = parseTimestampDate(isoDate);
+  return date ? getLongDateFormatter(getActiveLocale()).format(wallClockAsUtc(date)) : isoDate;
 }
 
 function ordinalSuffix(day: number): string {
@@ -169,10 +181,18 @@ export function formatChatTimestampTooltip(
 }
 
 export function formatFullTimestamp(isoDate: string, timestampFormat: TimestampFormat): string {
-  return new Date(isoDate).toLocaleString(
+  return formatterFor(
+    {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      ...hourChoice(timestampFormat),
+    },
     undefined,
-    timestampFormat === "locale" ? undefined : { hour12: timestampFormat === "12-hour" },
-  );
+  ).format(new Date(isoDate));
 }
 
 export function formatShortTimestamp(isoDate: string, timestampFormat: TimestampFormat): string {
@@ -181,21 +201,33 @@ export function formatShortTimestamp(isoDate: string, timestampFormat: Timestamp
   return formatTime(date, timestampFormat);
 }
 
-const dateTimeFormatterCache = new Map<TimestampFormat, Intl.DateTimeFormat>();
+/** A weekday's short name in the app's language: a name is a word, unlike a clock time. */
+export function formatShortWeekday(date: Date): string {
+  return new Intl.DateTimeFormat(getActiveLocale(), { weekday: "short" }).format(date);
+}
+
+/**
+ * When a record was made, for a row in a list. In English, the host region's date and time. In
+ * another language the date is written in that language, with the clock as `formatterFor` says.
+ */
+export function formatRecordTimestamp(
+  isoDate: string,
+  timestampFormat: TimestampFormat,
+  resolve: MessageResolver = m,
+): string {
+  return getActiveLocale() === DEFAULT_LOCALE
+    ? formatDateTimeTimestamp(isoDate, timestampFormat)
+    : formatChatTimestampTooltip(isoDate, timestampFormat, resolve);
+}
 
 export function formatDateTimeTimestamp(isoDate: string, timestampFormat: TimestampFormat): string {
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
-  let formatter = dateTimeFormatterCache.get(timestampFormat);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat(timestampLocale, {
-      dateStyle: "medium",
-      timeStyle: "short",
-      ...(timestampFormat === "locale" ? {} : { hour12: timestampFormat === "12-hour" }),
-    });
-    dateTimeFormatterCache.set(timestampFormat, formatter);
-  }
-  return formatter.format(date);
+  return formatterFor({
+    dateStyle: "medium",
+    timeStyle: "short",
+    ...hourChoice(timestampFormat),
+  }).format(date);
 }
 
 /** A wall-clock `H:MM` or `HH:MM` that names no date or zone, such as a daily schedule's time. */
@@ -213,14 +245,6 @@ const numericDateWithYearOptions: Intl.DateTimeFormatOptions = {
   ...numericDateOptions,
   year: "numeric",
 };
-const numericDateFormatter = new Intl.DateTimeFormat(timestampLocale, {
-  ...numericDateOptions,
-  timeZone: "UTC",
-});
-const numericDateWithYearFormatter = new Intl.DateTimeFormat(timestampLocale, {
-  ...numericDateWithYearOptions,
-  timeZone: "UTC",
-});
 
 interface CalendarDay {
   year: number;
@@ -247,11 +271,12 @@ function calendarDay(date: Date, timeZone: string | undefined): CalendarDay {
 
 function formatNumericDate(date: Date, sameYear: boolean, timeZone: string | undefined): string {
   if (!timeZone) {
-    return (sameYear ? numericDateFormatter : numericDateWithYearFormatter).format(
-      wallClockAsUtc(date),
-    );
+    return formatterFor({
+      ...(sameYear ? numericDateOptions : numericDateWithYearOptions),
+      timeZone: "UTC",
+    }).format(wallClockAsUtc(date));
   }
-  return new Intl.DateTimeFormat(timestampLocale, {
+  return formatterFor({
     ...(sameYear ? numericDateOptions : numericDateWithYearOptions),
     timeZone,
   }).format(date);

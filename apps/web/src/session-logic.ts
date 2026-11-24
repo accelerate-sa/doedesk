@@ -10,6 +10,7 @@ import {
   type OrchestrationV2ProjectedTurnItem,
   type OrchestrationV2RunAttempt,
   type OrchestrationV2TurnItem,
+  PROVIDER_FAILURE_NOT_SENT_CODE,
   type RunId,
   type ToolActivitySurface,
   type ToolActivityIcon,
@@ -26,6 +27,7 @@ import type { McpAppReference } from "@t3tools/shared/mcpApp";
 import {
   htmlRenderFromToolItem,
   mcpAppFromToolItem,
+  sealedOutputFromToolItem,
   sentMessageFromToolItem,
 } from "@t3tools/shared/toolOutput";
 import {
@@ -50,6 +52,7 @@ import {
   type SessionPhase,
   type TurnDiffSummary,
 } from "./types";
+import { serverSentence } from "@t3tools/shared/serverSentencesCopy";
 import { m, type MessageResolver } from "./i18n/messages";
 import * as DateTime from "effect/DateTime";
 import * as Equal from "effect/Equal";
@@ -310,6 +313,13 @@ export function providerErrorPresentation(
   item: Extract<OrchestrationV2TurnItem, { readonly type: "error" }>,
   resolve: MessageResolver = m,
 ): { readonly label: string; readonly detail: string } {
+  // DoeDesk refused to send the request: the provider never saw it, however often it was asked.
+  if (item.failure.code === PROVIDER_FAILURE_NOT_SENT_CODE) {
+    return {
+      label: resolve(msg("DoeDesk did not send this request")),
+      detail: item.failure.message,
+    };
+  }
   if (item.retry === undefined) {
     return {
       label:
@@ -455,7 +465,15 @@ function projectedWorkEntry(
     case "system_notice":
       return {
         ...common,
-        label: item.message,
+        // Claude's sign-in notice is one fixed sentence, written by the server in English.
+        label:
+          item.mcpSignIn !== undefined && item.nativeItemRef?.driver === "claudeAgent"
+            ? resolve(
+                msg("The {server} MCP server needs a sign-in before Claude can use it.", {
+                  server: item.mcpSignIn.server,
+                }),
+              )
+            : serverSentence(item.message, resolve),
         ...(item.level === "info" ? {} : { sourceActivityKind: "runtime.warning" }),
       };
     case "error": {
@@ -617,7 +635,7 @@ export function deriveTimelineEntriesFromVisibleTurnItems(
           id: item.id,
           createdAt,
           runId: item.runId,
-          label: item.summary,
+          label: serverSentence(item.summary, input.resolve ?? m),
           tone: "info",
           itemType: item.type,
           structuredPayload: item,
@@ -723,7 +741,13 @@ export function deriveTimelineEntriesFromVisibleTurnItems(
       continue;
     }
 
-    if (STANDALONE_V2_ITEM_TYPES.has(item.type)) {
+    if (
+      STANDALONE_V2_ITEM_TYPES.has(item.type) ||
+      // A finished file is the person's to open, so it stands in the reply, outside the work log.
+      (item.type === "dynamic_tool" &&
+        item.status === "completed" &&
+        sealedOutputFromToolItem(item) !== undefined)
+    ) {
       entries.push({
         id: item.id,
         kind: "event",

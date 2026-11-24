@@ -8,6 +8,7 @@ import { useStableCallback } from "~/hooks/useStableCallback";
 import { useTheme } from "~/hooks/useTheme";
 import { cn } from "~/lib/utils";
 import {
+  markRightToLeftTreeNames,
   PIERRE_TREE_UNSAFE_CSS,
   pierreTreeStyle,
   titleClippedPierreTreeRow,
@@ -191,7 +192,10 @@ export function DiffFileTree({
   }, [model, presented, revealRequestId, selectedPath]);
 
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col bg-background", className)}>
+    <div
+      ref={markRightToLeftTreeNames}
+      className={cn("flex min-h-0 flex-1 flex-col bg-background", className)}
+    >
       <div
         className="flex h-10 min-h-10 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-2 text-xs text-muted-foreground in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:h-7 in-data-[preview-panel-mode=inline]:min-h-7 in-data-[preview-panel-mode=inline]:border-b-transparent"
         data-surface-subheader

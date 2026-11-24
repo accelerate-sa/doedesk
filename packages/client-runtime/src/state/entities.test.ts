@@ -12,7 +12,11 @@ import {
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
-import { presentThreadShell, resolveThreadWorkingStartedAt } from "./models.ts";
+import {
+  presentThreadShell,
+  resolveThreadWorkingStartedAt,
+  setUnnamedThreadTitle,
+} from "./models.ts";
 import { v2Projection, v2ThreadShell } from "./orchestrationV2TestFixtures.ts";
 import { deriveLatestThreadRun, deriveThreadRuntime } from "./threadExecution.ts";
 import { isThreadWorking } from "./threadInbox.ts";
@@ -51,6 +55,17 @@ describe("V2 client presentation", () => {
     expect(completed.hasPendingUserInput).toBe(true);
     expect(isThreadWorking(completed)).toBe(false);
     expect(effectiveSnoozed(active, { now: "2026-06-20T00:05:00.000Z" })).toBe(false);
+  });
+
+  it("says the server's name for a chat without one in the app's language", () => {
+    setUnnamedThreadTitle(() => "محادثة جديدة");
+    using _english = { [Symbol.dispose]: () => setUnnamedThreadTitle(() => "New chat") };
+    const titled = (title: string) =>
+      presentThreadShell(environmentId, { ...v2ThreadShell, title }).title;
+    expect(titled("New chat")).toBe("محادثة جديدة");
+    // What an older server calls it.
+    expect(titled("New thread")).toBe("محادثة جديدة");
+    expect(titled("New chat about the lease")).toBe("New chat about the lease");
   });
 
   it("moves a running thread with any question out of Working", () => {

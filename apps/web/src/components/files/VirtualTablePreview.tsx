@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "re
 import { useClientSettings } from "~/hooks/useSettings";
 import { observeResize } from "~/lib/observeResize";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { FileValueMarkSurface } from "~/components/privacy/FileValueMarkSurface";
 import { PREVIEW_PAGE_ROWS } from "./largeTextProtocol";
 
 export default function VirtualTablePreview(props: {
@@ -565,6 +566,7 @@ function ScaledRows(
       }}
       onScroll={(event) => setTop(event.currentTarget.scrollTop)}
     >
+      <FileValueMarkSurface unitSelector="[data-preview-row]" />
       <div className="relative" style={{ height: scrollHeight }}>
         {!props.source ? (
           <div

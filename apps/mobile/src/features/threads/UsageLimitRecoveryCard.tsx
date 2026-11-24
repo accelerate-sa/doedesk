@@ -21,6 +21,7 @@ import { AppText as Text } from "../../components/ui/AppText";
 import { useDeadlinePassed } from "../../lib/clock";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
 
 export function UsageLimitRecoveryCard({
   thread,
@@ -69,7 +70,7 @@ export function UsageLimitRecoveryCard({
   const resumesUpcoming = resumes && !displayPassed;
   const shownAt = resumesUpcoming ? displayAt : resetAt;
   const resetDate = shownAt
-    ? new Date(shownAt).toLocaleString(undefined, {
+    ? formatAppDateTime(new Date(shownAt), {
         month: "short",
         day: "numeric",
         hour: "numeric",

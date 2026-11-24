@@ -113,6 +113,7 @@ import { useAssetUrl } from "../../state/assets";
 import { PullRequestGlyph } from "../pull-requests/pullRequestGlyphs";
 import { useOpenLinkedThread } from "./useOpenLinkedThread";
 import { startShimmerSteps } from "./work-shimmer-steps";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
 
 const SHIMMER_WIDTH = 72;
 const SHIMMER_ICON_AND_GAP_WIDTH = 30;
@@ -924,7 +925,7 @@ const ThreadWorkLogRow = function ThreadWorkLogRow(
     const resetAt = failureItem.failure.resetAt;
     // The reset time is the viewer's local time; naming the zone keeps it unambiguous.
     const resetTime = resetAt
-      ? `${new Date(resetAt).toLocaleString(undefined, {
+      ? `${formatAppDateTime(new Date(resetAt), {
           month: "short",
           day: "numeric",
           hour: "numeric",
@@ -976,7 +977,7 @@ const ThreadWorkLogRow = function ThreadWorkLogRow(
               accessibilityLabel={timestamp.toLocaleString()}
               className="shrink-0 text-xs text-foreground-muted"
             >
-              {timestamp.toLocaleString(undefined, {
+              {formatAppDateTime(timestamp, {
                 month: "short",
                 day: "numeric",
                 hour: "numeric",

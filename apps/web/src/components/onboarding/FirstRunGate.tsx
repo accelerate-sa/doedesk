@@ -109,8 +109,6 @@ export function FirstRunGate({
       serverCwd,
       bootstrapProjectId: serverWelcome?.bootstrapProjectId,
       bootstrapThreadId: serverWelcome?.bootstrapThreadId,
-      bootstrapProjectCreated: serverWelcome?.bootstrapProjectCreated,
-      bootstrapThreadCreated: serverWelcome?.bootstrapThreadCreated,
       projects,
       threads: soleThread === null ? [] : [soleThread],
     });

@@ -522,6 +522,16 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   );
 }
 
+/* Values DoeDesk replaces with stand-ins. A tint, not an underline: an underline runs into the
+   dots and descenders of Arabic letters. A highlight changes no text and no layout. */
+::highlight(doedesk-replaced-value-chat) {
+  background-color: color-mix(in oklab, var(--foreground, currentColor) 9%, transparent);
+}
+
+::highlight(doedesk-replaced-value) {
+  background-color: color-mix(in oklab, var(--foreground, currentColor) 14%, transparent);
+}
+
 @utility dialog-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
@@ -2329,6 +2339,17 @@ html[dir="rtl"] :is(code, kbd, samp) {
 
 html[dir="rtl"] .font-mono {
   unicode-bidi: plaintext;
+}
+
+/* A file's name takes its direction from its own first letter (dir="auto" on its element): a
+   Latin, dotted or numbered name stays left to right, an Arabic one runs right to left. Either
+   way it starts where the row starts. */
+.file-name {
+  text-align: left;
+}
+
+html[dir="rtl"] .file-name {
+  text-align: right;
 }
 
 .chat-markdown.user-message-markdown :not(pre) > code {

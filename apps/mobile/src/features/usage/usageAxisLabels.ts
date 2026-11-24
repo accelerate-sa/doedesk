@@ -1,6 +1,7 @@
 import { formatDayShort, formatHourShort } from "@t3tools/shared/usageFormat";
 
 import { DEFAULT_LOCALE } from "../../i18n/locales";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -9,11 +10,11 @@ export function usageAxisDayLabel(day: string, locale: string): string {
   if (locale === DEFAULT_LOCALE) return formatDayShort(day);
   const [year, month, dayOfMonth] = day.split("-").map((part) => Number(part));
   if (year === undefined || month === undefined || dayOfMonth === undefined) return day;
-  return new Intl.DateTimeFormat(locale, {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(Date.UTC(year, month - 1, dayOfMonth));
+  return formatAppDateTime(
+    Date.UTC(year, month - 1, dayOfMonth),
+    { month: "short", day: "numeric", timeZone: "UTC" },
+    locale,
+  );
 }
 
 /** Hour in the UI language, with the zone name on a repeated fall-back hour like the shared one. */
@@ -34,9 +35,9 @@ export function usageAxisHourLabel(hourStart: string, locale: string, timeZone?:
   const isRepeatedHour = [-HOUR_MS, HOUR_MS].some(
     (offset) => wallHourFormat.format(new Date(instant.getTime() + offset)) === wallHour,
   );
-  return new Intl.DateTimeFormat(locale, {
-    ...zone,
-    hour: "numeric",
-    ...(isRepeatedHour ? { timeZoneName: "short" as const } : {}),
-  }).format(instant);
+  return formatAppDateTime(
+    instant,
+    { ...zone, hour: "numeric", ...(isRepeatedHour ? { timeZoneName: "short" as const } : {}) },
+    locale,
+  );
 }

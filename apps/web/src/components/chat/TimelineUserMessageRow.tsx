@@ -225,7 +225,7 @@ function UserVideoAttachment({
             : "rounded-lg border border-border/80",
         )}
       >
-        {file.name}
+        <bdi>{file.name}</bdi>
       </div>
     );
   }
@@ -816,7 +816,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                   collage && "h-full",
                 )}
               >
-                {image.name}
+                <bdi>{image.name}</bdi>
               </div>
             )}
             {image.previewUrl && image.source?.kind === "snap-shot" ? (
@@ -1029,7 +1029,12 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                         theme={ctx.resolvedTheme}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate">{label}</span>
+                        <span
+                          dir={pastedText ? undefined : "auto"}
+                          className={cn("block truncate", !pastedText && "file-name")}
+                        >
+                          {label}
+                        </span>
                         {file.downloadable === false || pastedText ? (
                           <span className="block text-xs text-muted-foreground tabular-nums">
                             {file.downloadable === false ? (
@@ -1090,7 +1095,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                       kind="file"
                       theme={ctx.resolvedTheme}
                     />
-                    <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
+                    <span dir="auto" className="file-name min-w-0 flex-1 truncate">
+                      {attachment.name}
+                    </span>
                   </div>
                 ))}
               </div>

@@ -57,6 +57,12 @@ interface CompactToolOutput {
   linkedCount?: number;
   unlinkedCount?: number;
   sentMessage?: string;
+  sealedOutput?: SealedOutputReference;
+}
+
+/** A file `fill_sealed` finished for the person. Its name only: the file holds real values. */
+export interface SealedOutputReference {
+  readonly name: string;
 }
 
 function readResult(value: unknown, budget: ResultReadBudget, depth = 0): ResultEnvelope {
@@ -153,6 +159,31 @@ export function compactDynamicToolOutput(value: unknown): CompactToolOutput | un
     ) {
       output.sentMessage = data.sentMessage;
     }
+    if (
+      typeof data.name === "string" &&
+      data.name !== "" &&
+      data.name.length <= 255 &&
+      typeof data.filled === "number" &&
+      data.filled > 0 &&
+      Array.isArray(data.unknownMarkers) &&
+      data.unknownMarkers.length === 0 &&
+      // Absent from results recorded before the tool said it.
+      data.finished !== false
+    ) {
+      output.sealedOutput = { name: data.name };
+    }
+    // A client is sent this output already compacted: the reference is then all that is left.
+    const kept = data.sealedOutput;
+    if (
+      typeof kept === "object" &&
+      kept !== null &&
+      "name" in kept &&
+      typeof kept.name === "string" &&
+      kept.name !== "" &&
+      kept.name.length <= 255
+    ) {
+      output.sealedOutput = { name: kept.name };
+    }
     const htmlRender = readHtmlRenderReference(data.htmlRender);
     if (htmlRender !== undefined) output.htmlRender = htmlRender;
     const mcpApp = readMcpAppReference(data[MCP_APP_OUTPUT_KEY]);
@@ -221,6 +252,21 @@ export function htmlRenderFromToolItem(item: {
   }
   const output = compactDynamicToolOutput(item.output);
   return output?.isError ? undefined : output?.htmlRender;
+}
+
+/**
+ * The file a `fill_sealed` call finished: every marker filled, at least one value put in. A
+ * client shows it in the reply for the person to open; the agent is never given its contents.
+ */
+export function sealedOutputFromToolItem(item: {
+  readonly toolName: string | null | undefined;
+  readonly output?: unknown;
+}): SealedOutputReference | undefined {
+  if (item.toolName == null || !/(?:^|[^a-z0-9])fill_sealed$/i.test(item.toolName)) {
+    return undefined;
+  }
+  const output = compactDynamicToolOutput(item.output);
+  return output?.isError ? undefined : output?.sealedOutput;
 }
 
 /** The text `send_to_user` showed the user, which clients render as the agent's own words. */

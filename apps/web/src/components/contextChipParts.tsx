@@ -189,7 +189,10 @@ export function ImageChipButton({
         <ImageIcon />
       )}
       <ContextChipLabel className="flex items-baseline gap-[0.33em]">
-        <span className="min-w-0 max-w-72 overflow-x-clip text-ellipsis whitespace-nowrap">
+        <span
+          dir="auto"
+          className="min-w-0 max-w-72 overflow-x-clip text-ellipsis whitespace-nowrap"
+        >
           {middleTruncateAttachmentName(name)}
         </span>
         <span className="shrink-0 text-3xs text-current">{size}</span>
@@ -338,7 +341,10 @@ function FileChipContent(props: {
         <PierreEntryIcon pathValue={props.name} kind="file" theme={props.theme} />
       )}
       <ContextChipLabel className="flex items-baseline gap-[0.33em]">
-        <span className="min-w-0 max-w-72 overflow-x-clip text-ellipsis whitespace-nowrap">
+        <span
+          dir="auto"
+          className="min-w-0 max-w-72 overflow-x-clip text-ellipsis whitespace-nowrap"
+        >
           {middleTruncateAttachmentName(props.name)}
         </span>
         <span className="shrink-0 text-3xs text-current">{props.size}</span>

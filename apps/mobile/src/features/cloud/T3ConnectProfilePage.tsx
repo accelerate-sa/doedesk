@@ -24,8 +24,11 @@ import {
   deregisterManagedRelayEnvironmentCommand,
   useManagedRelayEnvironments,
 } from "./managedRelayState";
+import { formatAppDateTime } from "../../lib/dateTimeFormat";
 
-const linkedAtFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const linkedAtFormatter = {
+  format: (date: Date) => formatAppDateTime(date, { dateStyle: "medium" }),
+};
 
 function linkedAtLabel(value: string, resolve: MessageResolver): string {
   const linkedAt = new Date(value);

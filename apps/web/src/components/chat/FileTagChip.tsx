@@ -21,7 +21,7 @@ export function FileTagChipContent(props: {
           theme={props.theme}
         />
       )}
-      <ContextChipLabel>{props.label}</ContextChipLabel>
+      <ContextChipLabel dir="auto">{props.label}</ContextChipLabel>
     </>
   );
 }

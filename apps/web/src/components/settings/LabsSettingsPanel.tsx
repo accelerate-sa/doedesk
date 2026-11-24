@@ -41,7 +41,7 @@ function BoringSidebarRow() {
     <SettingsRow
       {...searchableSetting("boring-sidebar")}
       description={gt(
-        "Group sidebar chats into folder folders. Pinned chats stay on top, and Snoozed and Settled stay below the folders.",
+        "Group sidebar chats by folder. Pinned chats stay on top, and Snoozed and Settled stay below the folders.",
       )}
       control={
         <Switch

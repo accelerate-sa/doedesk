@@ -4,6 +4,7 @@ import {
   compactDynamicToolOutput,
   MAX_TOOL_OUTPUT_IMAGES,
   mcpToolResultOutput,
+  sealedOutputFromToolItem,
   SEND_TO_USER_MAX_LENGTH,
   sentMessageFromToolItem,
   toolOutputImages,
@@ -151,6 +152,53 @@ describe("compactDynamicToolOutput", () => {
     expect(compactDynamicToolOutput({ threadId: "known", body: "x".repeat(1_000_000) })).toEqual({
       threadId: "known",
     });
+  });
+});
+
+describe("sealedOutputFromToolItem", () => {
+  const result = (overrides: Record<string, unknown> = {}) => ({
+    structuredContent: {
+      name: "letter.txt",
+      filled: 3,
+      unknownMarkers: [],
+      note: "The finished copy is in the person's sealed outputs.",
+      ...overrides,
+    },
+  });
+
+  it("names the file a fill_sealed call finished, under any spelling of the tool", () => {
+    for (const toolName of ["fill_sealed", "mcp__t3-code__fill_sealed", "t3_code.fill_sealed"]) {
+      expect(sealedOutputFromToolItem({ toolName, output: result() })).toEqual({
+        name: "letter.txt",
+      });
+    }
+  });
+
+  it("still names it from the compacted output a client is sent", () => {
+    const compact = compactDynamicToolOutput(result());
+    expect(compact).toEqual({ sealedOutput: { name: "letter.txt" } });
+    expect(
+      sealedOutputFromToolItem({ toolName: "mcp__t3-code__fill_sealed", output: compact }),
+    ).toEqual({ name: "letter.txt" });
+  });
+
+  it("says nothing for an unfinished file, a failed call, or another tool", () => {
+    const unfinished = [
+      result({ unknownMarkers: ["{{DOC_1.fee}}"] }),
+      result({ finished: false }),
+      result({ filled: 0 }),
+      { ...result(), isError: true },
+      undefined,
+    ];
+    for (const output of unfinished) {
+      expect(
+        sealedOutputFromToolItem({ toolName: "mcp__t3-code__fill_sealed", output }),
+      ).toBeUndefined();
+    }
+    expect(
+      sealedOutputFromToolItem({ toolName: "mcp__other__refill_sealed", output: result() }),
+    ).toBeUndefined();
+    expect(sealedOutputFromToolItem({ toolName: null, output: result() })).toBeUndefined();
   });
 });
 

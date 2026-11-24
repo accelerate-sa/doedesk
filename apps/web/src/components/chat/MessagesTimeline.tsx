@@ -94,6 +94,7 @@ import {
   type TimelineLatestRun,
 } from "./MessagesTimeline.logic";
 import { type ThreadFindMatch } from "./threadFind";
+import { ChatValueMarks } from "../privacy/ChatValueMarks";
 import { useThreadFindNavigation } from "./useThreadFindNavigation";
 import { TooltipScrollDismissArea } from "../ui/tooltip";
 import { WorktreeSetupCard } from "./WorktreeSetupCard";
@@ -1454,6 +1455,11 @@ const ConversationTimeline = memo(function ConversationTimeline({
                 onCite={onCiteAssistantText}
               />
             ) : null}
+            <ChatValueMarks
+              container={timelineViewportElement}
+              threadRef={citationThreadRef}
+              environmentId={activeThreadEnvironmentId}
+            />
             <LegendList<MessagesTimelineRow>
               ref={setTimelineList}
               data={rows}
@@ -1669,6 +1675,7 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
         row.kind === "message" || row.kind === "assistant-meta" ? row.message.id : undefined
       }
       data-message-role={row.kind === "message" ? row.message.role : undefined}
+      data-run-id={row.kind === "message" ? (row.message.runId ?? undefined) : undefined}
     >
       {isWorkLogRow ? (
         <WorkLogBlock

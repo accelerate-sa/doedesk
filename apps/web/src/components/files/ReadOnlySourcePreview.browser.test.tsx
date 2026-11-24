@@ -12,6 +12,11 @@ vi.mock(import("~/components/DiffWorkerPoolProvider"), () => ({
   DiffWorkerPoolProvider: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
+import { makeKnownValueMatcher } from "@t3tools/shared/privacyKnownValues";
+import { page } from "vite-plus/test/browser";
+
+import { FileValueMarksContext } from "../privacy/FileValueMarkSurface";
+import { FILE_VALUE_MARK } from "../privacy/valueMarkRanges";
 import ReadOnlySourcePreview from "./ReadOnlySourcePreview";
 
 const LINE_COUNT = 301;
@@ -27,6 +32,63 @@ function copiedText(target: Element) {
 }
 
 describe("ReadOnlySourcePreview", () => {
+  it("highlights the values DoeDesk replaces in its lines, which live in a shadow tree", async () => {
+    await getSyntaxHighlighterPromise("text");
+    const contents = "Khalid Al-Otaibi signed.\nPhone: 0551234567\nجوال خالد العتيبي ٠٥٥١٢٣٤٥٦٧\n";
+    const matcher = makeKnownValueMatcher([
+      { token: "[PERSON_FBJD2]", surfaces: ["Khalid Al-Otaibi", "خالد العتيبي"] },
+      { token: "[PHONE_K7QW3]", surfaces: ["0551234567", "٠٥٥١٢٣٤٥٦٧"] },
+    ]);
+    await using screen = await render(
+      <FileValueMarksContext
+        value={{
+          on: true,
+          setOn: () => undefined,
+          surfaces: { text: 1, textless: 0 },
+          mount: () => () => undefined,
+          state: { kind: "ready", matcher },
+          stats: null,
+          report: () => undefined,
+        }}
+      >
+        <div className="flex h-[400px] flex-col">
+          <ReadOnlySourcePreview name="letter.txt" text={contents} wordWrap={false} />
+        </div>
+      </FileValueMarksContext>,
+    );
+    const marks = () => [...(CSS.highlights.get(FILE_VALUE_MARK)?.keys() ?? [])] as Range[];
+    await vi.waitFor(() =>
+      expect(marks().map((range) => range.toString())).toEqual([
+        "Khalid Al-Otaibi",
+        "0551234567",
+        "خالد العتيبي",
+        "٠٥٥١٢٣٤٥٦٧",
+      ]),
+    );
+    const root = screen.container.querySelector("diffs-container")!.shadowRoot!;
+    const first = marks()[0]!;
+    expect(first.startContainer.getRootNode()).toBe(root);
+    // The shadow tree paints the mark from its own stylesheet.
+    const line = root.querySelector("[data-line]")!;
+    expect(getComputedStyle(line, `::highlight(${FILE_VALUE_MARK})`).backgroundColor).not.toBe(
+      "rgba(0, 0, 0, 0)",
+    );
+    // The lines hold the characters they held: a mark is paint, and the copy is the file.
+    await userEvent.click(line);
+    await userEvent.keyboard("{ControlOrMeta>}a{/ControlOrMeta}");
+    expect(copiedText(line)).toBe(contents);
+
+    const rect = first.getClientRects()[0]!;
+    screen.container.querySelector("diffs-container")!.dispatchEvent(
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      }),
+    );
+    await expect.element(page.getByText("[PERSON_FBJD2]")).toBeVisible();
+  });
+
   it("copies the whole file after Select All, wherever the preview is scrolled", async () => {
     // File paints nothing until the shared highlighter has loaded; once it has, mount renders synchronously.
     await getSyntaxHighlighterPromise("text");

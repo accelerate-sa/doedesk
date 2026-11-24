@@ -42,6 +42,12 @@ import * as McpInvocationContext from "../../apps/server/src/mcp/McpInvocationCo
 import { advertisedJsonSchema } from "../../apps/server/src/mcp/advertisedJsonSchema.ts";
 import * as Contracts from "@t3tools/contracts";
 import {
+  NOT_REACHED,
+  WORKER_BUSY,
+  WORKER_NOT_INCLUDED,
+  workerBusyMessage,
+} from "@t3tools/privacy-gateway";
+import {
   EnvironmentId,
   ORCHESTRATOR_MCP_RUNNING_TASK_NEXT,
   PullRequestState,
@@ -51,7 +57,12 @@ import { projectComposerContextForProvider } from "@t3tools/shared/composerConte
 import { THEME_GUIDE } from "@t3tools/shared/themeCss";
 import { formatThreadLink } from "@t3tools/shared/threadLinks";
 import { buildCodexAdditionalContext } from "../../apps/server/src/provider/CodexDeveloperInstructions.ts";
-import { PULL_REQUEST_LINKING_INSTRUCTIONS } from "@t3tools/provider-core/server/runtimeInstructions";
+import { setProviderEnvironmentOverlay } from "@t3tools/provider-core/server/instanceEnvironment";
+import {
+  buildSealedFilesInstructions,
+  PRIVACY_STAND_IN_INSTRUCTIONS,
+  PULL_REQUEST_LINKING_INSTRUCTIONS,
+} from "@t3tools/provider-core/server/runtimeInstructions";
 import { makeSideChatContext } from "../../apps/server/src/orchestration-v2/ContextHandoffService.ts";
 import { withInlineContext } from "../../apps/server/src/orchestration-v2/ContextHandoffDelivery.ts";
 import { AttachmentToolkit } from "../../apps/server/src/mcp/toolkits/attachment/tools.ts";
@@ -62,6 +73,7 @@ import { IssuesToolkit } from "../../apps/server/src/mcp/toolkits/issues/tools.t
 import { MessageToolkit } from "../../apps/server/src/mcp/toolkits/message/tools.ts";
 import { OrchestratorToolkit } from "../../apps/server/src/mcp/toolkits/orchestrator/tools.ts";
 import { PreviewToolkit } from "../../apps/server/src/mcp/toolkits/preview/tools.ts";
+import { SealedToolkit } from "../../apps/server/src/mcp/toolkits/privacy/sealedTools.ts";
 import { PreviewControlsToolkit } from "../../apps/server/src/mcp/toolkits/previewControls/tools.ts";
 import { ProjectToolkit } from "../../apps/server/src/mcp/toolkits/project/tools.ts";
 import {
@@ -99,6 +111,7 @@ import {
 } from "./secret-grading.ts";
 /** Agent models by id, with the display name a harness gives them. */
 const MODELS = {
+  "claude-haiku-5-5": "Haiku 5.5",
   "claude-sonnet-5-5": "Sonnet 5.5",
   "claude-opus-5-5": "Opus 5.5",
   "gpt-6.1-sol": "GPT-6.1 Sol",
@@ -304,6 +317,27 @@ const McpToolUseWorld = Schema.StructWithRest(
     deviceAgentAccess: Schema.optional(Schema.Boolean),
     /** false: agent browser access is off. T3 denies every preview call and drops its browser text. */
     browserAgentAccess: Schema.optional(Schema.Boolean),
+    /** true: DoeDesk's privacy gateway masks the agent's requests, so T3's text says so. */
+    privacyMasking: Schema.optional(Schema.Boolean),
+    /**
+     * The folder has sealed files and a worker to read them, so T3 offers `ask_documents`. A list
+     * names them, moved out of the folder, and the prompt then starts with T3's note about them;
+     * `path` is where a file was, relative to the thread cwd.
+     */
+    sealedFiles: Schema.optional(
+      Schema.Union([
+        Schema.Boolean,
+        Schema.Array(
+          Schema.Struct({
+            handle: Schema.String,
+            name: Schema.String,
+            path: Schema.optional(Schema.String),
+          }),
+        ),
+      ]),
+    ),
+    /** Sealed subfolders, as paths from the thread cwd: every file in one is sealed. */
+    sealedFolders: Schema.optional(Schema.Array(Schema.String)),
     /** Every capture reaches T3 with adb screencap's warning ahead of the PNG: T3 reports 0×0. */
     deviceInvalidCapture: Schema.optional(Schema.Boolean),
     /** Devices another thread's agent-device session holds, by device id: that thread's id. */
@@ -499,6 +533,7 @@ const t3SourceTools: ReadonlyArray<Tool.Any> = [
   DeviceToolkit,
   HtmlToolkit,
   MessageToolkit,
+  SealedToolkit,
 ].flatMap((toolkit): ReadonlyArray<Tool.Any> => Object.values(toolkit.tools));
 // McpHttpServer decodes arguments with each tool's JSON codec, which drops undeclared keys.
 const t3InputDecoders = new Map(
@@ -567,6 +602,100 @@ const forgeToolNames = new Set(
     Object.values(toolkit.tools).map((tool: Tool.Any) => `${T3_PREFIX}${tool.name}`),
   ),
 );
+// T3 offers these only while a worker is connected to read sealed files: `world.sealedFiles`.
+const SEALED_TOOLS = new Set(
+  Object.values(SealedToolkit.tools).map((tool: Tool.Any) => `${T3_PREFIX}${tool.name}`),
+);
+/**
+ * A `$sealed` mock is answered in the product's own words: `busy` and `notIncluded` refuse with
+ * nothing read; `answers` gives each document in `values` its value under every asked field and
+ * marks those in `waiting`. `"$typed"` (or `{"$typed": n}`) answers by type, with stand-ins, and
+ * `program` is the result given to a call that sends one. See the README's sealed worker cases.
+ */
+const typedAnswer = (
+  handle: string,
+  field: Readonly<Record<string, unknown>>,
+  option: number,
+): unknown => {
+  if (field.type === "boolean") return { value: true };
+  if (field.type === "enum") {
+    const options = Array.isArray(field.options) ? field.options : [];
+    return { value: options[Math.min(option, options.length - 1)] ?? "" };
+  }
+  if (field.type === "list" || field.type === "text") return { found: false };
+  // The same field of the same document always gets the same stand-in, as in the product.
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let seed = 7;
+  for (const character of `${handle}.${String(field.name)}`) {
+    seed = (seed * 31 + character.charCodeAt(0)) % 33_554_432;
+  }
+  const code = Array.from({ length: 5 }, (_, index) => alphabet[(seed >> (index * 5)) % 32]).join(
+    "",
+  );
+  const kind = field.type === "number" ? "AMOUNT" : field.type === "date" ? "DATE" : "ID";
+  return { value: `[${kind}_${code}]` };
+};
+const sealedMock = (
+  mock: unknown,
+  input: Readonly<Record<string, unknown>>,
+): { readonly failed: string } | { readonly result: unknown } | undefined => {
+  if (!isRecord(mock) || typeof mock.$sealed !== "string") return undefined;
+  if (mock.$sealed === "busy") {
+    return {
+      failed: workerBusyMessage(
+        typeof mock.waiting === "number" ? mock.waiting : 1,
+        typeof mock.retryAfter === "number" ? mock.retryAfter : null,
+      ),
+    };
+  }
+  if (mock.$sealed === "notIncluded") return { failed: WORKER_NOT_INCLUDED };
+  const askedFields = (Array.isArray(input.fields) ? input.fields : []).flatMap((field: unknown) =>
+    isRecord(field) && typeof field.name === "string" ? [field] : [],
+  );
+  const asked = askedFields.map((field) => String(field.name));
+  const values = isRecord(mock.values) ? mock.values : {};
+  const waiting = Array.isArray(mock.waiting) ? mock.waiting.map(String) : [];
+  const problem = mock.reason === "notReached" ? NOT_REACHED : WORKER_BUSY;
+  return {
+    result: {
+      mode: "sealed",
+      documents: [
+        ...Object.entries(values).map(([handle, value]) => ({
+          handle,
+          status: "done",
+          fields: Object.fromEntries(
+            askedFields.map((field) => [
+              String(field.name),
+              value === "$typed"
+                ? typedAnswer(handle, field, 0)
+                : isRecord(value) && typeof value.$typed === "number"
+                  ? typedAnswer(handle, field, value.$typed)
+                  : value,
+            ]),
+          ),
+        })),
+        ...waiting.map((handle) => ({
+          handle,
+          status: "failed",
+          fields: Object.fromEntries(asked.map((name) => [name, { verified: false }])),
+          problem,
+        })),
+      ],
+      // A program's result, given only to a call that sent a program.
+      ...(typeof input.program === "string" && input.program.trim() !== "" && isRecord(mock.program)
+        ? { program: mock.program }
+        : {}),
+    },
+  };
+};
+/** A world's sealed files: whether T3 offers the tools that ask about them, and the ones it names. */
+const sealedFilesIn = (world: McpToolUseCase["setup"]["world"]) => {
+  const sealed = world?.sealedFiles;
+  return {
+    offered: sealed !== undefined && sealed !== false,
+    files: typeof sealed === "object" ? sealed : [],
+  };
+};
 /** T3's text for an arm: `raw` drops the PR linking block that names T3's PR tools. */
 const forArm = (value: string, arm: Arm | undefined) =>
   arm === "raw" ? value.replace(`\n\n${PULL_REQUEST_LINKING_INSTRUCTIONS}`, "") : value;
@@ -574,10 +703,12 @@ const visibleT3Tools = (options: {
   readonly subagent?: boolean;
   readonly links?: boolean;
   readonly forge?: boolean;
+  readonly sealedFiles?: boolean;
   readonly arm?: Arm;
 }) =>
   t3Tools.filter(
     (tool) =>
+      (options.sealedFiles === true || !SEALED_TOOLS.has(tool.name)) &&
       !(options.arm === "raw" && forgeToolNames.has(tool.name)) &&
       (options.links === true || !hiddenWhileLinksOff.has(tool.name)) &&
       (options.forge !== false || !hiddenWithoutForge.has(tool.name)) &&
@@ -589,7 +720,7 @@ const visibleT3Tools = (options: {
  * `browser` say whether the thread holds the `device` and `preview` capabilities, as agent device
  * and browser access decide.
  */
-const claudeQueryOptions = (model: Model, device = true, browser = true) => {
+const claudeQueryOptions = (model: Model, device = true, browser = true, masking = false) => {
   // Refs whose text follows a capability read its flag; older ones ignore it.
   const input: Parameters<typeof makeClaudeQueryOptions>[0] & {
     readonly deviceToolsAvailable?: boolean;
@@ -603,12 +734,19 @@ const claudeQueryOptions = (model: Model, device = true, browser = true) => {
     deviceToolsAvailable: device,
     browserToolsAvailable: browser,
   };
-  return makeClaudeQueryOptions(input);
+  if (!masking) return makeClaudeQueryOptions(input);
+  // The gateway routes every provider, as it does with masking on and none switched to direct.
+  setProviderEnvironmentOverlay(() => ({}));
+  try {
+    return makeClaudeQueryOptions(input);
+  } finally {
+    setProviderEnvironmentOverlay(undefined);
+  }
 };
 
 /** Text T3 appends to Claude Code's system prompt. Delegated children get the same text. */
-export const t3SystemAppend = (model: Model, device = true, browser = true) => {
-  const { systemPrompt } = claudeQueryOptions(model, device, browser);
+export const t3SystemAppend = (model: Model, device = true, browser = true, masking = false) => {
+  const { systemPrompt } = claudeQueryOptions(model, device, browser, masking);
   if (isRecord(systemPrompt) && systemPrompt.type === "preset" && systemPrompt.append) {
     return systemPrompt.append;
   }
@@ -698,6 +836,8 @@ export const buildBase = (
     readonly deviceAccess?: boolean;
     /** false: the thread has no agent browser access, so T3's text leaves the browser out. */
     readonly browserAccess?: boolean;
+    readonly privacyMasking?: boolean;
+    readonly sealedFiles?: boolean;
     readonly arm?: Arm;
   },
 ) => {
@@ -724,7 +864,10 @@ export const buildBase = (
   const { model } = options;
   const append = options.nativeSubagent
     ? ""
-    : forArm(t3SystemAppend(model, options.deviceAccess, options.browserAccess), options.arm);
+    : forArm(
+        t3SystemAppend(model, options.deviceAccess, options.browserAccess, options.privacyMasking),
+        options.arm,
+      );
   const modelLine = `You are powered by the model named ${MODELS[model]}. The exact model ID is ${model}.`;
   const joined = systemTexts.join("\n");
   // The capture's home directory names its user. Cases use `/home/user` paths instead.
@@ -794,6 +937,8 @@ const buildCodexBase = (
     readonly deviceAccess?: boolean;
     /** false: the thread has no agent browser access, so T3's text leaves the browser out. */
     readonly browserAccess?: boolean;
+    readonly privacyMasking?: boolean;
+    readonly sealedFiles?: boolean;
     readonly arm?: Arm;
   },
 ): Base => {
@@ -828,10 +973,16 @@ const buildCodexBase = (
     if (item.role === "assistant") return [];
     return [JSON.parse(clean(JSON.stringify(item))) as Block];
   });
-  const context = buildCodexAdditionalContext(
-    { model: options.model, reasoningEffort: effort },
-    { browser: options.browserAccess ?? true, device: options.deviceAccess ?? true },
-  );
+  const context = {
+    ...buildCodexAdditionalContext(
+      { model: options.model, reasoningEffort: effort },
+      { browser: options.browserAccess ?? true, device: options.deviceAccess ?? true },
+    ),
+    // CodexAdapterV2 adds this entry of its own for a masked provider.
+    ...(options.privacyMasking === true
+      ? { t3_code_privacy: { kind: "application" as const, value: PRIVACY_STAND_IN_INSTRUCTIONS } }
+      : {}),
+  };
   input.push(
     ...Object.entries(context).map(([key, entry]) =>
       message(`<${key}>${forArm(entry.value, options.arm)}</${key}>`),
@@ -1222,8 +1373,16 @@ export const buildMessages = (sample: Sample) => {
     testCase.promptContext === undefined
       ? testCase.prompt
       : projectComposerContextForProvider({ text: testCase.prompt, ...testCase.promptContext });
-  const prompt =
-    sideChatContext === undefined ? userText : withInlineContext(sideChatContext, userText);
+  // ProviderTurnStartService puts the sealed-file note ahead of each prompt, for every provider.
+  const sealedFiles = buildSealedFilesInstructions({
+    files: sealedFilesIn(testCase.setup.world).files,
+    folders: testCase.setup.world?.sealedFolders,
+    askOffered: true,
+  });
+  const prompt = withInlineContext(
+    [sideChatContext ?? "", sealedFiles].filter((part) => part !== "").join("\n\n"),
+    userText,
+  );
   const childPrompt = () => taskPrompt({ task: prompt, role: delegateRole });
   if (testCase.prompt !== "")
     push("user", text(role === "delegated-child" ? childPrompt() : prompt));
@@ -1952,6 +2111,15 @@ export const shellRequest = (sample: Sample, call: Omit<ShellEntry, "output">, m
       : []),
     // Which device each launcher and session drives, and which of this call's opens are refused.
     ...(devices?.describe(shell, typeof command === "string" ? command : undefined) ?? []),
+    ...(sealedFilesIn(world).files.length > 0
+      ? [
+          `The person sealed these files with DoeDesk: ${sealedFilesIn(world)
+            .files.map((file) => file.path ?? file.name)
+            .join(
+              ", ",
+            )}. Each was moved out of the folder, so reading or listing it there fails with "No such file or directory", and no readable copy is anywhere on this machine. Git's status and history are as stated above.`,
+        ]
+      : []),
     ...(world?.deviceInvalidCapture
       ? [
           "T3's device_screenshot gets each capture as a PNG whose header says 0×0, so it reports 0×0. agent-device's own screenshot is unaffected.",
@@ -2250,6 +2418,11 @@ export const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(fun
   if (sample.backgroundWait && isT3Name(call.name) && name === "t3_background_wait" && fromWorld) {
     const result = yield* sample.backgroundWait(input);
     return result.isError ? failed(result.text) : toolResult(call.id, result.text);
+  }
+  // The worker's busy and still-waiting answers come from the product's own text.
+  const sealed = name === "ask_documents" ? sealedMock(mock, input) : undefined;
+  if (sealed !== undefined) {
+    return "failed" in sealed ? failed(sealed.failed) : toolResult(call.id, sealed.result);
   }
   // `{"$error": "..."}` fails the call with that text, as T3 reports a forge error.
   if (isRecord(mock) && typeof mock.$error === "string") return failed(mock.$error);
@@ -2832,7 +3005,12 @@ const runSample = Effect.fn("evaluateMcpToolUse.runSample")(function* (
     modelCalls++;
     const response = input
       ? yield* callCodex(config, codexRequest(base, input))
-      : yield* callModel(config.apiKey, requestBody(sample, config.effort, messages));
+      : yield* callModel(
+          config.apiKey,
+          requestBody(sample, config.effort, messages),
+          // Without an Anthropic key the proxy answers Claude models too, as it does for the shell.
+          config.apiKey ? undefined : config.proxy,
+        );
     addUsage(usage, response.usage);
     if ("raw" in response) {
       input?.push(...response.raw);
@@ -3217,6 +3395,8 @@ const main = Effect.gen(function* () {
     browserAccess: boolean,
     links: boolean,
     forge: boolean,
+    privacyMasking: boolean,
+    sealedFiles: boolean,
   ): Effect.Effect<Base, Schema.SchemaError> =>
     codex
       ? decodeCodexCapture(template).pipe(
@@ -3230,6 +3410,8 @@ const main = Effect.gen(function* () {
               forge,
               deviceAccess,
               browserAccess,
+              privacyMasking,
+              sealedFiles,
               arm: flags.arm,
             }),
           ),
@@ -3245,6 +3427,8 @@ const main = Effect.gen(function* () {
               forge,
               deviceAccess,
               browserAccess,
+              privacyMasking,
+              sealedFiles,
               arm: flags.arm,
             });
             return role === "native-subagent"
@@ -3256,14 +3440,16 @@ const main = Effect.gen(function* () {
         );
   // Codex has no native subagents; its cases with that role run as top-level threads.
   const baseKey = ({ setup }: McpToolUseCase) =>
-    `${codex && setup.role === "native-subagent" ? "top" : setup.role}:${setup.world?.deviceAgentAccess !== false}:${setup.world?.browserAgentAccess !== false}:${setup.linkedEnvironments === true}:${setup.forge !== false}`;
-  const base = yield* buildFor("top", true, true, false, true);
-  const bases = new Map<string, Base>([["top:true:true:false:true", base]]);
+    `${codex && setup.role === "native-subagent" ? "top" : setup.role}:${setup.world?.deviceAgentAccess !== false}:${setup.world?.browserAgentAccess !== false}:${setup.linkedEnvironments === true}:${setup.forge !== false}:${setup.world?.privacyMasking === true}:${sealedFilesIn(setup.world).offered}`;
+  const base = yield* buildFor("top", true, true, false, true, false, false);
+  const bases = new Map<string, Base>([["top:true:true:false:true:false:false", base]]);
   for (const testCase of selected) {
     const key = baseKey(testCase);
     if (bases.has(key)) continue;
-    const [role = "top", device, browser, links, forge] = key.split(":") as [
+    const [role = "top", device, browser, links, forge, masking, sealed] = key.split(":") as [
       McpToolUseCase["setup"]["role"],
+      string,
+      string,
       string,
       string,
       string,
@@ -3277,6 +3463,8 @@ const main = Effect.gen(function* () {
         browser === "true",
         links === "true",
         forge === "true",
+        masking === "true",
+        sealed === "true",
       ),
     );
   }
@@ -3297,15 +3485,16 @@ const main = Effect.gen(function* () {
   }
   const apiKey = yield* Config.String("ANTHROPIC_API_KEY").pipe(Config.withDefault(""));
   const out = flags.out;
-  if ((!apiKey && !codex) || out === undefined) {
+  const proxied = codex || !isPricedModel(flags["shell-model"]);
+  if ((!apiKey && !proxied) || out === undefined) {
     const message =
-      "Set ANTHROPIC_API_KEY and pass --out <directory>. ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL are never used.";
+      "Set ANTHROPIC_API_KEY, or pass a --shell-model the proxy serves, and pass --out <directory>. ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL are never used.";
     return yield* Effect.die(new Error(message));
   }
   const config: Config = {
     apiKey,
     model: flags.model,
-    ...(codex || !isPricedModel(flags["shell-model"]) ? { proxy: proxyConfig() } : {}),
+    ...(proxied ? { proxy: proxyConfig() } : {}),
     effort,
     maxSteps: flags["max-steps"] ?? (codex ? 10 : 6),
     shellModel: flags["shell-model"],

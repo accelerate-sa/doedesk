@@ -44,6 +44,7 @@ import {
   type T3McpToolLogo,
   type T3McpToolPresentation,
 } from "@t3tools/shared/t3McpToolPresentation";
+import { sealedToolTitle, serverSentence } from "@t3tools/shared/serverSentencesCopy";
 import { resolveT3McpToolPresentation } from "@t3tools/shared/t3McpToolPresentationCopy";
 import type {
   ChatAttachment,
@@ -61,7 +62,13 @@ import type {
   ScheduledTaskId,
   TurnItemId,
 } from "@t3tools/contracts";
-import { idleCompactionOf, isCompactionCommandMessage, RunId, ThreadId } from "@t3tools/contracts";
+import {
+  idleCompactionOf,
+  isCompactionCommandMessage,
+  PROVIDER_FAILURE_NOT_SENT_CODE,
+  RunId,
+  ThreadId,
+} from "@t3tools/contracts";
 import {
   classifyToolActivity,
   collectToolFilePaths,
@@ -645,8 +652,8 @@ function itemSummary(
   toolPresentation: T3McpToolPresentation | null,
   resolve: MessageResolver,
 ): string {
-  if (item.type === "notification") return item.summary;
-  if (item.type === "system_notice") return item.message;
+  if (item.type === "notification") return serverSentence(item.summary, resolve);
+  if (item.type === "system_notice") return serverSentence(item.message, resolve);
   if (item.type === "compaction") return contextCompactionLabel(item, resolve);
   const title =
     (item.type === "dynamic_tool"
@@ -687,7 +694,9 @@ function itemSummary(
     case "error":
       return item.failure.class === "usage_limit"
         ? resolve(msg("Usage limit reached"))
-        : resolve(msg("Provider error"));
+        : item.failure.code === PROVIDER_FAILURE_NOT_SENT_CODE
+          ? resolve(msg("DoeDesk did not send this request"))
+          : resolve(msg("Provider error"));
     case "handoff":
       return resolve(msg("Context handed off"));
     case "fork":
@@ -754,7 +763,7 @@ function itemPreview(item: OrchestrationV2TurnItem, resolve: MessageResolver): s
     case "run_interrupt_request":
     case "run_interrupt_result":
     case "system_notice":
-      return item.message || null;
+      return item.message ? serverSentence(item.message, resolve) : null;
     case "error":
       return item.failure.message;
     case "compaction":
@@ -857,7 +866,10 @@ function toWorkLogEntry(
       return {
         ...common,
         toolTitle:
-          title ?? item.toolName ?? resolve(msg("Tool", { $context: "noun, an agent tool call" })),
+          sealedToolTitle(title ?? item.toolName, resolve) ??
+          title ??
+          item.toolName ??
+          resolve(msg("Tool", { $context: "noun, an agent tool call" })),
         toolData: { input: item.input, output: item.output },
       };
     default:

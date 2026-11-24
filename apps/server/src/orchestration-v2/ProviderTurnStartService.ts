@@ -41,6 +41,13 @@ import {
 } from "./Adapters/ClaudeAdapterV2.ts";
 import { withTurnStartReservation, withWorkspaceLease } from "../workspace/workspaceLease.ts";
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
+import {
+  noteAgentWorkspace,
+  noteSealedFilesTold,
+  owesSealedFilesNote,
+  sealedFilesNote,
+  sealedFoldersBeforeTurn,
+} from "../privacy/agentWorkspaces.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderAuthService from "../provider/ProviderAuthService.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -896,6 +903,20 @@ export const layer: Layer.Layer<
         return;
       }
       const resolvedRuntimePolicy = resolvedPolicy.success;
+      if (resolvedRuntimePolicy.cwd !== null) noteAgentWorkspace(resolvedRuntimePolicy.cwd);
+      // A sealed folder holds nothing readable when an agent's turn starts, or the turn does not.
+      const sealedFolderRefusal = yield* Effect.promise((signal) =>
+        sealedFoldersBeforeTurn(projection.thread.id, projection.thread.projectId, signal),
+      );
+      if (sealedFolderRefusal !== null) {
+        yield* settleStartFailure({
+          signal: "sealed-folder-not-ready",
+          title: sealedFolderRefusal.title,
+          error: new ProviderTurnStartError({ runId: run.id, cause: sealedFolderRefusal.title }),
+          message: sealedFolderRefusal.message,
+        });
+        return;
+      }
       if (!(yield* isCurrentAttemptInStatus("starting"))) return;
       const existingSessionProjection = projection.providerSessions.find(
         (candidate) => candidate.id === providerSessionId,
@@ -1910,12 +1931,22 @@ export const layer: Layer.Layer<
         sideChatHandoff !== undefined ||
         restartNote !== "" ||
         noteContinuation;
-      // Pending context turns the resume into a prompted turn, which needs no native resume.
+      // What is sealed goes ahead of the prompt, so a turn in a project with sealed files is
+      // started through the same delivery as one that carries context.
+      const carriesSealedFiles =
+        !slashCommand &&
+        sealedFilesNote(projection.thread.projectId, resolvedRuntimePolicy.cwd) !== "";
+      // Pending context turns the resume into a prompted turn, which needs no native resume. So
+      // does a note about sealed files that this agent has not been sent.
       if (
         manualResume &&
         unsentResumeMessage === undefined &&
         session.resumeTurn === undefined &&
-        !carriesPendingContext
+        !carriesPendingContext &&
+        !owesSealedFilesNote(
+          providerThread.id,
+          sealedFilesNote(projection.thread.projectId, resolvedRuntimePolicy.cwd),
+        )
       ) {
         yield* settleStartFailure({
           signal: "resume-unsupported",
@@ -2149,12 +2180,33 @@ export const layer: Layer.Layer<
                   (missed) =>
                     !turnInput.message.attachments.some((current) => current.id === missed.id),
                 );
-          // Like pending history, pending images need a prompt; native resume carries none.
-          const prompted = context !== "" || missedAttachments.length > 0;
+          // Read at each start, not kept with the thread: files are sealed and unsealed between
+          // turns.
+          const sealedFiles =
+            compact || slashCommand
+              ? ""
+              : sealedFilesNote(projection.thread.projectId, resolvedRuntimePolicy.cwd);
+          // Like pending history, pending images need a prompt; native resume carries none. So
+          // does a file sealed since this agent was last told what is sealed.
+          const prompted =
+            context !== "" ||
+            missedAttachments.length > 0 ||
+            (turnInput.resume === true && owesSealedFilesNote(providerThread.id, sealedFiles));
           // A resume that must be prompted still needs a request, or the agent has nothing to do.
           const requestText =
             turnInput.resume && prompted && userText === "" ? RESUME_PROMPT : userText;
-          const text = slashCommand ? userText : withInlineContext(context, requestText);
+          const sendsPrompt = !(turnInput.resume && !prompted);
+          if (sendsPrompt && !compact && !slashCommand) {
+            noteSealedFilesTold(providerThread.id, sealedFiles);
+          }
+          const text = slashCommand
+            ? userText
+            : withInlineContext(
+                [context, sendsPrompt ? sealedFiles : ""]
+                  .filter((part) => part !== "")
+                  .join("\n\n"),
+                requestText,
+              );
           const operation =
             turnInput.resume && !prompted
               ? (session.resumeTurn?.({ ...resumeInput, messageId: resumeMessage.messageId }) ??
@@ -2238,9 +2290,10 @@ export const layer: Layer.Layer<
               }),
         ),
       );
-      const deliverySession = carriesPendingContext
-        ? makeDeliverySession(session, startWithHandoffs)
-        : session;
+      const deliverySession =
+        carriesPendingContext || carriesSealedFiles
+          ? makeDeliverySession(session, startWithHandoffs)
+          : session;
       return runExecution.startRootRun({
         commandId: CommandId.make(`command:effect:provider-turn.start:${run.id}`),
         appThread: projection.thread,

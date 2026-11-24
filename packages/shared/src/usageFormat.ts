@@ -17,6 +17,8 @@ const INTEGER = new Intl.NumberFormat("en-US");
 
 // Clients pass their UI locale; English (and the server, which passes none) keeps en-US.
 function formatLocale(locale: string | undefined): string {
+  // Arabic with the digits the rest of the app uses: bare "ar" writes Arabic-Indic ones.
+  if (locale === "ar" || locale?.startsWith("ar-") === true) return "ar-u-nu-latn";
   return locale === undefined || locale === "en" ? "en-US" : locale;
 }
 

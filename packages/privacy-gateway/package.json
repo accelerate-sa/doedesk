@@ -6,6 +6,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./fixedFormats": {
+      "types": "./src/fixedFormats.ts",
+      "import": "./src/fixedFormats.ts"
     }
   },
   "scripts": {

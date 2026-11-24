@@ -104,6 +104,17 @@ export const primaryServerLegacyThreadMigrationAtom = Atom.make(
   },
 ).pipe(Atom.withLabel("web-primary-server-legacy-thread-migration"));
 
+/**
+ * The primary server's count of changes to sealed files. Null until it has sent one. The server
+ * sends its count again after a reconnect, so a change missed while away shows as a new count.
+ */
+export const primarySealedRevisionAtom = Atom.make((get): number | null => {
+  const environmentId = get(primaryEnvironmentIdAtom);
+  if (environmentId === null) return null;
+  const change = get(serverEnvironment.privacySealedChanges({ environmentId, input: {} }));
+  return AsyncResult.isSuccess(change) ? change.value.revision : null;
+}).pipe(Atom.withLabel("web-primary-sealed-revision"));
+
 export const primaryServerSettingsAtom = Atom.make(
   (get): ServerSettings => get(primaryServerConfigAtom)?.settings ?? DEFAULT_SERVER_SETTINGS,
 ).pipe(Atom.withLabel("web-primary-server-settings"));

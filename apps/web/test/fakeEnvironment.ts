@@ -106,11 +106,16 @@ const decodeServerConfig = Schema.decodeUnknownSync(ServerConfig);
 const makeServerConfig = (
   providers: ReadonlyArray<unknown>,
   supportsIssues = false,
+  fileAttachments = false,
 ): ServerConfig => ({
   ...decodeServerConfig({
     environment: {
       ...descriptor,
-      capabilities: { ...descriptor.capabilities, issues: supportsIssues },
+      capabilities: {
+        ...descriptor.capabilities,
+        issues: supportsIssues,
+        ...(fileAttachments ? { fileAttachments: { maxUploadBytes: 64 * 1024 * 1024 } } : {}),
+      },
     },
     auth,
     cwd: "/workspace/render",
@@ -429,6 +434,7 @@ let pendingDispatches: Array<{
   readonly reply: Deferred.Deferred<never, OrchestrationV2DispatchCommandError>;
 }> = [];
 let pendingAssetUrls: Array<Deferred.Deferred<AssetCreateUrlResult>> = [];
+let apiAnswers: Readonly<Record<string, unknown>> = {};
 let sequence = 1;
 let vcsStatusSubscriber: Queue.Queue<VcsStatusStreamEvent> | null = null;
 
@@ -444,6 +450,19 @@ const subscribe = <A>(first: ReadonlyArray<A>, register?: (queue: Queue.Queue<A>
       return Stream.fromQueue(queue);
     }),
   );
+
+const configSnapshot = () => ({
+  version: 1 as const,
+  type: "snapshot" as const,
+  config: serverConfig(),
+});
+// The app keeps its config subscription across tests, so each test's config is sent to it.
+const configSubscribers = new Set<Queue.Queue<ReturnType<typeof configSnapshot>>>();
+const subscribeServerConfig = () =>
+  subscribe([configSnapshot()], (queue) => {
+    configSubscribers.add(queue);
+    return () => void configSubscribers.delete(queue);
+  });
 
 const handlers: Record<string, (input: never) => unknown> = {
   // Recorded, and accepted only when the scenario asks, since a pending command holds every
@@ -545,8 +564,7 @@ const handlers: Record<string, (input: never) => unknown> = {
         if (vcsStatusSubscriber === queue) vcsStatusSubscriber = null;
       };
     }),
-  [WS_METHODS.subscribeServerConfig]: () =>
-    subscribe([{ version: 1 as const, type: "snapshot" as const, config: serverConfig() }]),
+  [WS_METHODS.subscribeServerConfig]: subscribeServerConfig,
 };
 
 // Unanswered calls stay pending, like a server that has not replied yet.
@@ -562,8 +580,7 @@ const client = new Proxy(handlers, {
 const session: EnvironmentConnectionLease["session"] = {
   client: client as unknown as WsRpcProtocolClient,
   initialConfig: Effect.sync(serverConfig),
-  subscribeServerConfig: () =>
-    subscribe([{ version: 1 as const, type: "snapshot" as const, config: serverConfig() }]),
+  subscribeServerConfig,
   ready: Effect.void,
   probe: Effect.void,
   inboundFrames: Effect.succeed(0),
@@ -607,6 +624,10 @@ export function installFakeEnvironment(
     /** Commands left unanswered even when accepting, until `rejectPendingCommand`. */
     readonly holdCommand?: (command: OrchestrationV2Command) => boolean;
     readonly providers?: ReadonlyArray<unknown>;
+    /** The server takes files of any kind, as a current one does; without it only images attach. */
+    readonly fileAttachments?: boolean;
+    /** What the environment's HTTP API answers, by path. Any other path is not found. */
+    readonly api?: Readonly<Record<string, unknown>>;
   },
 ): Disposable {
   threads = fixtures;
@@ -614,9 +635,11 @@ export function installFakeEnvironment(
     ...makeServerConfig(
       options?.providers ?? [CODEX_PROVIDER],
       fixtures.some((thread) => (thread.issues?.length ?? 0) > 0),
+      options?.fileAttachments === true,
     ),
     keybindings: options?.keybindings ?? DEFAULT_RESOLVED_KEYBINDINGS,
   };
+  for (const subscriber of configSubscribers) Queue.offerUnsafe(subscriber, configSnapshot());
   dispatched = [];
   acceptCommands = options?.acceptCommands === true;
   projects = [
@@ -628,6 +651,7 @@ export function installFakeEnvironment(
     })),
   ];
   holdCommand = options?.holdCommand ?? (() => false);
+  apiAnswers = options?.api ?? {};
   globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
     if (url.origin !== window.location.origin) return realFetch(input, init);
@@ -641,6 +665,9 @@ export function installFakeEnvironment(
         expiresAt: "2099-01-01T00:00:00.000Z",
       });
     }
+    // Read at call time: the app's HTTP client keeps the first fetch it was given.
+    const answer = apiAnswers[url.pathname];
+    if (answer !== undefined) return json(answer);
     // Snapshot endpoints fall back to the socket, which serves the same fixtures.
     if (/^\/(api|oauth|\.well-known)\//.test(url.pathname)) return json({}, 404);
     return realFetch(input, init);
@@ -656,6 +683,7 @@ export function installFakeEnvironment(
       holdCommand = () => false;
       pendingDispatches = [];
       pendingAssetUrls = [];
+      apiAnswers = {};
     },
   };
 }

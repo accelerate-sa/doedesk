@@ -16,6 +16,12 @@ export const ENTITY_KINDS = [
   "ACCOUNT",
   "DATE",
   "URL",
+  // A number that is confidential in itself: an amount, a measurement, a computed result.
+  "AMOUNT",
+  // Identifiers of a thing, not a person, that still point to its owner when combined.
+  "PARCEL",
+  "DEED",
+  "CASE",
   "OTHER",
 ] as const;
 

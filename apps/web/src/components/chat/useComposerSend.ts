@@ -1,6 +1,7 @@
 import { msg } from "gt-react";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m } from "~/i18n/messages";
+import { useProviderNoticeBeforeSend } from "../privacy/providerNoticeGate";
 import { isClearComposerCommand, parseSideChatCommand } from "@t3tools/shared/composerTrigger";
 import { readWorktreeBaseBranch } from "../../worktreeRepositoryChoiceStore";
 import { armFreshSession, disarmFreshSession, readFreshSessionArm } from "./freshSessionArms";
@@ -1754,13 +1755,20 @@ export function useComposerSend(input: ComposerSendInput) {
   };
 
   const onSendLatest = useStableCallback(onSend);
+  const providerNoticeBeforeSend = useProviderNoticeBeforeSend(environmentId);
   const onSendWithRouting = async (...args: Parameters<typeof onSend>) => {
     args[0]?.preventDefault();
+    // The first message to a provider waits for its masking notice to be read.
+    const notice = sendInFlightRef.current
+      ? null
+      : providerNoticeBeforeSend(composerRef.current?.getSendContext().selectedProvider);
+    if (notice !== null && !(await notice)) return;
     const refresh =
       args[3] || sendInFlightRef.current || readPendingEnvironmentChange() !== null
         ? null
         : refreshBeforeSend();
-    if (refresh === null) return onSend(...args);
+    // After a wait the composer may have rendered again: send through the latest closure.
+    if (refresh === null) return notice === null ? onSend(...args) : onSendLatest(...args);
     sendInFlightRef.current = true;
     const ready = await refresh.finally(() => {
       sendInFlightRef.current = false;

@@ -30,6 +30,7 @@ import type {
   TurnItemId,
 } from "@t3tools/contracts";
 import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
+import type { ThreadRunPrivacy } from "@t3tools/client-runtime/state/thread-privacy";
 import { Atom } from "effect/reactivity";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentProjects } from "./projects";
@@ -70,6 +71,9 @@ const EMPTY_VISIBLE_TURN_ITEMS_ATOM = Atom.make(EMPTY_VISIBLE_TURN_ITEMS).pipe(
 const EMPTY_CHECKPOINT_SUMMARIES_ATOM = Atom.make<ReadonlyArray<ThreadCheckpointSummary>>(
   Object.freeze([]),
 ).pipe(Atom.withLabel("web-thread-checkpoint-summaries:empty"));
+const EMPTY_RUN_PRIVACY_ATOM = Atom.make<ReadonlyArray<ThreadRunPrivacy>>(Object.freeze([])).pipe(
+  Atom.withLabel("web-thread-run-privacy:empty"),
+);
 const EMPTY_ASSISTANT_MESSAGE_TEXT_ATOM = Atom.make<string | null>(null).pipe(
   Atom.withLabel("web-assistant-message-text:empty"),
 );
@@ -287,6 +291,13 @@ export function useThreadCheckpointSummaries(
     ref === null
       ? EMPTY_CHECKPOINT_SUMMARIES_ATOM
       : environmentThreadDetails.checkpointSummariesAtom(ref),
+  );
+}
+
+/** What the privacy gateway did for each recorded turn of a chat, oldest first. */
+export function useThreadRunPrivacy(ref: ScopedThreadRef | null): ReadonlyArray<ThreadRunPrivacy> {
+  return useAtomValue(
+    ref === null ? EMPTY_RUN_PRIVACY_ATOM : environmentThreadDetails.runPrivacyAtom(ref),
   );
 }
 

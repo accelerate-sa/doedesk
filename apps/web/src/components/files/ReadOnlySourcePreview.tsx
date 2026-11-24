@@ -7,6 +7,8 @@ import { useRenderedAppearance } from "~/hooks/useTheme";
 import { resolveDiffThemeName } from "~/lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
 
+import { FileValueMarkSurface } from "../privacy/FileValueMarkSurface";
+import { codeViewerShadowRoot } from "../privacy/valueMarkRanges";
 import { FILE_LINK_REVEAL_UNSAFE_CSS } from "./fileSurfaceChrome";
 import { SourceSelection } from "./sourceSelection";
 
@@ -69,6 +71,7 @@ export default function ReadOnlySourcePreview(props: {
           if (root) selection.sync(root, text);
         }}
       >
+        <FileValueMarkSurface shadow={codeViewerShadowRoot} unitSelector="[data-line]" />
         <Virtualizer
           key={`${props.name}:${resolvedTheme}:${props.text.length}`}
           className="file-preview-virtualizer min-h-0 flex-1 overflow-auto"

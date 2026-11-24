@@ -27,6 +27,7 @@ import {
   OrchestrationV2LinkedSender,
   ThreadId,
 } from "@t3tools/contracts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 
 import packageJson from "../../package.json" with { type: "json" };
 import { parseBearerToken } from "../auth/EnvironmentAuth.ts";
@@ -95,6 +96,8 @@ import {
 import * as HtmlHandlers from "./toolkits/html/handlers.ts";
 import * as PrivacyGateway from "../privacy/PrivacyGateway.ts";
 import * as PrivacyHandlers from "./toolkits/privacy/handlers.ts";
+import * as SealedHandlers from "./toolkits/privacy/sealedHandlers.ts";
+import { SealedToolkit, SealedToolkitAskingFreely } from "./toolkits/privacy/sealedTools.ts";
 import { PrivacyToolkit } from "./toolkits/privacy/tools.ts";
 import { MessageToolkit } from "./toolkits/message/tools.ts";
 import * as MessageHandlers from "./toolkits/message/handlers.ts";
@@ -1315,6 +1318,25 @@ const layerPrivacyToolkit = toolkitRegistration(PrivacyToolkit, PrivacyHandlers.
   ),
 );
 
+/**
+ * The tools that ask about sealed documents. Listed only while a worker is connected and
+ * answering: with no worker there is nothing they could do.
+ */
+const layerSealedToolkit = Layer.unwrap(
+  Effect.map(HostProcess.Environment, (environment) =>
+    toolkitRegistration(
+      PrivacyGateway.sealedAskFreelyFromEnvironment(environment)
+        ? SealedToolkitAskingFreely
+        : SealedToolkit,
+      SealedHandlers.layer,
+    ),
+  ),
+).pipe(
+  Layer.provide(
+    McpServer.visibility(() => Effect.sync(() => PrivacyGateway.sealedToolsOffered())).layer,
+  ),
+);
+
 const layerWorktreeToolkitRegistration = toolkitRegistration(
   WorktreeToolkit,
   WorktreeHandlers.layer,
@@ -1409,6 +1431,7 @@ export const layerTools = Layer.mergeAll(
   layerHtmlToolkit,
   layerMessageToolkit,
   layerPrivacyToolkit,
+  layerSealedToolkit,
 );
 
 const layerToolExposure = Layer.effect(

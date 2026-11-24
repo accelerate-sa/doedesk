@@ -50,3 +50,7 @@
 [data-pdf-text-layer] .pdf-find-match {
   background: #ffc80066;
 }
+/* The page is white in every theme, so the mark for a replaced value is a fixed grey. */
+[data-pdf-text-layer] ::highlight(doedesk-replaced-value) {
+  background-color: rgb(60 60 67 / 18%);
+}

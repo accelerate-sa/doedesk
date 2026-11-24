@@ -273,6 +273,11 @@ const matchesPerson = (initials: ReadonlyArray<string>, name: string): boolean =
   return words.slice(1, -1).some((word) => initialsOfWord(word).has(middle));
 };
 
+const INITIALS_ANYWHERE = new RegExp(INITIALS_RUN.source, "u");
+
+/** True when `text` holds something shaped like initials, whoever they stand for. */
+export const holdsInitials = (text: string): boolean => INITIALS_ANYWHERE.test(text);
+
 /** Initials in `text` that stand for a person, outside the spans already found. */
 export const findInitials = (
   text: string,

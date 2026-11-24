@@ -160,7 +160,7 @@ export function SecretProviderDialog({
             form="secret-provider-form"
             disabled={submitted && Result.isFailure(result)}
           >
-            {existing ? gt("Save changes") : gt("Add provider")}
+            {existing ? gt("Save changes") : gt("Add secret provider")}
           </Button>
         </DialogFooter>
       </DialogPopup>

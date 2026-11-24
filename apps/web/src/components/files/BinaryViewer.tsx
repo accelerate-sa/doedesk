@@ -32,6 +32,7 @@ import {
 import { PreviewImage } from "./PreviewImage";
 import { readBinaryPreview } from "./readBinaryPreview";
 import { previewErrorText, previewFailureText } from "./previewFailureMessages";
+import { formatDateTimeWith } from "~/timestampFormat";
 
 const SourcePreview = lazy(() => import("./ReadOnlySourcePreview"));
 type Archive = Extract<BinaryWorkerResult, { type: "archive" }>;
@@ -375,7 +376,13 @@ export default function BinaryViewer(props: {
                       {formatAttachmentSize(item.size, messages)}
                     </td>
                     <td className="w-28 border-b border-border/60 px-3 py-2 text-end whitespace-nowrap text-muted-foreground">
-                      {item.modified ? new Date(item.modified).toLocaleDateString() : "-"}
+                      {item.modified
+                        ? formatDateTimeWith(new Date(item.modified), {
+                            year: "numeric",
+                            month: "numeric",
+                            day: "numeric",
+                          })
+                        : "-"}
                     </td>
                   </tr>
                 ))}

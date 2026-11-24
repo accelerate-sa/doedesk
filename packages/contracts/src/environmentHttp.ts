@@ -15,15 +15,24 @@ import {
   PrivacyActivity,
   PrivacyConfigureRequest,
   PrivacyConfigureResult,
+  PrivacyKnownValues,
+  PrivacyKnownValuesRequest,
   PrivacyPreferenceRequest,
   PrivacyProfileRequest,
   PrivacyRedactionFile,
   PrivacyRedactionFileRequest,
   PrivacyRedactions,
+  PrivacySealedRequest,
+  PrivacySealedResult,
   PrivacySignInRequest,
   PrivacySignInResult,
   PrivacyStatus,
+  PrivacyTurnValues,
+  PrivacyTurnValuesRequest,
   PrivacyVault,
+  PrivacyVaultRequest,
+  PrivacyVaultResult,
+  PrivacyWorkerRequest,
   UsageDataRequest,
   UsageDataStatus,
 } from "./privacy.ts";
@@ -1192,6 +1201,14 @@ class EnvironmentPrivacyHttpApi extends HttpApiGroup.make("privacy")
     }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
+    HttpApiEndpoint.post("changeVault", "/api/privacy/vault", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyVaultRequest,
+      success: PrivacyVaultResult,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
     HttpApiEndpoint.get("redactions", "/api/privacy/redactions", {
       headers: OptionalBearerHeaders,
       success: PrivacyRedactions,
@@ -1210,6 +1227,38 @@ class EnvironmentPrivacyHttpApi extends HttpApiGroup.make("privacy")
     HttpApiEndpoint.post("clearRedactions", "/api/privacy/redactions/clear", {
       headers: OptionalBearerHeaders,
       success: PrivacyRedactions,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("worker", "/api/privacy/worker", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyWorkerRequest,
+      success: PrivacyConfigureResult,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("sealed", "/api/privacy/sealed", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacySealedRequest,
+      success: PrivacySealedResult,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("turnValues", "/api/privacy/turn-values", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyTurnValuesRequest,
+      success: PrivacyTurnValues,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("knownValues", "/api/privacy/known-values", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyKnownValuesRequest,
+      success: PrivacyKnownValues,
       error: EnvironmentPrivacyErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
   ) {}

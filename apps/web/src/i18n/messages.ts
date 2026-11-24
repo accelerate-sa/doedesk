@@ -1,4 +1,5 @@
-import { decodeOptions, getReactI18nCache, gtFallback, type useMessages } from "gt-react";
+import { setUnnamedThreadTitle } from "@t3tools/client-runtime/state/models";
+import { decodeOptions, getReactI18nCache, gtFallback, msg, type useMessages } from "gt-react";
 
 import { DEFAULT_LOCALE } from "./locales";
 
@@ -37,3 +38,6 @@ function resolve(message: string, variables: Parameters<MessageResolver>[1] = {}
  */
 export const m = ((message, variables) =>
   typeof message === "string" ? resolve(message, variables) : message) as MessageResolver;
+
+// The server's "New chat" on a chat with no name yet is said in the app's language.
+setUnnamedThreadTitle(() => m(msg("New chat")));

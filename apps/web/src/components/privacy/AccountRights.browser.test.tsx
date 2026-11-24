@@ -87,6 +87,35 @@ const setup = async (current = status()) => {
 };
 
 describe("account rights in Settings", () => {
+  it("says what the region changes, and asks before moving sealed files' questions to another one", async () => {
+    await using screen = await setup(
+      status({ accountRegion: "sa", sealedDocuments: 2, hostedWorkerEntitled: true }),
+    );
+    client.accountAction.mockResolvedValue(result());
+    await expect
+      .element(
+        screen.getByText(
+          /deep\.sa, in Saudi Arabia according to deep\.sa\. Detection, PDF and image reading, and your account also run on DoeDesk Cloud in Saudi Arabia/,
+        ),
+      )
+      .toBeVisible();
+
+    await press(screen.getByLabelText("Account region"));
+    await press(page.getByRole("option", { name: "European Union" }));
+    await expect
+      .element(
+        screen.getByText(
+          "Future questions about your sealed files will use European Union. Already sealed files stay encrypted on this computer.",
+        ),
+      )
+      .toBeVisible();
+    expect(client.accountAction).not.toHaveBeenCalled();
+    await press(screen.getByRole("button", { name: "Change region" }));
+    await vi.waitFor(() =>
+      expect(client.accountAction).toHaveBeenCalledWith({ action: "setRegion", region: "eu" }),
+    );
+  });
+
   it("saves a copy of the account's data as a file", async () => {
     await using screen = await setup();
     client.accountAction.mockResolvedValue(result({ exported: `{"account":{"id":"acct-1"}}` }));
@@ -97,6 +126,8 @@ describe("account rights in Settings", () => {
       saved.push({ name: this.download, href: this.href });
     });
 
+    // The region governs only DoeDesk Cloud's worker, which this account does not have.
+    expect(screen.getByLabelText("Account region").query()).toBeNull();
     await press(screen.getByRole("button", { name: "Download" }));
     await vi.waitFor(() => expect(saved).toHaveLength(1));
     expect(client.accountAction).toHaveBeenCalledWith({ action: "export" });

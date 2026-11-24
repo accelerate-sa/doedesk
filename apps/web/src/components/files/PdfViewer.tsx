@@ -14,6 +14,7 @@ import { msg, useGT } from "gt-react";
 import { m } from "~/i18n/messages";
 import { ChevronDownIcon, ChevronUpIcon, MinusIcon, PlusIcon, ScanIcon } from "lucide-react";
 import { Input } from "~/components/ui/input";
+import { FileValueMarkSurface } from "~/components/privacy/FileValueMarkSurface";
 import { observeResize } from "~/lib/observeResize";
 import { FileSurfaceAction, FileSurfaceFailure, FileSurfaceLoading } from "./fileSurfaceChrome";
 import { readBoundedDocument } from "./readBoundedDocument";
@@ -36,6 +37,8 @@ import {
 import "./pdfViewer.css";
 
 const MAX_PAGES = 2000;
+const PDF_TEXT_READY_ATTRIBUTE = "data-pdf-text-ready";
+const PDF_VALUE_MARK_ATTRIBUTES = [PDF_TEXT_READY_ATTRIBUTE] as const;
 const MAX_FIND_TEXT = 4 * 1024 * 1024;
 
 const MAX_POSITIONS = 50;
@@ -117,6 +120,7 @@ function PdfPage(props: {
         background: "white",
       });
       text.current.replaceChildren();
+      text.current.removeAttribute(PDF_TEXT_READY_ATTRIBUTE);
       text.current.style.setProperty("--total-scale-factor", String(viewport.scale));
       layer = new TextLayer({
         container: text.current,
@@ -156,6 +160,8 @@ function PdfPage(props: {
       // A page whose annotations cannot be read still renders, without links.
       const linkedOrNone = linked.catch(() => undefined);
       await Promise.all([shown, layer.render(), linkedOrNone]);
+      // A page is looked at for known values once its text is whole, so one with none is known.
+      if (!cancelled) text.current?.setAttribute(PDF_TEXT_READY_ATTRIBUTE, "");
     })().catch((cause: unknown) => {
       if (!cancelled)
         onError(thrownErrorMessage(cause, m) ?? m(msg("This PDF page could not render.")));
@@ -573,6 +579,11 @@ export default function PdfViewer(props: {
           }
         }}
       >
+        <FileValueMarkSurface
+          unitSelector={`[data-pdf-text-layer][${PDF_TEXT_READY_ATTRIBUTE}]`}
+          unitAttributes={PDF_VALUE_MARK_ATTRIBUTES}
+          lineBreaks="space"
+        />
         {error ? (
           <FileSurfaceFailure
             message={error}

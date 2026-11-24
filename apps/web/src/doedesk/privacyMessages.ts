@@ -3,7 +3,8 @@
  * or a deletion. The service's own messages are English and written for apps; these are for the
  * person. The copy rule: each sentence says who does what to what.
  */
-import { msg, useMessages } from "gt-react";
+import type { PrivacyServiceProblem } from "@t3tools/contracts";
+import { msg, useGT, useMessages } from "gt-react";
 
 export const UNREACHABLE = msg("Could not reach the DoeDesk service on this computer. Try again.");
 export const NOT_WORKED = msg("Something went wrong. Try again.");
@@ -41,4 +42,59 @@ export const CLOUD_MESSAGES: Readonly<Record<string, string>> = {
 /** Reads one of these messages in the app's active language. */
 export function usePrivacyMessage(): (message: string) => string {
   return useMessages();
+}
+
+/**
+ * Why one's own detection service could not be connected, said for the person connecting it.
+ * The server's own sentence is English and written for a message that failed to send.
+ */
+export function useServiceProblemMessage(): (problem: PrivacyServiceProblem) => string {
+  const gt = useGT();
+  return (problem) => {
+    // An address reads left to right inside an Arabic sentence.
+    const host = `\u2066${problem.host ?? ""}\u2069`;
+    const status = problem.status ?? "";
+    switch (problem.kind) {
+      case "address":
+        return gt("Enter the service address as a full URL, such as {example}.", {
+          example: "\u2066http://localhost:8080\u2069",
+        });
+      case "unreachable":
+        return gt(
+          "DoeDesk could not reach a detection service at {host}. Check the address and that the service is running, then try again.",
+          { host },
+        );
+      case "timeout":
+        return gt(
+          "The detection service at {host} did not answer in time. Check that it is running, then try again.",
+          { host },
+        );
+      case "allowance":
+        return gt(
+          "The detection service at {host} has no allowance left for this account. Add more allowance on the service, then try again.",
+          { host },
+        );
+      case "busy":
+      case "failing":
+        return gt(
+          "The detection service at {host} answered with an error ({status}). Check the service, then try again.",
+          { host, status },
+        );
+      case "signIn":
+        return gt(
+          "The detection service at {host} did not accept the access token. Check the token, then try again.",
+          { host },
+        );
+      case "refused":
+        return gt(
+          "The detection service at {host} refused the request ({status}). Check the address and the access token.",
+          { host, status },
+        );
+      case "unreadable":
+        return gt(
+          "The service at {host} answered, but not in the format DoeDesk expects. Check that it follows the detection format.",
+          { host },
+        );
+    }
+  };
 }

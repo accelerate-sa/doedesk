@@ -1673,6 +1673,10 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.subscribeResourceTelemetry,
       idleTtlMs: 0,
     }),
+    privacySealedChanges: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:server:privacy-sealed-changes",
+      tag: WS_METHODS.subscribePrivacySealedChanges,
+    }),
     resourceTelemetryHistory: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:server:resource-telemetry-history",
       tag: WS_METHODS.serverGetResourceTelemetryHistory,

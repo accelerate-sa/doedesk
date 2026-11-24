@@ -100,8 +100,8 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   const preview =
     promptPreview.length > 0
       ? promptPreview
-      : attachmentCount === 0 && props.terminalLabel !== null
-        ? props.terminalLabel
+      : attachmentCount === 0
+        ? (props.terminalLabel ?? gt("New chat"))
         : gt("{count, plural, one {{count} attachment} other {{count} attachments}}", {
             count: attachmentCount,
           });
@@ -204,14 +204,18 @@ function listedDraftComposer(draftId: string | null): ComposerThreadDraftState |
     : null;
 }
 
+const NO_PROJECT_KEYS: ReadonlySet<string> = new Set();
+
 /**
  * Unsent drafts listed above the threads, newest first. The open draft keeps the
  * row it had on arrival (frozen content), so its row and jump number stay put.
+ * A folder with no chat yet has no other row, so its draft is listed even while empty.
  */
 export function useSidebarDrafts(
   scopedProjectKeys: ReadonlySet<string> | null,
   routeDraftId: string | null,
   terminalLabels: ReadonlyMap<string, string>,
+  chatlessProjectKeys: ReadonlySet<string> = NO_PROJECT_KEYS,
 ): { draftIds: readonly DraftId[]; routeDraftComposer: ComposerThreadDraftState | null } {
   const [frozenRoute, setFrozenRoute] = useState<{
     routeDraftId: string | null;
@@ -235,6 +239,7 @@ export function useSidebarDrafts(
         }
         // Composer edits stay frozen while open; terminals come and go live.
         const isListed =
+          chatlessProjectKeys.has(`${session.environmentId}:${session.projectId}`) ||
           draftTerminalLabel(session, terminalLabels) !== null ||
           (draftKey === routeDraftId
             ? routeDraftComposer !== null

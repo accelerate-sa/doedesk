@@ -35,6 +35,7 @@ import type {
   ThreadStructureVisibleTurnItem,
 } from "./models.ts";
 import { EMPTY_ENVIRONMENT_THREAD_STATE, type EnvironmentThreadState } from "./threadState.ts";
+import { threadRunPrivacy } from "./threadPrivacy.ts";
 import {
   createQuestionHistoryProjector,
   derivePendingThreadRequests,
@@ -537,6 +538,28 @@ export function createEnvironmentThreadDetailAtoms<E>(
     }).pipe(Atom.setIdleTTL(0), Atom.withLabel(`environment-thread-checkpoint-summaries:${key}`));
   });
 
+  const runPrivacyAtomFamily = Atom.family((key: string) => {
+    let runs: OrchestrationV2ThreadProjection["runs"] | null = null;
+    let value = threadRunPrivacy([]);
+    return Atom.make((get) => {
+      const projection = Option.getOrNull(get(threadStateValueAtomFamily(key)).data);
+      if (projection === null) {
+        runs = null;
+        value = threadRunPrivacy([]);
+      } else if (projection.runs !== runs) {
+        runs = projection.runs;
+        const next = threadRunPrivacy(runs);
+        // Runs change through a turn; the records change once, when it ends.
+        if (
+          next.length !== value.length ||
+          next.some((entry, index) => entry.privacy !== value[index]?.privacy)
+        )
+          value = next;
+      }
+      return value;
+    }).pipe(Atom.setIdleTTL(0), Atom.withLabel(`environment-thread-run-privacy:${key}`));
+  });
+
   const lastVisitedAtAtomFamily = Atom.family((key: string) =>
     Atom.make(
       (get) =>
@@ -636,6 +659,7 @@ export function createEnvironmentThreadDetailAtoms<E>(
     turnSubagentsAtom: (ref: ScopedThreadRef) => turnSubagentsAtomFamily(threadKey(ref)),
     checkpointSummariesAtom: (ref: ScopedThreadRef) =>
       checkpointSummariesAtomFamily(threadKey(ref)),
+    runPrivacyAtom: (ref: ScopedThreadRef) => runPrivacyAtomFamily(threadKey(ref)),
     stateAtom: (ref: ScopedThreadRef) => threadStateValueAtomFamily(threadKey(ref)),
     threadAtom: (ref: ScopedThreadRef) => threadAtomFamily(threadKey(ref)),
     quietThreadAtom: (ref: ScopedThreadRef) => quietThreadAtomFamily(threadKey(ref)),
