@@ -618,7 +618,7 @@ export const makeSealedWorker = (options: SealedWorkerOptions): SealedWorker => 
     fill: (project, name, template) => {
       const jsonLines = /\.(jsonl|ndjson)$/i.test(name);
       const json = jsonLines || /\.json$/i.test(name);
-      const data = /\.(csv|tsv)$/i.test(name);
+      const data = /\.tsv$/i.test(name) ? "tsv" : /\.csv$/i.test(name) ? "csv" : false;
       const values = options.store.values(project);
       // Stand-ins the model wrote into the file are finished here too, and only here.
       const vault = options.vault();
@@ -654,7 +654,8 @@ export const makeSealedWorker = (options: SealedWorkerOptions): SealedWorker => 
             return token;
           }
           restored += 1;
-          if (data) return plainForm(value);
+          if (data !== false) return plainForm(value, data);
+          if (value.table !== undefined) return value.written;
           return withoutRepeatedUnit(
             value.written,
             source.slice(Math.max(0, offset - UNIT_REACH), offset),

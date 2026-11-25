@@ -531,6 +531,43 @@ describe("asking about sealed documents", () => {
     ).toBe(true);
   });
 
+  it("fills a sealed list as the kind of file it is written into", () => {
+    using context = setup();
+    context.store.mergeValues("p", {
+      "calc.flagged": {
+        written: "| ref | amount |\n| --- | --- |\n| INV-7 | SAR 60,000 |",
+        token: "[OTHER_FLAGD]",
+        table: {
+          columns: ["ref", "amount"],
+          rows: [[{ written: "INV-7" }, { written: "SAR 60,000", number: "60000" }]],
+        },
+      },
+    });
+    for (const [name, template, finished] of [
+      [
+        "flagged.md",
+        "Flagged:\n[OTHER_FLAGD]",
+        "Flagged:\n| ref | amount |\n| --- | --- |\n| INV-7 | SAR 60,000 |",
+      ],
+      ["flagged.csv", "{{calc.flagged}}", "ref,amount\nINV-7,60000"],
+      ["flagged.csv", "[OTHER_FLAGD]", "ref,amount\nINV-7,60000"],
+      ["flagged.tsv", "[OTHER_FLAGD]", "ref\tamount\nINV-7\t60000"],
+      ["flagged.txt", "{{calc.flagged|lines}}", "INV-7; SAR 60,000"],
+      [
+        "flagged.json",
+        '{"flagged": [OTHER_FLAGD]}',
+        '{"flagged": [{"ref":"INV-7","amount":60000}]}',
+      ],
+    ] as const) {
+      expect(context.worker.fill("p", name, template), name).toMatchObject({
+        filled: 1,
+        unknown: [],
+        invalid: false,
+      });
+      expect(context.store.readOutput("p", name), name).toBe(finished);
+    }
+  });
+
   it("fills a program's value under any key, and names every marker it leaves", async () => {
     using context = setup();
     await ask(context.worker);

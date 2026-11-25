@@ -223,7 +223,8 @@ identifier that way for one counted answer. So each run goes first over
 made-up values (`trialAnswers` in `program.ts`): what the model was told in clear stays
 (handles, a yes or no, a choice, which fields are not stated, a list's rows and empty cells),
 and every number, date, identifier and text is drawn at random. The real run's result must have
-the trial's shape (keys, list lengths, which leaves are reveals and their answers), or it fails.
+the trial's shape (keys, list lengths, which leaves are reveals and their answers; a sealed
+list, below, has none of its own), or it fails.
 The shape the model sees is then decided by no value, and what a run tells is whether it
 worked and what it reveals. Values the program would call equal are drawn equal, or joins on
 identifiers would fail; their stand-ins already show that, and identifiers are filed for
@@ -326,6 +327,31 @@ language. That shape is counted as one clear answer and recorded; each yes-or-no
 a row is one more. One cell that fails its check fails the list, a list longer than `MAX_ROWS`
 is not answered, and a list that would pass the document's limit is withheld entire: a list
 short of a row would be totalled as if it were whole.
+
+**A choice costs what `reveal()` of as many answers costs.** An enum answer, a field's or a
+list cell's, is charged `choiceCost` of its options: one for two, two for four, four for
+sixteen. Charged one, a sixteen-option enum read four bits for the price of one, where a
+program's `reveal()` among the same options paid four. A stand-in, "not stated" and a list's
+size are still one each.
+
+**A list a value filtered is sealed whole.** `sealed_list(rows)` lets a program keep the rows
+a value chose (`[r for r in rows if r["amount"] > 50000]`), which a result's shape would
+otherwise refuse. It takes plain values or flat dicts with keys the program wrote, never a
+value `reveal()` chose, and becomes an opaque value the program cannot index, loop over or
+measure. In the result it is one fresh stand-in, and its shape is `sealed_list`, or the
+columns the program named, whatever its rows: the trial and the real run agree however many
+rows each kept, and the run costs nothing more. The rows go only into files `fill_sealed`
+writes, which the model never reads back: a Markdown table in text, rows in a `.csv` or
+`.tsv`, an array in JSON. Its inferred columns (the keys rows have) can follow a value, so they
+too are seen only in the file.
+
+**Text no reader sees is not read.** A document can carry instructions for a model that its
+reader never sees. `sanitizeIngestedText` removes Unicode tag characters, control characters,
+soft hyphens, zero-width spaces and byte order marks from every document's text, local or read
+by the service; ZWNJ, ZWJ and directional marks stay, because Arabic and Persian need them.
+Word runs that are hidden, hidden on the web or of size zero, HTML elements that are `hidden` or
+styled out of sight, and comments in both are dropped before the text is taken. A reading
+service's layout keeps its text as sent: its word positions are offsets into it.
 
 **The agent is told to ask the minimum.** The tool description says so: a yes-or-no question
 where one will do, no category the deliverable does not need, no asking again to double-check.

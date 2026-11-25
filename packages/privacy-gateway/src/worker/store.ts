@@ -4,6 +4,7 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as NodeZlib from "node:zlib";
 
+import { sanitizeIngestedText } from "./sanitize.ts";
 import { type ClearAnswer, emptyLedger, type SealedValue, type SealLedger } from "./seal.ts";
 import { Tripwire } from "./tripwire.ts";
 
@@ -209,16 +210,28 @@ const unzipEntry = (archive: Buffer, wanted: string): Buffer | undefined => {
   return undefined;
 };
 
+/** A Word run and its properties; a run's own text is never a tag. */
+const WORD_RUN = /<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g;
+const RUN_PROPERTIES = /<w:rPr\b[^>]*>([\s\S]*?)<\/w:rPr>/;
+/** Hidden text, text hidden on the web, or text of size zero; `w:val="false"` turns one off. */
+const HIDDEN_RUN = /<w:(?:vanish|webHidden)\b(?![^>]*w:val="(?:0|false|off)")|<w:sz w:val="0"/;
+
 const docxText = (bytes: Buffer): string | undefined => {
   const xml = unzipEntry(bytes, "word/document.xml")?.toString("utf8");
   if (xml === undefined) return undefined;
-  return decodeEntities(
-    xml
-      .replace(/<w:tab\b[^>]*\/>/g, "\t")
-      .replace(/<w:(?:br|cr)\b[^>]*\/>/g, "\n")
-      .replace(/<\/w:tc>/g, "\t")
-      .replace(/<\/w:(?:p|tr)>/g, "\n")
-      .replace(/<[^>]+>/g, ""),
+  // Text Word does not show is not part of the document a person reads, so a model is not given it.
+  const visible = xml
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(WORD_RUN, (run) => (HIDDEN_RUN.test(RUN_PROPERTIES.exec(run)?.[1] ?? "") ? "" : run));
+  return sanitizeIngestedText(
+    decodeEntities(
+      visible
+        .replace(/<w:tab\b[^>]*\/>/g, "\t")
+        .replace(/<w:(?:br|cr)\b[^>]*\/>/g, "\n")
+        .replace(/<\/w:tc>/g, "\t")
+        .replace(/<\/w:(?:p|tr)>/g, "\n")
+        .replace(/<[^>]+>/g, ""),
+    ),
   )
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -242,13 +255,79 @@ export const localText = (bytes: Buffer, name: string): string | undefined => {
   if (!TEXT_EXTENSIONS.has(extension) && !HTML_EXTENSIONS.has(extension)) return undefined;
   const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes).replace(/^﻿/, "");
   if (text.includes("\u0000")) return undefined;
-  if (!HTML_EXTENSIONS.has(extension)) return text;
-  return decodeEntities(
-    text
-      .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, "")
-      .replace(/<\/(?:p|div|tr|li|h[1-6])>|<br\s*\/?>/gi, "\n")
-      .replace(/<[^>]+>/g, ""),
+  if (!HTML_EXTENSIONS.has(extension)) return sanitizeIngestedText(text);
+  return sanitizeIngestedText(
+    decodeEntities(
+      withoutHiddenElements(
+        text.replace(/<!--[\s\S]*?(?:-->|$)/g, "").replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, ""),
+      )
+        .replace(/<\/(?:p|div|tr|li|h[1-6])>|<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, ""),
+    ),
   ).replace(/\n{3,}/g, "\n\n");
+};
+
+const HTML_VOID = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "source",
+  "track",
+  "wbr",
+]);
+const HIDING_CSS =
+  /display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?:[^.\d]|$)|font-size\s*:\s*0(?:px|pt|em|rem|%)?(?:[;\s"']|$)/i;
+
+/** Whether a tag's attributes hide it: `hidden`, or a style a browser shows nothing of. */
+const hidesElement = (attributes: string): boolean => {
+  const style = /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(attributes);
+  if (HIDING_CSS.test(style?.[1] ?? style?.[2] ?? "")) return true;
+  // Quoted values blanked first, so `title="not hidden"` does not count.
+  return /(?:^|\s)hidden(?=[\s=/]|$)/i.test(attributes.replace(/"[^"]*"|'[^']*'/g, '""'));
+};
+
+/**
+ * HTML without the elements a browser does not show, nested ones included. An element left open
+ * is cut to the next closing tag, as far as it plausibly reaches, and not to the end of the file.
+ */
+const withoutHiddenElements = (html: string): string => {
+  let kept = "";
+  let from = 0;
+  const opening = /<([a-z][a-z0-9-]*)\b([^>]*)>/gi;
+  for (let found = opening.exec(html); found !== null; found = opening.exec(html)) {
+    const [whole, name = "", attributes = ""] = found;
+    if (!hidesElement(attributes)) continue;
+    let end = found.index + whole.length;
+    const tag = name.toLowerCase();
+    if (!HTML_VOID.has(tag) && !whole.endsWith("/>")) {
+      const same = new RegExp(`<(/?)${tag}\\b[^>]*>`, "gi");
+      same.lastIndex = end;
+      let depth = 1;
+      for (let next = same.exec(html); next !== null; next = same.exec(html)) {
+        if (next[1] === "" && next[0].endsWith("/>")) continue;
+        depth += next[1] === "/" ? -1 : 1;
+        if (depth === 0) {
+          end = next.index + next[0].length;
+          break;
+        }
+      }
+      if (depth > 0) {
+        const close = html.indexOf("</", end);
+        end = close === -1 ? html.length : close;
+      }
+    }
+    kept += html.slice(from, found.index);
+    from = end;
+    opening.lastIndex = end;
+  }
+  return kept + html.slice(from);
 };
 
 /** The record keeps this many answers a project; the oldest go first. */

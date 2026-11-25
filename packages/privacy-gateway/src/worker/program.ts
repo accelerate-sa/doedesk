@@ -743,11 +743,13 @@ const BUILTINS = [
   "add_months",
   "doc",
   "reveal",
+  "sealed_list",
 ] as const;
 type Builtin = (typeof BUILTINS)[number];
 
 /** The keyword arguments each function takes. */
 const KEYWORDS_OF: Partial<Record<Builtin, ReadonlyArray<string>>> = {
+  sealed_list: ["columns"],
   sorted: ["key", "reverse"],
   min: ["key", "default"],
   max: ["key", "default"],
@@ -1003,6 +1005,7 @@ const NOT_YES_OR_NO = new Set([
   "add_days",
   "add_months",
   "doc",
+  "sealed_list",
 ]);
 const ARITHMETIC = new Set(["+", "-", "*", "/", "//", "%", "**"]);
 
@@ -1095,7 +1098,18 @@ type Value =
       readonly scope: Scope;
     }
   | { readonly t: "builtin"; readonly name: Builtin }
-  | { readonly t: "method"; readonly self: Value; readonly name: string };
+  | { readonly t: "method"; readonly self: Value; readonly name: string }
+  /**
+   * Rows of plain values, sealed whole: one stand-in however many rows it has. Nothing reads
+   * it again, so its length and contents can follow a value. `fixed`: the program named the
+   * columns. Each row is its cells in column order, or one cell for a list of plain values.
+   */
+  | {
+      readonly t: "sealed";
+      readonly columns: ReadonlyArray<string> | null;
+      readonly fixed: boolean;
+      readonly rows: ReadonlyArray<ReadonlyArray<Value>>;
+    };
 
 const NONE: Value = { t: "none" };
 const YES_OR_NO: Revealed = ["true", "false"];
@@ -1103,6 +1117,12 @@ const MAX_REVEAL_OPTIONS = 16;
 const REVEAL_CALLED = "reveal is only called, as reveal(...): it cannot be named otherwise.";
 const REVEAL_YES_OR_NO =
   "reveal() shows a yes or no, such as reveal(n > 0). To show a count or a choice, list the possible answers in the program: reveal(n, [0, 1, 2, 3]).";
+const REVEAL_IN_SEALED_LIST =
+  "reveal() cannot be used inside sealed_list(): its rows are sealed whole, never shown.";
+const SEALED_LIST_COLUMNS =
+  "The columns of sealed_list() are a list of different words written in the program, such as sealed_list(rows, ['vendor', 'amount']).";
+const SEALED_LIST_ROWS =
+  "sealed_list() takes a list of numbers, dates, words, yes-or-nos and None, or of flat dicts of them.";
 const bool = (v: boolean): Value => ({ t: "bool", v });
 const literal = (v: string): Value => ({ t: "str", v, clear: true });
 
@@ -1131,7 +1151,16 @@ export interface ProgramLeaf {
 export type ProgramOutput =
   | { readonly leaf: ProgramLeaf }
   | { readonly list: ReadonlyArray<ProgramOutput> }
-  | { readonly dict: ReadonlyArray<readonly [string, ProgramOutput]> };
+  | { readonly dict: ReadonlyArray<readonly [string, ProgramOutput]> }
+  | {
+      /** `sealed_list()`: rows of leaves, or of dicts of leaves keyed by `columns`. */
+      readonly sealedList: {
+        readonly columns: ReadonlyArray<string> | null;
+        /** The program named the columns, so they are part of its shape. */
+        readonly fixed: boolean;
+        readonly rows: ReadonlyArray<ProgramOutput>;
+      };
+    };
 
 export type ProgramRun =
   | {
@@ -1314,7 +1343,13 @@ export const runProgram = (
         ? Number(value.v)
         : fail(`A number is needed, not ${describe(value)}.`);
   const describe = (value: Value): string =>
-    value.t === "none" ? "None" : value.t === "num" ? "a number" : `a ${value.t}`;
+    value.t === "none"
+      ? "None"
+      : value.t === "num"
+        ? "a number"
+        : value.t === "sealed"
+          ? "a sealed_list"
+          : `a ${value.t}`;
   const list = (values: Array<Value>, tuple = false): Value => {
     grow(values.length);
     return { t: "list", v: values, tuple };
@@ -1716,7 +1751,86 @@ export const runProgram = (
         if (chosen?.t === "num") return { t: "num", v: chosen.v, revealed };
         return fail("The value is none of the options reveal() was given.");
       }
+      case "sealed_list":
+        return sealedList(first, args[1] ?? kwargs.get("columns"));
     }
+  };
+
+  /** A plain value a sealed list may hold: never one reveal() chose, which would be shown. */
+  const isCell = (value: Value): boolean => {
+    if (
+      value.t !== "none" &&
+      value.t !== "bool" &&
+      value.t !== "num" &&
+      value.t !== "date" &&
+      value.t !== "str"
+    ) {
+      return false;
+    }
+    if ("revealed" in value && value.revealed !== undefined) fail(REVEAL_IN_SEALED_LIST);
+    return true;
+  };
+
+  const sealedList = (items: Value, given: Value | undefined): Value => {
+    if (items.t !== "list") return fail(`sealed_list() takes a list, not ${describe(items)}.`);
+    let columns: Array<string> | null = null;
+    if (given !== undefined && given.t !== "none") {
+      const names =
+        given.t === "list"
+          ? given.v.map((name) => (name.t === "str" && name.clear ? name.v : null))
+          : [];
+      if (
+        names.length === 0 ||
+        names.some((name) => name === null) ||
+        new Set(names).size !== names.length
+      ) {
+        return fail(SEALED_LIST_COLUMNS);
+      }
+      columns = names.filter((name) => name !== null);
+    }
+    const fixed = columns !== null;
+    spend(items.v.length);
+    const dicts = items.v.filter((row) => row.t === "dict");
+    if (dicts.length > 0 && dicts.length < items.v.length) {
+      return fail("sealed_list() takes rows that are all dicts, or all plain values.");
+    }
+    if (dicts.length === 0) {
+      for (const row of items.v) {
+        if (!isCell(row)) return fail(SEALED_LIST_ROWS);
+      }
+      if (fixed && items.v.length > 0) {
+        return fail("sealed_list() names columns only for rows that are dicts.");
+      }
+      grow(items.v.length);
+      return { t: "sealed", columns, fixed, rows: items.v.map((row) => [row]) };
+    }
+    const allowed = columns === null ? null : new Set(columns.map((name) => keyOf(literal(name))));
+    /** Each key as dict keys compare, with the spelling it was first met with. */
+    const keys = new Map<string, string>();
+    for (const row of dicts) {
+      if (row.t !== "dict") continue;
+      for (const [at, [key, value]] of row.v) {
+        if (key.t !== "str" || !key.clear) {
+          return fail("A key of a sealed_list() row must be a word written in the program.");
+        }
+        if (!isCell(value)) return fail(SEALED_LIST_ROWS);
+        if (allowed !== null && !allowed.has(at)) {
+          return fail(`"${key.v}" is not one of the columns sealed_list() was given.`);
+        }
+        if (!keys.has(at)) keys.set(at, key.v);
+      }
+    }
+    const named =
+      columns ??
+      [...keys.values()].toSorted(
+        (a, b) => KEY_ORDER.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0),
+      );
+    // A snapshot: rows changed after sealing are not what was sealed.
+    const rows = dicts.map((row) =>
+      named.map((name) => (row.t === "dict" ? row.v.get(keyOf(literal(name)))?.[1] : NONE) ?? NONE),
+    );
+    grow(rows.length * named.length);
+    return { t: "sealed", columns: named, fixed, rows };
   };
 
   const method = (self: Value, name: string, args: ReadonlyArray<Value>): Value => {
@@ -2000,43 +2114,72 @@ export const runProgram = (
             // In order of the keys, not of when they were set: that order can follow a value.
             .toSorted(([a], [b]) => KEY_ORDER.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0)),
         };
+      case "sealed": {
+        leaves += value.rows.reduce((total, row) => total + row.length, 0);
+        if (leaves > MAX_LEAVES) return fail("`result` holds too many values.");
+        const { columns } = value;
+        return {
+          sealedList: {
+            columns,
+            fixed: value.fixed,
+            rows: value.rows.map((cells) =>
+              columns === null
+                ? { leaf: leafOf(cells[0] ?? NONE) }
+                : {
+                    dict: columns.map(
+                      (name, index) => [name, { leaf: leafOf(cells[index] ?? NONE) }] as const,
+                    ),
+                  },
+            ),
+          },
+        };
+      }
       case "none":
       case "bool":
       case "num":
       case "date":
-      case "str": {
-        const revealed =
-          value.t === "bool" || value.t === "str" || value.t === "num" ? value.revealed : undefined;
-        const written =
-          value.t !== "none" && value.t !== "bool" && value.stated !== undefined
-            ? { written: value.stated.written }
-            : {};
-        return {
-          leaf: {
-            type:
-              value.t === "num"
-                ? "number"
-                : value.t === "str"
-                  ? "text"
-                  : value.t === "bool"
-                    ? "boolean"
-                    : value.t,
-            // A stated number keeps every digit the document wrote.
-            value:
-              value.t === "none"
-                ? null
-                : value.t === "num" && value.stated === undefined
-                  ? clean(value.v)
-                  : value.v,
-            ...written,
-            shown: revealed !== undefined,
-            ...(revealed === undefined ? {} : { options: revealed }),
-          },
-        };
-      }
+      case "str":
+        return { leaf: leafOf(value) };
       default:
         return fail(`\`result\` cannot hold ${describe(value)}.`);
     }
+  };
+  const leafOf = (value: Value): ProgramLeaf => {
+    if (
+      value.t !== "none" &&
+      value.t !== "bool" &&
+      value.t !== "num" &&
+      value.t !== "date" &&
+      value.t !== "str"
+    ) {
+      return fail(`\`result\` cannot hold ${describe(value)}.`);
+    }
+    const revealed =
+      value.t === "bool" || value.t === "str" || value.t === "num" ? value.revealed : undefined;
+    const written =
+      value.t !== "none" && value.t !== "bool" && value.stated !== undefined
+        ? { written: value.stated.written }
+        : {};
+    return {
+      type:
+        value.t === "num"
+          ? "number"
+          : value.t === "str"
+            ? "text"
+            : value.t === "bool"
+              ? "boolean"
+              : value.t,
+      // A stated number keeps every digit the document wrote.
+      value:
+        value.t === "none"
+          ? null
+          : value.t === "num" && value.stated === undefined
+            ? clean(value.v)
+            : value.v,
+      ...written,
+      shown: revealed !== undefined,
+      ...(revealed === undefined ? {} : { options: revealed }),
+    };
   };
 
   const globals = new Scope(null);
@@ -2250,7 +2393,10 @@ export const trialAnswers = (
   }));
 };
 
-/** Everything about a result the model sees in clear besides what it reveals. */
+/**
+ * Everything about a result the model sees in clear besides what it reveals. A sealed list is
+ * one stand-in whatever its rows, so its shape is only the columns the program named, if any.
+ */
 export const shapeOf = (output: ProgramOutput): string =>
   "leaf" in output
     ? output.leaf.shown
@@ -2258,19 +2404,29 @@ export const shapeOf = (output: ProgramOutput): string =>
       : "_"
     : "list" in output
       ? `[${output.list.map(shapeOf).join(",")}]`
-      : `{${output.dict.map(([key, item]) => `${JSON.stringify(key)}:${shapeOf(item)}`).join(",")}}`;
+      : "sealedList" in output
+        ? output.sealedList.fixed
+          ? `sealed_list(${JSON.stringify(output.sealedList.columns)})`
+          : "sealed_list"
+        : `{${output.dict.map(([key, item]) => `${JSON.stringify(key)}:${shapeOf(item)}`).join(",")}}`;
+
+/** The yes-or-no answers it takes to tell one of `options` answers from the others. */
+export const choiceCost = (options: number): number => Math.ceil(Math.log2(Math.max(2, options)));
 
 /** What a result shows, in clear answers: one for whether the run worked, and enough yes-or-no answers for each value it reveals to tell its options apart. */
 export const costOf = (output: ProgramOutput): number => {
   const reveals = (part: ProgramOutput): number =>
     "leaf" in part
       ? part.leaf.shown
-        ? Math.ceil(Math.log2(Math.max(2, part.leaf.options?.length ?? 2)))
+        ? choiceCost(part.leaf.options?.length ?? 2)
         : 0
-      : ("list" in part ? part.list : part.dict.map(([, item]) => item)).reduce(
-          (total, item) => total + reveals(item),
-          0,
-        );
+      : // Nothing in a sealed list is shown: sealed_list() refuses what reveal() chose.
+        "sealedList" in part
+        ? 0
+        : ("list" in part ? part.list : part.dict.map(([, item]) => item)).reduce(
+            (total, item) => total + reveals(item),
+            0,
+          );
   return 1 + reveals(output);
 };
 

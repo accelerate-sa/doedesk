@@ -1,5 +1,7 @@
 import * as NodeCrypto from "node:crypto";
 
+import { sanitizeIngestedText } from "./worker/sanitize.ts";
+
 /** Turns an image or PDF into the text written in it. */
 export interface Reader {
   readonly read: (bytes: Buffer, mediaType: string) => Promise<string>;
@@ -71,7 +73,9 @@ export const makeRemoteReader = (options: RemoteReaderOptions): Reader => {
     return { text: body.text, pages: pages ?? 1, layout: body.layout };
   };
   return {
-    read: async (bytes, mediaType) => (await call(bytes, mediaType, false)).text,
+    // Only plain reading is cleaned: a layout's word positions are offsets into its text as sent.
+    read: async (bytes, mediaType) =>
+      sanitizeIngestedText((await call(bytes, mediaType, false)).text),
     readLayout: (bytes, mediaType) => call(bytes, mediaType, true),
   };
 };

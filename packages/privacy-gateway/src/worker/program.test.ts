@@ -84,7 +84,12 @@ const real = (output: ProgramOutput): unknown =>
       : output.leaf.value
     : "list" in output
       ? output.list.map(real)
-      : Object.fromEntries(output.dict.map(([key, value]) => [key, real(value)]));
+      : "sealedList" in output
+        ? {
+            sealed: output.sealedList.rows.map(real),
+            columns: output.sealedList.columns,
+          }
+        : Object.fromEntries(output.dict.map(([key, value]) => [key, real(value)]));
 
 const run = (lines: ReadonlyArray<string>, rows: ReadonlyArray<Record<string, Cell>> = [{}]) => {
   const documents = documentsOf(rows);
@@ -394,6 +399,132 @@ describe("what a program may show", () => {
       specs,
     );
     expect(outcome).toMatchObject({ ok: false, detail: "line 1: None cannot be looped over." });
+  });
+});
+
+describe("a list sealed whole", () => {
+  const invoices = (amounts: ReadonlyArray<number>) => [
+    { invoices: amounts.map((amount, index) => ({ amount, ref: `INV-${index + 1}` })) },
+  ];
+  const FILTER = [
+    'flagged = [r for d in docs for r in d["invoices"] if r["amount"] > 50000]',
+    'result = {"flagged": sealed_list(flagged), "total": sum(r["amount"] for r in flagged)}',
+  ];
+  const runOn = (lines: ReadonlyArray<string>, rows: ReadonlyArray<Record<string, Cell>>) => {
+    const documents = documentsOf(rows);
+    const specs = specsOf(documents);
+    const program = parseProgram(lines.join("\n"), new Set(["invoices", "amount", "ref"]));
+    return {
+      real: runProgram(program, documents, specs),
+      trial: runProgram(program, trialAnswers(documents, specs), specs, { trial: true }),
+    };
+  };
+  const refusal = (expression: string, lines: ReadonlyArray<string> = []) => {
+    const outcome = runOn([...lines, `result = ${expression}`], invoices([60_000, 70_000])).trial;
+    return outcome.ok ? "ran" : outcome.detail;
+  };
+
+  it("holds rows a value chose, and its shape says nothing of how many or which", () => {
+    const none = runOn(FILTER, invoices([100, 200, 300, 400, 500]));
+    const five = runOn(FILTER, invoices([60_000, 70_000, 80_000, 90_000, 100_000]));
+    for (const outcome of [none.real, none.trial, five.real, five.trial]) {
+      if (!outcome.ok) throw new Error(outcome.detail);
+    }
+    if (!none.real.ok || !five.real.ok || !five.trial.ok) return;
+    expect(real(five.real.output)).toEqual({
+      flagged: {
+        columns: ["amount", "ref"],
+        sealed: [60_000, 70_000, 80_000, 90_000, 100_000].map((amount, index) => ({
+          amount,
+          ref: `INV-${index + 1}`,
+        })),
+      },
+      total: 400_000,
+    });
+    expect(real(none.real.output)).toEqual({ flagged: { columns: null, sealed: [] }, total: 0 });
+    // None of five, five of five, or whatever the trial's made-up amounts gave: one shape.
+    const shapes = new Set(
+      [none.real, none.trial, five.real, five.trial].map((run) => run.ok && shapeOf(run.output)),
+    );
+    expect([...shapes]).toEqual(['{"flagged":sealed_list,"total":_}']);
+    expect(costOf(five.real.output)).toBe(1);
+    // The same list unsealed has a length a value chose, which a run refuses.
+    const bare = [
+      'result = [r["amount"] for d in docs for r in d["invoices"] if r["amount"] > 50000]',
+    ];
+    const [empty, one] = [[100], [60_000]].map((amounts) => runOn(bare, invoices(amounts)).real);
+    expect(empty?.ok && shapeOf(empty.output)).toBe("[]");
+    expect(one?.ok && shapeOf(one.output)).toBe("[_]");
+  });
+
+  it("keeps the columns the program names, in its order, even with no rows", () => {
+    const lines = [
+      'rows = [{"ref": r["ref"], "amount": r["amount"]} for d in docs for r in d["invoices"] if r["amount"] > 50000]',
+      'result = sealed_list(sorted(rows, key=lambda r: r["amount"]), ["ref", "amount", "note"])',
+    ];
+    const some = runOn(lines, invoices([90_000, 100, 60_000]));
+    const none = runOn(lines, invoices([100]));
+    if (!some.real.ok || !none.real.ok || !some.trial.ok) throw new Error("failed");
+    expect(real(some.real.output)).toEqual({
+      columns: ["ref", "amount", "note"],
+      sealed: [
+        { ref: "INV-3", amount: 60_000, note: null },
+        { ref: "INV-1", amount: 90_000, note: null },
+      ],
+    });
+    expect(real(none.real.output)).toEqual({ columns: ["ref", "amount", "note"], sealed: [] });
+    expect(shapeOf(some.trial.output)).toBe('sealed_list(["ref","amount","note"])');
+    expect(shapeOf(none.real.output)).toBe(shapeOf(some.trial.output));
+    // A list of plain values has no columns.
+    expect(value('sealed_list([d.handle for d in docs] + [1, None, date("2026-01-02")])')).toEqual({
+      columns: null,
+      sealed: ["DOC_1", 1, null, "2026-01-02"],
+    });
+  });
+
+  it("refuses what it could show, and cannot be read again once sealed", () => {
+    // What reveal() chose is shown wherever it goes, so it never goes into a sealed list.
+    expect(refusal('sealed_list([reveal(len(r["ref"]) > 2) for r in docs[0]["invoices"]])')).toBe(
+      "line 1: reveal() cannot be used inside sealed_list(): its rows are sealed whole, never shown.",
+    );
+    expect(
+      refusal('sealed_list([{"big": reveal(r["amount"] > 1)} for r in docs[0]["invoices"]])'),
+    ).toContain("reveal() cannot be used inside sealed_list()");
+    expect(refusal("sealed_list([[1, 2]])")).toContain("sealed_list() takes a list of numbers");
+    expect(refusal('sealed_list([{"a": [1]}])')).toContain("sealed_list() takes a list of numbers");
+    expect(refusal('sealed_list([{"a": 1}, 2])')).toContain("all dicts, or all plain values");
+    expect(refusal('sealed_list([{r["ref"]: 1} for r in docs[0]["invoices"]])')).toContain(
+      "must be a word written in the program",
+    );
+    expect(refusal('sealed_list([{"a": 1}], [docs[0]["invoices"][0]["ref"]])')).toContain(
+      "The columns of sealed_list()",
+    );
+    expect(refusal('sealed_list([{"a": 1}], ["a", "a"])')).toContain(
+      "The columns of sealed_list()",
+    );
+    expect(refusal('sealed_list([{"b": 1}], ["a"])')).toBe(
+      'line 1: "b" is not one of the columns sealed_list() was given.',
+    );
+    expect(refusal("sealed_list([1], ['a'])")).toContain(
+      "names columns only for rows that are dicts",
+    );
+    expect(refusal("sealed_list(5)")).toContain("sealed_list() takes a list, not a number.");
+    for (const read of ["len(s)", "s[0]", "[x for x in s]", "s[1:]", "s == 1 or sum(s)"]) {
+      expect(refusal(read, ["s = sealed_list([1, 2])"]), read).toMatch(/sealed_list/);
+    }
+    expect(() => parseProgram("result = reveal(sealed_list([1]))", new Set())).toThrow(
+      "reveal() shows a yes or no",
+    );
+    // Sealed as it was: a row changed afterwards is not what was sealed.
+    expect(
+      run([
+        'rows = [{"a": 1}]',
+        "s = sealed_list(rows)",
+        'rows[0]["a"] = [2]',
+        'rows.append({"a": 3})',
+        "result = s",
+      ]).result,
+    ).toEqual({ columns: ["a"], sealed: [{ a: 1 }] });
   });
 });
 

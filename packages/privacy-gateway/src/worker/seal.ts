@@ -5,6 +5,7 @@ import type { Vault } from "../vault.ts";
 import type { FieldAnswer, FieldSpec } from "./fields.ts";
 import type { JobResult } from "./job.ts";
 import {
+  choiceCost,
   costOf,
   type ProgramLeaf,
   type ProgramOutput,
@@ -96,6 +97,18 @@ export interface SealedValue {
   readonly literal?: "true" | "false" | "null";
   /** Its stand-in, so a file is filled with this value and not another written the same way. */
   readonly token?: string;
+  /** A program's `sealed_list()`: `written` is its Markdown, and a file can ask for other forms. */
+  readonly table?: SealedTable;
+}
+
+/** One value in a sealed list. */
+export type SealedCell = Pick<SealedValue, "written" | "number" | "iso" | "literal">;
+
+export interface SealedTable {
+  /** Null for a list of plain values, or for an empty list whose program named no columns. */
+  readonly columns: ReadonlyArray<string> | null;
+  /** Each row's cells in column order; one cell a row when `columns` is null. */
+  readonly rows: ReadonlyArray<ReadonlyArray<SealedCell>>;
 }
 
 /** What one field looks like to the remote model. */
@@ -174,6 +187,8 @@ interface Shown {
   readonly asked: string;
   /** Null for a stand-in, which tells nothing and is free. */
   readonly given: Pick<ClearAnswer, "kind" | "value"> | null;
+  /** Clear answers it is charged: 1, or for a choice as many as `choiceCost` says. */
+  readonly cost?: number;
 }
 
 /**
@@ -181,7 +196,7 @@ interface Shown {
  * depend on a value, so the fault goes to the person's record and never to the model.
  */
 export const PROGRAM_FAILED =
-  "The program failed on the documents' values. The reason is not shown, because it could depend on a value. Usual causes: the keys of `result` or the length of a list in it depended on a value (key by d.handle and put the condition in the value), a value matched none of reveal()'s answers, or a value was zero.";
+  "The program failed on the documents' values. The reason is not shown, because it could depend on a value. Usual causes: the keys of `result` or the length of a list in it depended on a value (key by d.handle and put the condition in the value, or put a filtered list in sealed_list(...)), a value matched none of reveal()'s answers, or a value was zero.";
 
 const describeQuestion = (
   field: Pick<FieldSpec, "name" | "description" | "type" | "options">,
@@ -192,6 +207,86 @@ const answerKind = (value: unknown): Pick<ClearAnswer, "kind" | "value"> =>
   typeof value === "boolean"
     ? { kind: value ? "yes" : "no", value: null }
     : { kind: "value", value: Array.isArray(value) ? value.join(", ") : String(value) };
+
+const NONE_LEAF: ProgramLeaf = { type: "none", value: null, shown: false };
+const leafOf = (output: ProgramOutput): ProgramLeaf => ("leaf" in output ? output.leaf : NONE_LEAF);
+
+/** A value of a program's result as a deliverable would write it. */
+const leafCell = (leaf: ProgramLeaf): SealedCell => {
+  switch (leaf.type) {
+    case "number": {
+      const value = Number(leaf.value);
+      return { written: leaf.written ?? formatNumber(value), number: plainDigits(value) };
+    }
+    case "date":
+      return { written: leaf.written ?? String(leaf.value), iso: String(leaf.value) };
+    case "boolean":
+      return {
+        written: String(leaf.value === true),
+        literal: leaf.value === true ? "true" : "false",
+      };
+    case "none":
+      return { written: "null", literal: "null" };
+    default:
+      return { written: leaf.written ?? String(leaf.value) };
+  }
+};
+
+/** The forms a sealed list can be written in: `{{calc.flagged|csv}}`. */
+const TABLE_FORMS = ["markdown", "csv", "tsv", "json", "lines"] as const;
+type TableForm = (typeof TABLE_FORMS)[number];
+const isTableForm = (form: string | undefined): form is TableForm =>
+  (TABLE_FORMS as ReadonlyArray<string | undefined>).includes(form);
+
+const NULL_CELL: SealedCell = { written: "null", literal: "null" };
+
+/** A cell as text reads it: nothing for None. */
+const cellText = (cell: SealedCell): string => (cell.literal === "null" ? "" : cell.written);
+
+const csvCell = (text: string): string =>
+  /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+const markdownCell = (text: string): string =>
+  text.replaceAll("\\", "\\\\").replaceAll("|", "\\|").replace(/\r?\n/g, " ");
+
+/**
+ * A sealed list written out. `markdown`: a table, or a line a value for plain values; `csv` and
+ * `tsv`: a header and plain digits and ISO days; `json`: an array; `lines`: a line a row.
+ */
+export const tableText = (table: SealedTable, form: TableForm): string => {
+  const { columns, rows } = table;
+  switch (form) {
+    case "json":
+      return `[${rows
+        .map((row) =>
+          columns === null
+            ? jsonForm(row[0] ?? NULL_CELL)
+            : `{${columns.map((name, index) => `${JSON.stringify(name)}:${jsonForm(row[index] ?? NULL_CELL)}`).join(",")}}`,
+        )
+        .join(",")}]`;
+    case "csv":
+    case "tsv": {
+      const cell = form === "csv" ? csvCell : (text: string) => text.replace(/[\t\r\n]+/g, " ");
+      const line = (cells: ReadonlyArray<string>) =>
+        cells.map(cell).join(form === "csv" ? "," : "\t");
+      return [
+        ...(columns === null ? [] : [line(columns)]),
+        ...rows.map((row) => line(row.map((cell) => plainForm(cell)))),
+      ].join("\n");
+    }
+    case "markdown":
+    case "lines": {
+      if (form === "lines" || columns === null) {
+        return rows.map((row) => row.map(cellText).join("; ")).join("\n");
+      }
+      const line = (cells: ReadonlyArray<string>) => `| ${cells.map(markdownCell).join(" | ")} |`;
+      return [
+        line(columns),
+        `|${columns.map(() => " --- ").join("|")}|`,
+        ...rows.map((row) => line(row.map(cellText))),
+      ].join("\n");
+    }
+  }
+};
 
 export interface SealOptions {
   readonly mode: SealMode;
@@ -270,7 +365,10 @@ export const sealBatch = (
     const fresh = answers.filter((answer) => ledger.asked[answer.key] !== true);
     if (fresh.length === 0) return true;
     const limit = policy.clearAnswersPerDocument;
-    const counted = fresh.filter((answer) => answer.given !== null).length;
+    const counted = fresh.reduce(
+      (total, answer) => total + (answer.given === null ? 0 : (answer.cost ?? 1)),
+      0,
+    );
     const full = (handle: string) => {
       const used = ledger.clearAnswers[handle] ?? 0;
       return used >= limit || used + counted > limit;
@@ -279,9 +377,9 @@ export const sealBatch = (
       withheld = true;
       return false;
     }
-    for (const { key, asked, given } of fresh) {
+    for (const { key, asked, given, cost = 1 } of fresh) {
       if (given !== null) {
-        for (const handle of handles) charge(ledger.clearAnswers, handle, 1, limit);
+        for (const handle of handles) charge(ledger.clearAnswers, handle, cost, limit);
         clear.push({ at, handle: handles.join(", "), asked, ...given });
       }
       ledger.asked[key] = true;
@@ -293,7 +391,8 @@ export const sealBatch = (
     key: string,
     asked: string,
     given: Shown["given"],
-  ): boolean => allowAll(handles, [{ key, asked, given }]);
+    cost?: number,
+  ): boolean => allowAll(handles, [{ key, asked, given, ...(cost === undefined ? {} : { cost }) }]);
 
   /**
    * Kept under its name and under its stand-in: a later call may reuse the name for another
@@ -365,6 +464,7 @@ export const sealBatch = (
             key: JSON.stringify([question, index, cell.name, cell.value]),
             asked: `${spec.name}[${index}].${column === undefined ? cell.name : describeQuestion({ ...column, description: column.description ?? "" })}`,
             given: answerKind(cell.value),
+            ...(cell.type === "enum" ? { cost: choiceCost(column?.options?.length ?? 2) } : {}),
           };
         }),
       ),
@@ -427,7 +527,12 @@ export const sealBatch = (
     // Prose is counted below, by its length as well.
     if (spec !== undefined && !(answer.type === "text" && given === null)) {
       const key = JSON.stringify([questionKey(handle, spec), given ?? "stand-in"]);
-      if (!allow([handle], key, describeQuestion(spec), given)) return { note: LIMIT_NOTE };
+      // A choice among many tells as much as reveal() choosing among as many.
+      const cost =
+        answer.status === "ok" && answer.type === "enum"
+          ? choiceCost(spec.options?.length ?? 2)
+          : undefined;
+      if (!allow([handle], key, describeQuestion(spec), given, cost)) return { note: LIMIT_NOTE };
     }
     if (answer.status === "absent") return { found: false };
     if (answer.status === "unverified") {
@@ -482,31 +587,28 @@ export const sealBatch = (
   /** The value of one leaf of a program's result with nothing sealed: for files the model can read. */
   const plainLeaf = (leaf: ProgramLeaf): unknown => leaf.value;
 
-  const sealLeaf = (reference: string, leaf: ProgramLeaf): unknown => {
-    if (leaf.shown) return leaf.value;
-    switch (leaf.type) {
-      case "number": {
-        const value = Number(leaf.value);
-        return sealFresh(reference, {
-          written: leaf.written ?? formatNumber(value),
-          number: plainDigits(value),
-        });
-      }
-      case "date":
-        return sealFresh(reference, {
-          written: leaf.written ?? String(leaf.value),
-          iso: String(leaf.value),
-        });
-      case "boolean":
-        return sealChoice(reference, leaf.value === true);
-      case "none":
-        return sealFresh(reference, { written: "null", literal: "null" });
-      default:
-        return sealFresh(reference, { written: leaf.written ?? String(leaf.value) });
-    }
-  };
+  const sealLeaf = (reference: string, leaf: ProgramLeaf): unknown =>
+    leaf.shown ? leaf.value : sealFresh(reference, leafCell(leaf));
 
   const shape = (output: ProgramOutput, path: string, shown: Array<string>): unknown => {
+    if ("sealedList" in output) {
+      const { columns, rows } = output.sealedList;
+      const cells = rows.map((row) =>
+        "leaf" in row ? [row.leaf] : "dict" in row ? row.dict.map(([, item]) => leafOf(item)) : [],
+      );
+      if (mode === "masked") {
+        return cells.map((row) =>
+          columns === null
+            ? plainLeaf(row[0] ?? NONE_LEAF)
+            : Object.fromEntries(
+                columns.map((name, index) => [name, plainLeaf(row[index] ?? NONE_LEAF)]),
+              ),
+        );
+      }
+      const table: SealedTable = { columns, rows: cells.map((row) => row.map(leafCell)) };
+      // One stand-in, new every time, whatever the rows: how many there are is not shown.
+      return sealFresh(ledgerKey("calc", path), { written: tableText(table, "markdown"), table });
+    }
     if ("list" in output) {
       return output.list.map((item, index) => shape(item, `${path}[${index}]`, shown));
     }
@@ -591,17 +693,30 @@ export const sealBatch = (
   };
 };
 
-/** A sealed value as a data file holds it: plain digits, the ISO day, or the text itself. */
-export const plainForm = (value: SealedValue): string =>
-  value.number ?? value.iso ?? (value.literal === "null" ? "" : value.literal) ?? value.written;
+/**
+ * A sealed value as a data file holds it: plain digits, the ISO day, or the text itself. A
+ * sealed list is rows of comma-separated values, or of tab-separated ones in a `.tsv`.
+ */
+export const plainForm = (value: SealedValue, data: DataFile = "csv"): string =>
+  value.table !== undefined
+    ? tableText(value.table, data)
+    : (value.number ??
+      value.iso ??
+      (value.literal === "null" ? "" : value.literal) ??
+      value.written);
+
+/** A file whose values are written plain: `csv` is also what a JSON string holds. */
+export type DataFile = "csv" | "tsv";
 
 const JSON_NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
 
 /** A sealed value as JSON writes it: a number, true, false or null bare, anything else quoted. */
 const jsonForm = (value: SealedValue): string =>
-  value.number !== undefined && JSON_NUMBER.test(value.number)
-    ? value.number
-    : (value.literal ?? JSON.stringify(value.number ?? value.iso ?? value.written));
+  value.table !== undefined
+    ? tableText(value.table, "json")
+    : value.number !== undefined && JSON_NUMBER.test(value.number)
+      ? value.number
+      : (value.literal ?? JSON.stringify(value.number ?? value.iso ?? value.written));
 
 /**
  * Anything between double braces that starts like a name is a marker, so one that names no
@@ -633,25 +748,43 @@ const markerValue = (
   if (!Object.hasOwn(values, reference)) return undefined;
   const value = values[reference];
   if (value === undefined || form === undefined || form === "written") return value;
+  if (isTableForm(form)) {
+    return value.table !== undefined || reference.startsWith("calc.") ? value : undefined;
+  }
   if (form !== "number" && form !== "iso") return undefined;
   return value[form] !== undefined || reference.startsWith("calc.") ? value : undefined;
 };
 
 /** What a marker is written as in text. `data`: with no form, plain digits or the ISO day. */
-const markerText = (value: SealedValue, form: string | undefined, data: boolean): string =>
-  form === "number" || form === "iso"
-    ? (value[form] ?? plainForm(value))
-    : form === undefined && data
-      ? plainForm(value)
+const markerText = (
+  value: SealedValue,
+  form: string | undefined,
+  data: DataFile | false,
+): string => {
+  if (isTableForm(form)) {
+    // A program's value that is not a list takes a list's form as no form at all.
+    return value.table === undefined
+      ? markerText(value, undefined, data)
+      : tableText(value.table, form);
+  }
+  return form === "number" || form === "iso"
+    ? (value[form] ?? plainForm(value, data || "csv"))
+    : form === undefined && data !== false
+      ? plainForm(value, data)
       : value.written;
+};
 
 /** A marker that is a JSON value of its own: `|written` and a date are strings, a yes is `true`. */
 const markerJson = (value: SealedValue, form: string | undefined): string =>
-  form === "written"
-    ? (value.literal ?? JSON.stringify(value.written))
-    : form === "iso" && value.iso !== undefined
-      ? JSON.stringify(value.iso)
-      : jsonForm(value);
+  isTableForm(form)
+    ? value.table === undefined || form === "json"
+      ? jsonForm(value)
+      : JSON.stringify(tableText(value.table, form))
+    : form === "written"
+      ? (value.literal ?? JSON.stringify(value.written))
+      : form === "iso" && value.iso !== undefined
+        ? JSON.stringify(value.iso)
+        : jsonForm(value);
 
 export interface FilledText {
   readonly text: string;
@@ -688,7 +821,7 @@ const fillJsonWith = (
     }
     filled += 1;
     return isMarker
-      ? { json: markerJson(value, form), text: markerText(value, form, true) }
+      ? { json: markerJson(value, form), text: markerText(value, form, "csv") }
       : { json: jsonForm(value), text: plainForm(value) };
   };
   const text = source.replace(JSON_PART, (match: string, offset: number) => {
@@ -878,7 +1011,7 @@ const MARKER = new RegExp(MARKER_SOURCE, "gu");
 export const fillMarkers = (
   text: string,
   values: Readonly<Record<string, SealedValue>>,
-  data = false,
+  data: DataFile | false = false,
   /** What a value is written as instead, to keep it out of a later pass (see `fill`). */
   hold: (value: string) => string = (value) => value,
 ): FilledText => {
@@ -899,8 +1032,8 @@ export const fillMarkers = (
     }
     filled += 1;
     const chosen = markerText(value, form, data);
-    // A form the model asked for, or a data file's plain form, is written as it is.
-    if (form !== undefined || data) return hold(chosen);
+    // A form the model asked for, a data file's plain form, or a table, is written as it is.
+    if (form !== undefined || data !== false || value.table !== undefined) return hold(chosen);
     return hold(
       withoutRepeatedUnit(
         chosen,
