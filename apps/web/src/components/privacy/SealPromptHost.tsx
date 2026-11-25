@@ -487,24 +487,26 @@ export function SealPromptHost() {
         return {
           title: gt("Choose who reads sealed files"),
           lines: [
-            gt("A sealed file is read by a small model, in place of your AI company."),
             gt(
-              "DoeDesk Cloud's worker needs nothing set up. The next step says where a file's text is sent, before anything is sealed.",
+              "A sealed file is read by a separate model, in place of your AI company. On your own computer or company server, each file is read on hardware you control.",
+            ),
+            gt(
+              "Any server that supports the Chat Completions or Responses format works; with a hosted service you have a key for, the file goes to that service.",
             ),
           ],
           form: (
             <div className="grid gap-3 text-start">
+              {ownServer}
+              <p className="text-sm text-muted-foreground">
+                {gt(
+                  "No model hardware of your own yet? DoeDesk Cloud's worker is managed for your organization and needs nothing set up. The next step says where a file's text is sent, before anything is sealed.",
+                )}
+              </p>
               <div>
                 <Button variant="outline" disabled={busy} onClick={chooseCloudWorker}>
                   {gt("Use DoeDesk Cloud's worker")}
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground">
-                {gt(
-                  "Or connect your own server. Any server that supports the Chat Completions or Responses format works; with a hosted service you have a key for, the file goes to that service.",
-                )}
-              </p>
-              {ownServer}
             </div>
           ),
           action: connect,
@@ -516,7 +518,7 @@ export function SealPromptHost() {
           ...(status?.worker?.notIncluded === true ? [resolve(HOSTED_WORKER_NOT_INCLUDED)] : []),
           ...(hostedWorkerNotInRegion(status) ? [resolve(HOSTED_WORKER_NOT_IN_REGION)] : []),
           gt(
-            "A sealed file is read by a small model on your own server, in place of your AI company.",
+            "A sealed file is read by a model on your own computer or company server, in place of your AI company, so each file is read on hardware you control.",
           ),
           gt(
             "Any server that supports the Chat Completions or Responses format works. A hosted service you have a key for works too, and the file then goes to that service.",

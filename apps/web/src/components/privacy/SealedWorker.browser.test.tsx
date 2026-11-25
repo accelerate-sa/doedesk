@@ -70,10 +70,10 @@ describe("the worker's settings", () => {
       },
     });
     expect(workerRequest({ ...form, model: "" })).toEqual({ problem: "Enter the model's name." });
-    // DoeDesk Cloud's worker leads, and is offered only to a signed-in account that has it.
+    // The person's own server leads; DoeDesk Cloud's worker is offered only to a signed-in account that has it.
     expect(WORKER_CHOICES.map((choice) => m(choice.label))).toEqual([
-      "DoeDesk Cloud",
       "My own server",
+      "DoeDesk Cloud",
       "None",
     ]);
     expect(workerChoicesFor(status()).map((choice) => choice.value)).toEqual(["custom", "off"]);
@@ -85,7 +85,7 @@ describe("the worker's settings", () => {
       workerChoicesFor(status({ mode: "cloud", hostedWorkerEntitled: true })).map(
         (choice) => choice.value,
       ),
-    ).toEqual(["cloud", "custom", "off"]);
+    ).toEqual(["custom", "cloud", "off"]);
     expect(workerRequest({ ...form, kind: "cloud" })).toEqual({ request: { kind: "cloud" } });
     // A server from before the worker existed reports no worker and an open rule.
     expect(workerOf(status()).kind).toBe("off");
@@ -126,7 +126,7 @@ describe("the worker's settings", () => {
     await expect
       .element(
         screen.getByText(
-          "Sealed files are read by a separate model you connect here, on your own server or under your own API key. Organizations that need a managed in-region worker can contact hello@doedesk.com.",
+          "Sealed files are read by a separate model you connect here. On your own computer or company server, they are read on hardware you control; under an API key, they go to that service. Organizations without their own model hardware yet can ask for a managed in-region worker at hello@doedesk.com.",
         ),
       )
       .toBeInTheDocument();
@@ -214,7 +214,7 @@ describe("the worker's settings", () => {
     await expect
       .element(
         screen.getByText(
-          "Masking runs automatically on DoeDesk Cloud. Sealed files are read by a separate model you connect here, on your own server or under your own API key. Organizations that need a managed in-region worker can contact hello@doedesk.com.",
+          "Masking runs automatically on DoeDesk Cloud. Sealed files are read by a separate model you connect here. On your own computer or company server, they are read on hardware you control; under an API key, they go to that service. Organizations without their own model hardware yet can ask for a managed in-region worker at hello@doedesk.com.",
         ),
       )
       .toBeInTheDocument();

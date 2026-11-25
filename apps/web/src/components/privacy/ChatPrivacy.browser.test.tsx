@@ -222,6 +222,14 @@ describe("the status beside the message box", () => {
     const masked = screen.getByRole("button", { name: "Privacy of this chat: Masked" });
     await expect.element(masked).toBeInTheDocument();
     await expect.element(masked).toHaveTextContent("");
+    // Without sealed files, the open popover says what masking still sends.
+    await expect
+      .element(
+        screen.getByText(
+          "Amounts, dates and the wording of your documents still reach Anthropic. To keep a file's contents away from it, seal the file.",
+        ),
+      )
+      .toBeInTheDocument();
 
     // The chat's provider changes to one DoeDesk was never tested with.
     await screen.rerender(chip("kiro"));

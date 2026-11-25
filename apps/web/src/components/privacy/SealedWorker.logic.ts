@@ -29,14 +29,17 @@ const NO_WORKER: PrivacyWorkerStatus = {
 /** A server from before the worker existed reports none. */
 export const workerOf = (status: PrivacyStatus): PrivacyWorkerStatus => status.worker ?? NO_WORKER;
 
-/** Who can read sealed files: DoeDesk Cloud's worker, the person's own server, or nobody. */
+/**
+ * Who can read sealed files: the person's own server, DoeDesk Cloud's worker, or nobody. The own
+ * server leads: with it, each sealed file is read on hardware the person controls.
+ */
 export const WORKER_CHOICES: ReadonlyArray<{
   readonly value: PrivacyWorkerKind;
   readonly label: string;
 }> = [
+  { value: "custom", label: msg("My own server") },
   // oxlint-disable-next-line t3code/no-untranslated-copy -- the service's name
   { value: "cloud", label: "DoeDesk Cloud" },
-  { value: "custom", label: msg("My own server") },
   { value: "off", label: msg("None", { $context: "no worker model is connected" }) },
 ];
 

@@ -27,6 +27,7 @@ import { usePrimaryEnvironmentId } from "~/state/environments";
 import { PrivacySetup } from "../privacy/PrivacySetup";
 import { ProviderMaskingSection } from "../privacy/ProviderMasking";
 import { UsageDataSettings } from "../privacy/UsageData";
+import { WhatLeavesOverview } from "../privacy/WhatLeavesOverview";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -71,6 +72,7 @@ export function PrivacySettingsPanel() {
           )}
         </div>
       </SettingsSection>
+      {state.kind === "ready" ? <WhatLeavesOverview status={state.status} /> : null}
       <ActivitySection />
       {state.kind === "ready" ? (
         <SealedDocumentsSection

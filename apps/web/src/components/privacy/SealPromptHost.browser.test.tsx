@@ -278,7 +278,9 @@ describe("sealing a file", () => {
     await expect.element(screen.getByText(/the file then goes to that service/)).toBeVisible();
     await expect
       .element(
-        screen.getByText("Need a managed in-region worker for a team? Contact hello@doedesk.com."),
+        screen.getByText(
+          "No model hardware of your own yet? Organizations can ask for a managed in-region worker at hello@doedesk.com.",
+        ),
       )
       .toBeVisible();
     expect(screen.getByText(/is not included in this account/).query()).toBeNull();
@@ -338,7 +340,9 @@ describe("sealing a file", () => {
         ),
       )
       .toBeVisible();
-    await expect.element(screen.getByText(/Need a managed in-region worker/)).toBeVisible();
+    await expect
+      .element(screen.getByText(/Organizations can ask for a managed in-region worker/))
+      .toBeVisible();
     expect(screen.getByRole("button", { name: "Use DoeDesk Cloud's worker" }).query()).toBeNull();
     expect(screen.getByText(/Account region/).query()).toBeNull();
 
@@ -346,7 +350,9 @@ describe("sealing a file", () => {
     privacy.setStatus(status(included));
     requestSeal({ projectId: "p", name: "lease.txt", path: "/case/lease.txt" });
     await expect.element(screen.getByText("Choose who reads sealed files")).toBeVisible();
-    expect(screen.getByText(/Need a managed in-region worker/).query()).toBeNull();
+    expect(
+      screen.getByText(/Organizations can ask for a managed in-region worker/).query(),
+    ).toBeNull();
     // Their own server is still there to connect.
     await expect.element(screen.getByLabelText("Server address")).toBeVisible();
     await press(screen.getByRole("button", { name: "Use DoeDesk Cloud's worker" }));
