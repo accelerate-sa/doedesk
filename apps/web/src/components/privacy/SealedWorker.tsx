@@ -100,7 +100,7 @@ export function WorkerSection({ status }: { readonly status: PrivacyStatus }) {
       <SettingsRow
         title={gt("Reading model", { $context: "the model that reads sealed files" })}
         description={gt(
-          "A small model reads sealed files so DoeDesk does not send them to your AI company; yes-or-no answers and choices from a list still reach it.",
+          "A separate model reads sealed files so DoeDesk does not send them to your AI company; yes-or-no answers and choices from a list still reach it. Run it on your own computer or company server and each file is read on hardware you control.",
         )}
         control={
           <Select

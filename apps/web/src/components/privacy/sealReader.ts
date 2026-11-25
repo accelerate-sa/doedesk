@@ -69,7 +69,7 @@ export const managedWorkerNote = (
   if (hostedWorkerNotInRegion(status)) {
     return resolve(
       msg(
-        "DoeDesk Cloud's worker is not available in your region yet. Sealed files are read by a separate model you connect here, on your own server or under your own API key.",
+        "DoeDesk Cloud's worker is not available in your region yet. Sealed files are read by a separate model you connect here. On your own computer or company server, they are read on hardware you control; under an API key, they go to that service.",
       ),
     );
   }
@@ -78,18 +78,18 @@ export const managedWorkerNote = (
   return status.mode === "cloud"
     ? resolve(
         msg(
-          "Masking runs automatically on DoeDesk Cloud. Sealed files are read by a separate model you connect here, on your own server or under your own API key. Organizations that need a managed in-region worker can contact hello@doedesk.com.",
+          "Masking runs automatically on DoeDesk Cloud. Sealed files are read by a separate model you connect here. On your own computer or company server, they are read on hardware you control; under an API key, they go to that service. Organizations without their own model hardware yet can ask for a managed in-region worker at hello@doedesk.com.",
         ),
       )
     : resolve(
         msg(
-          "Sealed files are read by a separate model you connect here, on your own server or under your own API key. Organizations that need a managed in-region worker can contact hello@doedesk.com.",
+          "Sealed files are read by a separate model you connect here. On your own computer or company server, they are read on hardware you control; under an API key, they go to that service. Organizations without their own model hardware yet can ask for a managed in-region worker at hello@doedesk.com.",
         ),
       );
 };
 
 export const MANAGED_WORKER_FOOTER = msg(
-  "Need a managed in-region worker for a team? Contact hello@doedesk.com.",
+  "No model hardware of your own yet? Organizations can ask for a managed in-region worker at hello@doedesk.com.",
 );
 
 /** DoeDesk Cloud's worker read this account's sealed files and the account does not have it now. */

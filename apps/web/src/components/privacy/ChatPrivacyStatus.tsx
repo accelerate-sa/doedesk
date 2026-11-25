@@ -65,7 +65,13 @@ const sentencesOf = (state: ChatMaskingState, words: Words, gt: Translate): Arra
                 { count: state.sealed },
               ),
             ]
-          : []),
+          : [
+              // Said only without sealed files, so masking is not taken for sealing.
+              gt(
+                "Amounts, dates and the wording of your documents still reach {company}. To keep a file's contents away from it, seal the file.",
+                { company },
+              ),
+            ]),
       ];
     case "notMasked":
       return [
