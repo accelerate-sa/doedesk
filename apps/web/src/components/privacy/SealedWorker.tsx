@@ -3,6 +3,7 @@ import { serverSentence } from "@t3tools/shared/serverSentencesCopy";
 import { useClientSettings } from "~/hooks/useSettings";
 import { formatRecordTimestamp } from "~/timestampFormat";
 import { msg, useGT, useLocale, useMessages } from "gt-react";
+import { ShieldCheckIcon } from "lucide-react";
 import { useState } from "react";
 
 import { SEALED_ARTICLE_URL } from "~/branding";
@@ -21,6 +22,11 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Switch } from "../ui/switch";
 import { AccountRegionNotice, AccountRegionSelect, useAccountRegionChange } from "./AccountRegion";
 import { SealedFilesList } from "./SealedFiles";
+import {
+  type OpenedSealedOutput,
+  openedSealedOutput,
+  SealedOutputDialog,
+} from "./SealedOutputCard";
 import {
   accountRegionLabel,
   answerRouteLabel,
@@ -348,6 +354,10 @@ export function SealedDocumentsSection({
   // The record of clear answers is read once the person opens it, and again as answers are given.
   const [answersOpen, setAnswersOpen] = useState(false);
   const answers = useSealedAnswers(answersOpen ? projectId : null);
+  const [openedOutput, setOpenedOutput] = useState<{
+    readonly name: string;
+    readonly fetched: OpenedSealedOutput;
+  } | null>(null);
   const act = (request: Parameters<typeof changeSealedDocuments>[0]) => {
     setBusy(true);
     setProblem(null);
@@ -446,9 +456,36 @@ export function SealedDocumentsSection({
               {listing.outputs.map((output) => (
                 <li key={output.name} className="flex items-center gap-3 text-sm">
                   <bdi className="min-w-0 flex-1 truncate">{output.name}</bdi>
+                  {output.verifiedSpans !== undefined && output.verifiedSpans > 0 ? (
+                    <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
+                      <ShieldCheckIcon className="size-3.5 text-success" aria-hidden />
+                      {gt(
+                        "{count, plural, one {{count} verified value} other {{count} verified values}}",
+                        { count: output.verifiedSpans },
+                      )}
+                    </span>
+                  ) : null}
                   <span className="text-xs text-muted-foreground">
                     {formatRecordTimestamp(output.writtenAt, timestampFormat, resolve)}
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    disabled={busy}
+                    onClick={() =>
+                      projectId === null
+                        ? undefined
+                        : void act({ action: "output", projectId, name: output.name }).then(
+                            (result) => {
+                              const fetched =
+                                result === null ? null : openedSealedOutput(output.name, result);
+                              if (fetched !== null) setOpenedOutput({ name: output.name, fetched });
+                            },
+                          )
+                    }
+                  >
+                    {gt("Open", { $context: "verb, opens a file" })}
+                  </Button>
                   <Button
                     variant="ghost"
                     size="xs"
@@ -470,6 +507,13 @@ export function SealedDocumentsSection({
                 </li>
               ))}
             </ul>
+            {openedOutput === null ? null : (
+              <SealedOutputDialog
+                name={openedOutput.name}
+                opened={openedOutput.fetched}
+                onClose={() => setOpenedOutput(null)}
+              />
+            )}
           </>
         ) : null}
         {listing !== null && listing.documents.length > 0 ? (

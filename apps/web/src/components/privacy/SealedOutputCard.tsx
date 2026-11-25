@@ -1,15 +1,21 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  PrivacySealedProvenanceSpan,
+  ScopedThreadRef,
+  ThreadId,
+} from "@t3tools/contracts";
 import { useGT } from "gt-react";
 import { FileCheck2Icon } from "lucide-react";
 import { useState } from "react";
 
+import { useComposerDraftStore } from "~/composerDraftStore";
 import { changeSealedDocuments } from "~/privacy/privacyClient";
 import { useThreadShell } from "~/state/entities";
 import { usePrimaryEnvironmentId } from "~/state/environments";
-import { AttachmentFilePreview } from "../files/AttachmentFilePreview";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
+import { SealedOutputViewer } from "./SealedOutputViewer";
 
 const TEXT_TYPES: Readonly<Record<string, string>> = {
   md: "text/markdown",
@@ -23,7 +29,7 @@ const TEXT_TYPES: Readonly<Record<string, string>> = {
 const mimeTypeOf = (name: string): string =>
   TEXT_TYPES[name.split(".").at(-1)?.toLowerCase() ?? ""] ?? "text/plain";
 
-const save = (file: File): void => {
+const saveSealedOutput = (file: File): void => {
   const url = URL.createObjectURL(file);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -31,6 +37,77 @@ const save = (file: File): void => {
   anchor.click();
   URL.revokeObjectURL(url);
 };
+
+/** A finished file read from the person's own server, with where its sealed values came from. */
+export interface OpenedSealedOutput {
+  readonly file: File;
+  readonly text: string;
+  readonly provenance: ReadonlyArray<PrivacySealedProvenanceSpan>;
+  readonly hasTemplate: boolean | undefined;
+}
+
+export const openedSealedOutput = (
+  name: string,
+  result: {
+    readonly output: string | null;
+    readonly provenance?: ReadonlyArray<PrivacySealedProvenanceSpan>;
+    readonly hasTemplate?: boolean;
+  },
+): OpenedSealedOutput | null =>
+  typeof result.output === "string"
+    ? {
+        file: new File([result.output], name, { type: mimeTypeOf(name) }),
+        text: result.output,
+        provenance: result.provenance ?? [],
+        hasTemplate: result.hasTemplate,
+      }
+    : null;
+
+/** The dialog a finished file opens in, from a reply or from Settings. */
+export function SealedOutputDialog({
+  name,
+  opened,
+  onRevise,
+  onClose,
+}: {
+  readonly name: string;
+  readonly opened: OpenedSealedOutput;
+  readonly onRevise?: () => void;
+  readonly onClose: () => void;
+}) {
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogPopup
+        className="h-[min(85vh,52rem)] max-w-5xl overflow-hidden"
+        showCloseButton={false}
+      >
+        <DialogTitle className="sr-only">{name}</DialogTitle>
+        <SealedOutputViewer
+          name={name}
+          text={opened.text}
+          file={opened.file}
+          provenance={opened.provenance}
+          {...(opened.hasTemplate === undefined ? {} : { hasTemplate: opened.hasTemplate })}
+          {...(onRevise === undefined
+            ? {}
+            : {
+                onRevise: () => {
+                  onRevise();
+                  onClose();
+                },
+              })}
+          onSave={() => saveSealedOutput(opened.file)}
+          onClose={onClose}
+        />
+      </DialogPopup>
+    </Dialog>
+  );
+}
 
 /** The card in a chat: finds the chat's folder, and whether its sealed files can be fetched here. */
 export function SealedOutputCard({
@@ -43,9 +120,17 @@ export function SealedOutputCard({
   readonly name: string;
 }) {
   const primary = usePrimaryEnvironmentId();
-  const projectId = useThreadShell(scopeThreadRef(environmentId, threadId))?.projectId ?? null;
+  const threadRef = scopeThreadRef(environmentId, threadId);
+  const projectId = useThreadShell(threadRef)?.projectId ?? null;
   // Sealed files are held by the primary environment; a chat on another machine cannot fetch one.
-  return <SealedOutputFile projectId={environmentId === primary ? projectId : null} name={name} />;
+  const fetchable = environmentId === primary && projectId !== null;
+  return (
+    <SealedOutputFile
+      projectId={fetchable ? projectId : null}
+      name={name}
+      {...(fetchable ? { threadRef } : {})}
+    />
+  );
 }
 
 /**
@@ -56,31 +141,46 @@ export function SealedOutputCard({
 export function SealedOutputFile({
   projectId,
   name,
+  threadRef,
 }: {
   /** Null where the file cannot be fetched: it is then named, with nothing to press. */
   readonly projectId: string | null;
   readonly name: string;
+  /** The chat whose message box Revise writes in. */
+  readonly threadRef?: ScopedThreadRef;
 }) {
   const gt = useGT();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [opened, setOpened] = useState<File | null>(null);
+  const [opened, setOpened] = useState<OpenedSealedOutput | null>(null);
 
-  const fetchFile = (then: (file: File) => void) => {
+  const fetchFile = (then: (opened: OpenedSealedOutput) => void) => {
     if (projectId === null) return;
     setBusy(true);
     setProblem(null);
     void changeSealedDocuments({ action: "output", projectId, name })
       .then((result) => {
-        if (typeof result.output !== "string") {
+        const fetched = openedSealedOutput(name, result);
+        if (fetched === null) {
           setProblem(gt("This finished file is no longer stored."));
           return;
         }
-        then(new File([result.output], name, { type: mimeTypeOf(name) }));
+        then(fetched);
       })
       .catch(() => setProblem(gt("This finished file is no longer stored.")))
       .finally(() => setBusy(false));
   };
+
+  // Only the file's name goes in the message box: its values stay out of the chat.
+  const revise =
+    threadRef === undefined
+      ? undefined
+      : () => {
+          const store = useComposerDraftStore.getState();
+          const existing = store.getComposerDraft(threadRef)?.prompt ?? "";
+          const line = gt("Revise {name}: ", { name });
+          store.setPrompt(threadRef, existing.trim().length === 0 ? line : `${existing}\n${line}`);
+        };
 
   return (
     <div
@@ -105,7 +205,17 @@ export function SealedOutputFile({
             >
               {gt("Open", { $context: "verb, opens a file" })}
             </Button>
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => fetchFile(save)}>
+            {revise === undefined ? null : (
+              <Button variant="outline" size="sm" onClick={revise}>
+                {gt("Revise", { $context: "button, asks the AI to change a finished file" })}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => fetchFile((fetched) => saveSealedOutput(fetched.file))}
+            >
               {gt("Save", { $context: "verb, saves a file to the person's computer" })}
             </Button>
           </>
@@ -120,27 +230,12 @@ export function SealedOutputFile({
         </p>
       ) : null}
       {opened !== null ? (
-        <Dialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setOpened(null);
-          }}
-        >
-          <DialogPopup
-            className="h-[min(85vh,52rem)] max-w-4xl overflow-hidden"
-            showCloseButton={false}
-          >
-            <DialogTitle className="sr-only">{name}</DialogTitle>
-            <AttachmentFilePreview
-              name={name}
-              mimeType={opened.type}
-              sizeBytes={opened.size}
-              file={opened}
-              origin={gt("Finished file")}
-              onClose={() => setOpened(null)}
-            />
-          </DialogPopup>
-        </Dialog>
+        <SealedOutputDialog
+          name={name}
+          opened={opened}
+          {...(revise === undefined ? {} : { onRevise: revise })}
+          onClose={() => setOpened(null)}
+        />
       ) : null}
     </div>
   );

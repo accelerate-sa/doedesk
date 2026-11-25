@@ -24,7 +24,7 @@ import {
   Table2Icon,
 } from "lucide-react";
 import { msg, T, useGT, useMessages, Var } from "gt-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { m, type MessageResolver } from "~/i18n/messages";
 
 import { useAssetUrlRefresh } from "~/assets/assetUrls";
@@ -112,6 +112,8 @@ export function AttachmentFilePreview(props: {
   htmlRender?: boolean;
   threadRef?: ScopedThreadRef;
   origin?: string;
+  /** Controls a host adds to the header, before the file's own actions. */
+  actions?: ReactNode;
   onRemove?: () => void;
   onClose?: () => void;
 }) {
@@ -425,6 +427,7 @@ export function AttachmentFilePreview(props: {
             </span>
           ) : null}
         </div>
+        {props.actions}
         {renderedMode ? (
           <FileSurfaceAction
             label={renderedToggleLabel(renderedMode, rendered, messages)}

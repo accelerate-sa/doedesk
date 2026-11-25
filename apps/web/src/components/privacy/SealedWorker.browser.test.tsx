@@ -19,6 +19,9 @@ const client = vi.hoisted(() => ({
   accountAction: vi.fn(),
   changeSealedDocuments: vi.fn(),
   configurePrivacyWorker: vi.fn(),
+  // The finished file viewer can highlight known values: masking is not set up here, so none.
+  fetchKnownValues: vi.fn(),
+  usePrivacyStatus: vi.fn(),
   reloadPrivacyStatus: vi.fn(),
   setPrivacyPreference: vi.fn(),
   useSealedAnswers: vi.fn(),
@@ -49,6 +52,7 @@ const setup = () => {
   client.setPrivacyPreference.mockResolvedValue(undefined);
   client.useSealedDocuments.mockReturnValue(listing());
   client.useSealedAnswers.mockReturnValue(null);
+  client.fetchKnownValues.mockResolvedValue({ values: [], turns: [] });
 };
 
 describe("the worker's settings", () => {
