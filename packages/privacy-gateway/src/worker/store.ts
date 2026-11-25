@@ -5,7 +5,15 @@ import * as NodePath from "node:path";
 import * as NodeZlib from "node:zlib";
 
 import { sanitizeIngestedText } from "./sanitize.ts";
-import { type ClearAnswer, emptyLedger, type SealedValue, type SealLedger } from "./seal.ts";
+import {
+  type ClearAnswer,
+  emptyLedger,
+  type FilledSpan,
+  type SealedValue,
+  type SealedValueSource,
+  type SealedValueSourceInput,
+  type SealLedger,
+} from "./seal.ts";
 import { Tripwire } from "./tripwire.ts";
 
 /**
@@ -76,6 +84,18 @@ export interface SealedOutputInfo {
   readonly writtenAt: string;
   /** Sealed values that were put into it. */
   readonly filled: number;
+  /** Its draft is kept, so the model can revise it. Unset on files finished before drafts were. */
+  readonly hasTemplate?: boolean;
+  /** Values put into it whose source is kept, for the person to check. */
+  readonly verifiedSpans?: number;
+}
+
+/** One sealed value of a finished file, where it stands and where it came from. */
+export interface SealedOutputSpan
+  extends Omit<FilledSpan, "source">, Omit<SealedValueSource, "inputs"> {
+  /** The name of the document, or of each document, for the person. */
+  readonly documentName: string;
+  readonly inputs?: ReadonlyArray<SealedValueSourceInput & { readonly documentName: string }>;
 }
 
 /** A file of a sealed folder that stays readable there, and why. */
@@ -1043,16 +1063,23 @@ export class SealedStore {
     filled: number,
     /** The text before sealed values were put in, as the model wrote it. */
     template: string,
+    /** Where each value was put in `text`. Only those with a source are kept. */
+    spans: ReadonlyArray<FilledSpan> = [],
   ): SealedOutputInfo {
     const key = projectKey(project);
     const index = this.#index(key);
+    const traced = spans.filter((span) => span.source !== undefined);
     const info: SealedOutputInfo = {
       name: safeName(name),
       characters: text.length,
       writtenAt: new Date().toISOString(),
       filled,
+      hasTemplate: true,
+      verifiedSpans: traced.length,
     };
     this.#write(key, `out/${info.name}`, Buffer.from(text, "utf8"));
+    this.#write(key, `out-tpl/${info.name}`, Buffer.from(template, "utf8"));
+    this.#write(key, `out-prov/${info.name}`, Buffer.from(JSON.stringify(traced), "utf8"));
     this.#saveIndex(key, {
       ...index,
       outputs: [...(index.outputs ?? []).filter((output) => output.name !== info.name), info],
@@ -1069,5 +1096,48 @@ export class SealedStore {
 
   readOutput(project: string, name: string): string | undefined {
     return this.#readText(projectKey(project), `out/${safeName(name)}`);
+  }
+
+  /** The draft a finished file was filled from, with stand-ins and markers. */
+  readOutputTemplate(project: string, name: string): string | undefined {
+    return this.#readText(projectKey(project), `out-tpl/${safeName(name)}`);
+  }
+
+  /**
+   * Where each sealed value of a finished file came from, with the name each document has for
+   * the person. Empty for a file finished before this was kept.
+   */
+  readOutputProvenance(project: string, name: string): ReadonlyArray<SealedOutputSpan> {
+    const key = projectKey(project);
+    const spans = this.#readJson<ReadonlyArray<FilledSpan>>(
+      key,
+      `out-prov/${safeName(name)}`,
+      () => [],
+    );
+    const names = new Map(this.#index(key).documents.map((info) => [info.handle, info.name]));
+    const documentName = (handles: string) =>
+      handles
+        .split(", ")
+        .map((handle) => names.get(handle) ?? handle)
+        .join(", ");
+    return spans.flatMap(({ source, ...span }): ReadonlyArray<SealedOutputSpan> => {
+      if (source === undefined) return [];
+      const { inputs, ...from } = source;
+      return [
+        {
+          ...span,
+          ...from,
+          documentName: documentName(source.handle),
+          ...(inputs === undefined
+            ? {}
+            : {
+                inputs: inputs.map((input) => ({
+                  ...input,
+                  documentName: documentName(input.handle),
+                })),
+              }),
+        },
+      ];
+    });
   }
 }

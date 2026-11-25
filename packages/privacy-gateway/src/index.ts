@@ -82,7 +82,7 @@ export type {
   SealTargetsInspection,
   UnsealFolderResult,
 } from "./sealedFolders.ts";
-export type { SealedTurnActivity } from "./worker/store.ts";
+export type { SealedOutputSpan, SealedTurnActivity } from "./worker/store.ts";
 
 export interface PrivacyGatewayConfig {
   /** Where the vault and the local certificate authority are kept. */

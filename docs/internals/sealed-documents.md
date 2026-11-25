@@ -345,6 +345,19 @@ writes, which the model never reads back: a Markdown table in text, rows in a `.
 `.tsv`, an array in JSON. Its inferred columns (the keys rows have) can follow a value, so they
 too are seen only in the file.
 
+**A finished file says where each value came from, on this machine only.** A sealed value
+keeps its `source`: the document, field, checked quote and line, or for a computed value the
+program and up to 24 document values it read. `fill` records the exact span of every value it
+puts in (`text.slice(start, end)` is what it wrote, in text, CSV and JSON alike) and the store
+keeps spans and the agent's draft encrypted beside the output. Only the person's client reads
+them, through the `output` action; no source, quote or span is in what the agent is told.
+
+**A finished file is revised from its draft.** `read_sealed_draft` gives the agent back what
+it wrote for `fill_sealed`, stand-ins and markers in place, so a change the person asks for is
+an edit and a second fill under the same name, not a rewrite from memory. The draft goes
+through `maskKnown(draft, true)` on the way back: a real value the agent typed in comes back as
+its stand-in, so reading a draft never carries a value it did not already hold.
+
 **Text no reader sees is not read.** A document can carry instructions for a model that its
 reader never sees. `sanitizeIngestedText` removes Unicode tag characters, control characters,
 soft hyphens, zero-width spaces and byte order marks from every document's text, local or read

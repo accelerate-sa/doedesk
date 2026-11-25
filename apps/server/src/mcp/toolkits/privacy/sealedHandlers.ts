@@ -41,6 +41,28 @@ export const sealedFilesIn = <File extends { readonly handle: string; readonly o
     .toSorted((first, second) => Number(first.handle.slice(4)) - Number(second.handle.slice(4)));
 };
 
+/** A finished file's draft by name, or the names of those that have one. */
+export const readSealedDraft = Effect.fn("SealedToolkit.readSealedDraft")(function* (
+  privacy: Pick<PrivacyGateway.PrivacyGateway["Service"], "sealedDrafts" | "sealedDraft">,
+  project: string,
+  name: string | undefined,
+) {
+  const outputs = [...(yield* privacy.sealedDrafts(project))];
+  if (name === undefined) return { outputs };
+  // fill_sealed keeps only the last part of a name.
+  const wanted = name.split(/[\\/]/).at(-1) ?? name;
+  const template = yield* privacy.sealedDraft(project, wanted);
+  if (template === undefined) {
+    return yield* refuse(
+      "invalid_request",
+      outputs.length === 0
+        ? "No finished file has a draft to revise yet."
+        : `No finished file called ${wanted} has a draft. These do: ${outputs.join(", ")}.`,
+    );
+  }
+  return { name: wanted, template, outputs };
+});
+
 /** The project whose sealed documents the calling thread may ask about: its own. */
 const callingThread = Effect.fn("SealedToolkit.callingThread")(function* () {
   const { caller } = yield* loadCaller();
@@ -138,6 +160,13 @@ const handlers = {
                 ? "The file has no markers, so nothing was filled."
                 : "The finished copy is in the person's sealed outputs. Tell them it is there; do not read it back.",
       };
+    }),
+  ),
+  read_sealed_draft: McpToolAccess.readsAsCaller(({ name }) =>
+    Effect.gen(function* () {
+      const privacy = yield* PrivacyGateway.PrivacyGateway;
+      const { project } = yield* callingThread();
+      return yield* readSealedDraft(privacy, project, name);
     }),
   ),
   list_sealed: McpToolAccess.readsAsCaller(({ folder, after }) =>

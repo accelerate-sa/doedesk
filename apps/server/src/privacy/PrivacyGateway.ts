@@ -200,8 +200,15 @@ export class PrivacyGateway extends Context.Service<
     readonly sealedClearAnswers: (
       project: string,
     ) => Effect.Effect<ReturnType<PrivacyController["sealedClearAnswers"]>>;
-    /** A finished file that holds sealed values, for the person. Never for an agent. */
-    readonly sealedOutput: (project: string, name: string) => Effect.Effect<string | undefined>;
+    /** A finished file that holds sealed values, and their sources, for the person. Never for an agent. */
+    readonly sealedOutputDetail: (
+      project: string,
+      name: string,
+    ) => Effect.Effect<ReturnType<PrivacyController["sealedOutputDetail"]>>;
+    /** Finished files whose draft `read_sealed_draft` can give back. */
+    readonly sealedDrafts: (project: string) => Effect.Effect<ReadonlyArray<string>>;
+    /** What `read_sealed_draft` gives back: stand-ins and markers, never a value. */
+    readonly sealedDraft: (project: string, name: string) => Effect.Effect<string | undefined>;
     /** What the `ask_documents` tool answers. */
     readonly askDocuments: (input: PrivacyAskInput) => Effect.Effect<AskAnswer>;
     /** Evaluation only: the worker's own words about each document, unchecked. */
@@ -539,8 +546,15 @@ export const make = Effect.fn("PrivacyGateway.make")(function* (stateDirectory: 
     sealedClearAnswers: Effect.fn("PrivacyGateway.sealedClearAnswers")((project: string) =>
       Effect.sync(() => controller.sealedClearAnswers(project)),
     ),
-    sealedOutput: Effect.fn("PrivacyGateway.sealedOutput")((project: string, name: string) =>
-      Effect.sync(() => controller.sealedOutput(project, name)),
+    sealedOutputDetail: Effect.fn("PrivacyGateway.sealedOutputDetail")(
+      (project: string, name: string) =>
+        Effect.sync(() => controller.sealedOutputDetail(project, name)),
+    ),
+    sealedDrafts: Effect.fn("PrivacyGateway.sealedDrafts")((project: string) =>
+      Effect.sync(() => controller.sealedDrafts(project)),
+    ),
+    sealedDraft: Effect.fn("PrivacyGateway.sealedDraft")((project: string, name: string) =>
+      Effect.sync(() => controller.sealedDraft(project, name)),
     ),
     askDocuments: Effect.fn("PrivacyGateway.askDocuments")((input: PrivacyAskInput) =>
       Effect.promise(() => controller.askDocuments(input)),

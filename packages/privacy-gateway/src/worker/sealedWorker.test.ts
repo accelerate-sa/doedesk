@@ -486,6 +486,79 @@ describe("asking about sealed documents", () => {
     expect(context.worker.fill("p", "bad.json", `{"order": ${order} ${order}}`).invalid).toBe(true);
   });
 
+  it("keeps where each value it fills came from, and a draft the model can revise without a value", async () => {
+    using context = setup();
+    const answer = await ask(context.worker);
+    const payload = (answer.ok ? answer.payload : {}) as {
+      documents: Array<{ fields: Record<string, { value?: string }> }>;
+      program: { result: { rows: Record<string, { days: string }> } };
+    };
+    const total = String(payload.documents[0]?.fields.total?.value);
+    const days = String(payload.program.result.rows.DOC_1?.days);
+    const draft = `Total ${total} ريال for {{DOC_1.order_number}}: ${days} days after {{DOC_1.date|iso}}.\n${total} [AMOUNT_ZZZZZ]`;
+    context.worker.fill("p", "letter.txt", draft);
+    const text = context.store.readOutput("p", "letter.txt") ?? "";
+    const spans = context.store.readOutputProvenance("p", "letter.txt");
+    for (const span of spans) expect(text.slice(span.start, span.end)).toBe(span.written);
+    const order = {
+      kind: "document",
+      handle: "DOC_1",
+      documentName: "order.txt",
+    };
+    expect(spans).toMatchObject([
+      {
+        ...order,
+        written: "٣٬٨٢٩٬٥٨٩٫٠٥",
+        token: total,
+        field: "total",
+        quote: "إجمالي قيمة الأمر: ٣٬٨٢٩٬٥٨٩٫٠٥ ريال",
+        line: 3,
+      },
+      { ...order, written: "PO-2026-703787", reference: "DOC_1.order_number", line: 1 },
+      {
+        kind: "computed",
+        written: "42",
+        token: days,
+        handle: "DOC_1, DOC_2",
+        documentName: "order.txt, delivery.txt",
+        field: "calc.rows.DOC_1.days",
+        program: PROGRAM,
+      },
+      { ...order, written: "2026-02-03", reference: "DOC_1.date", field: "date" },
+      { ...order, written: "٣٬٨٢٩٬٥٨٩٫٠٥ ريال", field: "total" },
+    ]);
+    expect(spans[2]?.inputs).toContainEqual({
+      handle: "DOC_2",
+      documentName: "delivery.txt",
+      field: "date",
+      written: "17 مارس 2026م",
+      quote: "التاريخ: 17 مارس 2026م",
+      line: 2,
+    });
+    expect(context.store.outputs("p")).toMatchObject([
+      { name: "letter.txt", hasTemplate: true, verifiedSpans: 5 },
+    ]);
+
+    // The draft comes back as the model wrote it; a real value it typed in, as its stand-in.
+    expect(context.worker.draft("p", "letter.txt")).toBe(draft);
+    context.worker.fill("p", "typed.txt", "Total ٣٬٨٢٩٬٥٨٩٫٠٥ ريال and PO-2026-703787.");
+    const typed = context.worker.draft("p", "typed.txt") ?? "";
+    expect(typed).not.toMatch(/٣٬٨٢٩|703787/);
+    expect(typed).toContain(String(payload.documents[0]?.fields.order_number?.value));
+    expect(context.worker.drafts("p")).toEqual(["letter.txt", "typed.txt"]);
+    expect(context.worker.draft("p", "missing.txt")).toBeUndefined();
+
+    // Revised and filled again under its name, the file and what it says of each value follow.
+    context.worker.fill("p", "letter.txt", `Order {{DOC_1.order_number}} came to ${total}.`);
+    expect(context.store.readOutput("p", "letter.txt")).toBe(
+      "Order PO-2026-703787 came to ٣٬٨٢٩٬٥٨٩٫٠٥ ريال.",
+    );
+    expect(context.store.readOutputProvenance("p", "letter.txt")).toMatchObject([
+      { start: 6, end: 20, field: "order_number" },
+      { start: 29, written: "٣٬٨٢٩٬٥٨٩٫٠٥ ريال", field: "total" },
+    ]);
+  });
+
   it("finishes a data file as valid data whatever the agent quoted", () => {
     using context = setup();
     context.store.mergeValues("p", {

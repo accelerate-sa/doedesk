@@ -62,6 +62,7 @@ import {
   type SealedFolderInfo,
   type RecordedClearAnswer,
   type SealedOutputInfo,
+  type SealedOutputSpan,
   SealedStore,
   type SealedTurnActivity,
 } from "./worker/store.ts";
@@ -696,8 +697,24 @@ export interface PrivacyController {
   readonly resetSealedLimits: (project: string) => void;
   /** Every answer the remote model was given in clear about a project's sealed documents. */
   readonly sealedClearAnswers: (project: string) => ReadonlyArray<RecordedClearAnswer>;
-  /** A finished file that holds sealed values, for the person. Never returned to an agent. */
-  readonly sealedOutput: (project: string, name: string) => string | undefined;
+  /**
+   * A finished file that holds sealed values, with where each value came from, for the person.
+   * Never returned to an agent.
+   */
+  readonly sealedOutputDetail: (
+    project: string,
+    name: string,
+  ) =>
+    | {
+        readonly text: string;
+        readonly provenance: ReadonlyArray<SealedOutputSpan>;
+        readonly hasTemplate: boolean;
+      }
+    | undefined;
+  /** Finished files whose draft the `read_sealed_draft` tool can give back. */
+  readonly sealedDrafts: (project: string) => ReadonlyArray<string>;
+  /** What the `read_sealed_draft` tool gives back: stand-ins and markers, never a value. */
+  readonly sealedDraft: (project: string, name: string) => string | undefined;
   /** What the `ask_documents` tool answers. */
   readonly askDocuments: (input: PrivacyAskInput) => Promise<AskAnswer>;
   /** Evaluation only. See `workerFreeText`. */
@@ -2318,7 +2335,17 @@ export const startPrivacyController = async (
     sealedFolderPaths: sealedFolders.paths,
     resetSealedLimits: (project) => sealedStore.resetLedger(project),
     sealedClearAnswers: (project) => sealedStore.clearAnswers(project),
-    sealedOutput: (project, name) => sealedStore.readOutput(project, name),
+    sealedOutputDetail: (project, name) => {
+      const text = sealedStore.readOutput(project, name);
+      if (text === undefined) return undefined;
+      return {
+        text,
+        provenance: sealedStore.readOutputProvenance(project, name),
+        hasTemplate: sealedStore.readOutputTemplate(project, name) !== undefined,
+      };
+    },
+    sealedDrafts: (project) => sealedWorker.drafts(project),
+    sealedDraft: (project, name) => sealedWorker.draft(project, name),
     askDocuments: (input) => sealedWorker.ask(input),
     askDocumentsFreeText: (input) => sealedWorker.askFreeText(input),
     fillSealed: (project, name, template) => sealedWorker.fill(project, name, template),
