@@ -110,6 +110,7 @@ const FillSealedTool = Tool.make("fill_sealed", {
     "Make a finished file that holds sealed values: a summary, a letter, a table, a report. This is the only way to give the person a file with the real values in it; a stand-in written into a file in the folder with another tool stays a stand-in there. Give its `name` and `content` here, with a stand-in where each value belongs (or the `path` of a file you already wrote). For a value in another form use a marker instead: {{DOC_1.field_name|number}} for plain digits, {{DOC_1.field_name|iso}} for a YYYY-MM-DD date, {{DOC_1.list_name[0].column|number}} for a cell of a list's first row, {{calc.total}} or {{calc.rows.DOC_1.days}} for a value of a program's result, named by its keys as the result shows them. In a .json, .jsonl or .csv file a number is written as plain digits and a date as YYYY-MM-DD unless you add |written, and in a .json or .jsonl file a stand-in or a marker that is a value of its own becomes the JSON its value needs (a number, true, false, null or a quoted string) whether or not you put quotes around it. A program's sealed_list() is a Markdown table in a text file, rows with a header in a .csv or .tsv, and a JSON array in a .json or .jsonl; {{calc.flagged|markdown}}, |csv, |tsv, |json or |lines asks for one form.",
     "A stand-in, or a marker with no form, is written as the document writes the value, with or without its currency or percent sign: you cannot tell which. Write the unit beside it (`SAR [AMOUNT_K2M4P]`, `{{DOC_1.rate}}%`); one the value already carries is then written once. `|number` never brings a unit.",
     "The finished copy goes to the person's sealed outputs, not to the workspace, and is not returned and cannot be read back: check `finished` and the counts in the result instead, and tell the person where it is.",
+    "When the person asks for changes to a finished file, get your draft of it with read_sealed_draft, edit it keeping its stand-ins and markers as they are, and call this again with the same name.",
   ].join("\n"),
   parameters: Schema.Struct({
     name: Schema.optionalKey(
@@ -141,6 +142,32 @@ const FillSealedTool = Tool.make("fill_sealed", {
 })
   .annotate(Tool.Title, "Fill sealed values")
   .annotate(Tool.Readonly, false)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true)
+  .annotate(Tool.OpenWorld, false)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+
+const ReadSealedDraftTool = Tool.make("read_sealed_draft", {
+  description:
+    "Get back the draft of a file you finished with fill_sealed: its text as you wrote it, with stand-ins and markers where the sealed values go, never the values. Use it to revise a finished file the person asked to change. Without `name`, it lists the finished files that have a draft.",
+  parameters: Schema.Struct({
+    name: Schema.optionalKey(
+      Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)).annotate({
+        description: "The finished file's name, as fill_sealed gave it.",
+      }),
+    ),
+  }),
+  success: Schema.Struct({
+    outputs: Schema.Array(Schema.String),
+    name: Schema.optionalKey(Schema.String),
+    template: Schema.optionalKey(Schema.String),
+  }),
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies,
+})
+  .annotate(Tool.Title, "Read a sealed file's draft")
+  .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true)
   .annotate(Tool.OpenWorld, false)
@@ -191,11 +218,13 @@ const ListSealedTool = Tool.make("list_sealed", {
 export const SealedToolkit = Toolkit.make(
   askDocumentsTool(ASK_THE_MINIMUM),
   FillSealedTool,
+  ReadSealedDraftTool,
   ListSealedTool,
 );
 /** Evaluation only (`DOEDESK_EVAL_SEALED_ASK_FREELY`): the same tools without "ask the minimum". */
 export const SealedToolkitAskingFreely = Toolkit.make(
   askDocumentsTool(ASK_WITHIN_THE_LIMIT),
   FillSealedTool,
+  ReadSealedDraftTool,
   ListSealedTool,
 );

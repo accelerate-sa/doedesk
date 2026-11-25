@@ -11,7 +11,7 @@ import * as Project from "../../../project/ProjectService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import { liveThreadShell } from "../../McpToolAccess.testkit.ts";
 import { readableFile } from "./handlers.ts";
-import { sealedFilesIn } from "./sealedHandlers.ts";
+import { readSealedDraft, sealedFilesIn } from "./sealedHandlers.ts";
 
 const threadId = ThreadId.make("thread:reading");
 
@@ -119,6 +119,34 @@ it.effect("reads for a thread only what the agent could read without asking", ()
       );
     }
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect("gives back a finished file's draft by name, and names the drafts there are", () =>
+  Effect.gen(function* () {
+    const drafts = new Map([["letter.txt", "Total [AMOUNT_K2M4P] for {{DOC_1.party}}."]]);
+    const privacy = {
+      sealedDrafts: () => Effect.succeed([...drafts.keys()]),
+      sealedDraft: (_project: string, name: string) => Effect.succeed(drafts.get(name)),
+    };
+    const read = (name?: string) =>
+      readSealedDraft(privacy, "project:reading", name).pipe(
+        Effect.catch((failure) => Effect.succeed(`${failure.code}: ${failure.message}`)),
+      );
+    expect(yield* read()).toEqual({ outputs: ["letter.txt"] });
+    // A name with a folder is the file fill_sealed kept, as it keeps only the last part.
+    expect(yield* read("out/letter.txt")).toEqual({
+      name: "letter.txt",
+      template: "Total [AMOUNT_K2M4P] for {{DOC_1.party}}.",
+      outputs: ["letter.txt"],
+    });
+    expect(yield* read("memo.txt")).toBe(
+      "invalid_request: No finished file called memo.txt has a draft. These do: letter.txt.",
+    );
+    drafts.clear();
+    expect(yield* read("memo.txt")).toBe(
+      "invalid_request: No finished file has a draft to revise yet.",
+    );
+  }),
 );
 
 it("lists the sealed files that were in a folder as the agent names it, oldest handle first", () => {

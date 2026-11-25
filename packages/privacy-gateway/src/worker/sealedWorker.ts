@@ -27,6 +27,9 @@ import {
   fillMarkers,
   isJsonTemplate,
   parsesAsJson,
+  type PlacedText,
+  placedValue,
+  replaceTracked,
   UNIT_REACH,
   withoutRepeatedUnit,
   plainForm,
@@ -154,6 +157,13 @@ export interface SealedWorker {
     /** A `.json` or `.jsonl` file that is not JSON once filled. */
     readonly invalid: boolean;
   };
+  /** Finished files whose draft, as the model wrote it for `fill`, is kept. */
+  readonly drafts: (project: string) => ReadonlyArray<string>;
+  /**
+   * A finished file's draft with stand-ins and markers, for the model to revise and fill again.
+   * Every known value in it, sealed ones too, is a stand-in. Undefined when none is kept.
+   */
+  readonly draft: (project: string, name: string) => string | undefined;
   /**
    * Evaluation only: the same question, but each document's answer is the worker's own prose,
    * returned unchecked and unsealed. Measures what the typed answers and the checks are worth.
@@ -639,37 +649,46 @@ export const makeSealedWorker = (options: SealedWorkerOptions): SealedWorker => 
         // A value filled in is not read for stand-ins: a program's text can spell made-up ones,
         // and what is unknown or how many were filled goes back to the model.
         const nonce = NodeCrypto.randomUUID();
-        const held: Array<string> = [];
-        const marked = fillMarkers(template, values, data, (value) => {
-          held.push(value);
-          return `\u0000${nonce}:${held.length - 1}\u0000`;
-        });
+        const held: Array<PlacedText> = [];
+        const hold = (placed: PlacedText): PlacedText => {
+          held.push(placed);
+          return { text: `\u0000${nonce}:${held.length - 1}\u0000`, spans: [] };
+        };
+        const marked = fillMarkers(template, values, data, hold);
         const left: Array<string> = [];
         let restored = 0;
         const source = marked.text;
-        const text = source.replace(placeholderPattern(), (token: string, offset: number) => {
+        const text = replaceTracked(source, placeholderPattern(), (token, offset) => {
           const value = typed(token);
           if (value === undefined) {
             left.push(token);
-            return token;
+            return undefined;
           }
           restored += 1;
-          if (data !== false) return plainForm(value, data);
-          if (value.table !== undefined) return value.written;
-          return withoutRepeatedUnit(
-            value.written,
-            source.slice(Math.max(0, offset - UNIT_REACH), offset),
-            source.slice(offset + token.length, offset + token.length + UNIT_REACH),
-            (item) => typed(item)?.written,
-          );
-        });
+          const written =
+            data !== false
+              ? plainForm(value, data)
+              : value.table !== undefined
+                ? value.written
+                : withoutRepeatedUnit(
+                    value.written,
+                    source.slice(Math.max(0, offset - UNIT_REACH), offset),
+                    source.slice(offset + token.length, offset + token.length + UNIT_REACH),
+                    (item) => typed(item)?.written,
+                  );
+          return hold(placedValue(written, value, { token }));
+        }).text;
+        // Every value was held, so each lands, with its span, only here.
+        const finished = replaceTracked(
+          text,
+          new RegExp(`\u0000${nonce}:(\\d+)\u0000`, "g"),
+          (match) => held[Number(match.slice(nonce.length + 2, -1))] ?? { text: "", spans: [] },
+        );
         return {
-          text: text.replace(
-            new RegExp(`\u0000${nonce}:(\\d+)\u0000`, "g"),
-            (_, index: string) => held[Number(index)] ?? "",
-          ),
+          text: finished.text,
           filled: marked.filled + restored,
           unknown: [...marked.unknown, ...left],
+          spans: finished.spans,
         };
       };
       const done = json ? fillJson(template, values, typed) : fillText();
@@ -681,8 +700,28 @@ export const makeSealedWorker = (options: SealedWorkerOptions): SealedWorker => 
         json &&
         (!isJsonTemplate(template, jsonLines) ||
           (unknown.length === 0 && !parsesAsJson(done.text, jsonLines)));
-      const info = options.store.writeOutput(project, name, done.text, done.filled, template);
+      const info = options.store.writeOutput(
+        project,
+        name,
+        done.text,
+        done.filled,
+        template,
+        done.spans,
+      );
       return { filled: done.filled, unknown, name: info.name, invalid };
+    },
+    drafts: (project) =>
+      options.store
+        .outputs(project)
+        .filter((output) => output.hasTemplate === true)
+        .map((output) => output.name),
+    draft: (project, name) => {
+      const vault = options.vault();
+      const template = options.store.readOutputTemplate(project, name);
+      // The model wrote it, but a real value it typed in is a stand-in again on the way back.
+      return vault === undefined || template === undefined
+        ? undefined
+        : vault.maskKnown(template, true);
     },
     askFreeText: async (request) => {
       const endpoint = options.endpoint();

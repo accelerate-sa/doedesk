@@ -612,8 +612,47 @@ export const PrivacySealedOutput = Schema.Struct({
   characters: Schema.Number,
   writtenAt: Schema.String,
   filled: Schema.Number,
+  /** Its draft is kept, so an agent can revise it with `read_sealed_draft`. */
+  hasTemplate: Schema.optionalKey(Schema.Boolean),
+  /** Values in it whose source can be shown. */
+  verifiedSpans: Schema.optionalKey(Schema.Number),
 });
 export type PrivacySealedOutput = typeof PrivacySealedOutput.Type;
+
+/** A document value a program read for a computed value. */
+export const PrivacySealedProvenanceInput = Schema.Struct({
+  handle: Schema.String,
+  documentName: Schema.String,
+  field: Schema.String,
+  written: Schema.String,
+  quote: Schema.optionalKey(Schema.String),
+  line: Schema.optionalKey(Schema.Number),
+});
+export type PrivacySealedProvenanceInput = typeof PrivacySealedProvenanceInput.Type;
+
+/**
+ * One sealed value of a finished file: `output.slice(start, end)` (UTF-16 offsets) is `written`,
+ * and where it came from. `document`: read from `handle`, with the checked quote; `computed`: a
+ * program's result, with its text and the values it read. `handle` and `documentName` join
+ * several with ", ".
+ */
+export const PrivacySealedProvenanceSpan = Schema.Struct({
+  start: Schema.Number,
+  end: Schema.Number,
+  written: Schema.String,
+  kind: Schema.Literals(["document", "computed"]),
+  handle: Schema.String,
+  documentName: Schema.String,
+  field: Schema.String,
+  quote: Schema.optionalKey(Schema.String),
+  line: Schema.optionalKey(Schema.Number),
+  program: Schema.optionalKey(Schema.String),
+  inputs: Schema.optionalKey(Schema.Array(PrivacySealedProvenanceInput)),
+  /** The marker's reference, such as `DOC_1.fee_amount`. */
+  reference: Schema.optionalKey(Schema.String),
+  token: Schema.optionalKey(Schema.String),
+});
+export type PrivacySealedProvenanceSpan = typeof PrivacySealedProvenanceSpan.Type;
 
 /**
  * A subfolder whose files are sealed, now and as they arrive. Its sealed files are the listing's
@@ -818,6 +857,10 @@ export const PrivacySealedResult = Schema.Struct({
   handle: Schema.NullOr(Schema.String),
   /** After `output`: the file's text. */
   output: Schema.NullOr(Schema.String),
+  /** After `output`: where each sealed value in it stands and came from. */
+  provenance: Schema.optionalKey(Schema.Array(PrivacySealedProvenanceSpan)),
+  /** After `output`: its draft is kept, so an agent can revise it. */
+  hasTemplate: Schema.optionalKey(Schema.Boolean),
   /** After `inspect`: the person's own repository holds the file, so earlier versions stay readable there. */
   inGit: Schema.optionalKey(Schema.Boolean),
   /** After an inspection: chats ran in the folder while a file to be sealed was readable there. */

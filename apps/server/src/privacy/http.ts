@@ -250,6 +250,8 @@ export const layer = HttpApiBuilder.group(
           let message: string | null = null;
           let handle: string | null = null;
           let output: string | null = null;
+          let provenance: PrivacySealedResult["provenance"];
+          let hasTemplate: boolean | undefined;
           let inGit: boolean | undefined;
           let seenByChats: boolean | undefined;
           // What history holds of the files about to be sealed. A few stand for a long list.
@@ -477,9 +479,13 @@ export const layer = HttpApiBuilder.group(
               answers = yield* privacy.sealedClearAnswers(project);
               break;
             case "output": {
-              const text = yield* privacy.sealedOutput(project, request.name);
-              if (text === undefined) message = "No finished file has that name.";
-              else output = text;
+              const detail = yield* privacy.sealedOutputDetail(project, request.name);
+              if (detail === undefined) message = "No finished file has that name.";
+              else {
+                output = detail.text;
+                provenance = detail.provenance;
+                hasTemplate = detail.hasTemplate;
+              }
               break;
             }
           }
@@ -506,6 +512,8 @@ export const layer = HttpApiBuilder.group(
             },
             handle,
             output,
+            ...(provenance === undefined ? {} : { provenance }),
+            ...(hasTemplate === undefined ? {} : { hasTemplate }),
             ...(inGit === undefined ? {} : { inGit }),
             ...(seenByChats === undefined ? {} : { seenByChats }),
             ...(copy === undefined ? {} : { copy }),

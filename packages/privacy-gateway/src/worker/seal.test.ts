@@ -12,6 +12,7 @@ import { costOf, parseProgram, ProgramSyntaxError, sealedRuns } from "./program.
 import {
   DEFAULT_SEAL_POLICY,
   emptyLedger,
+  type FilledText,
   fillJson,
   fillMarkers,
   isJsonTemplate,
@@ -21,6 +22,7 @@ import {
   sealBatch,
   type SealedTable,
   type SealedValue,
+  tableText,
   withoutRepeatedUnit,
 } from "./seal.ts";
 import { localText, SealedStore } from "./store.ts";
@@ -231,6 +233,13 @@ describe("what the remote model is shown", () => {
     expect(values["DOC_1.items[0].amount"]).toMatchObject({
       written: "SAR 140,500.00",
       number: "140500",
+    });
+    expect(values["DOC_1.items[0].amount"]?.source).toEqual({
+      kind: "document",
+      handle: "DOC_1",
+      field: "items[0].amount",
+      quote: "SAR 140,500.00",
+      line: 3,
     });
     expect(
       fillMarkers("{{DOC_1.items[0].amount|number}} due {{DOC_1.items[1].due|iso}}", values).text,
@@ -924,6 +933,125 @@ describe("filling a file with sealed values", () => {
     expect(withoutRepeatedUnit("SAR 2,064,941.79", "of **[OTHER_FRD4F] ", "** (the")).toBe(
       "SAR 2,064,941.79",
     );
+  });
+});
+
+describe("where each filled value stands and came from", () => {
+  it("keeps each value's document and quote, or a program and what it read, and tells the model neither", () => {
+    const results = [order, delivery];
+    const source =
+      'result = {"total": sum(d["amount"] for d in docs), "rows": sealed_list([{"doc": d.handle, "amount": d["amount"]} for d in docs])}';
+    const sealed = sealBatch(results, fields, {
+      mode: "sealed",
+      vault: new Vault(),
+      ledger: emptyLedger(),
+      program: sealedRuns(parseProgram(source, FIELD_NAMES), results, fields),
+    });
+    expect(sealed.values["DOC_2.amount"]?.source).toEqual({
+      kind: "document",
+      handle: "DOC_2",
+      field: "amount",
+      quote: "SAR 900,000",
+      line: 3,
+    });
+    for (const reference of ["calc.total", "calc.rows"]) {
+      const computed = sealed.values[reference]?.source;
+      expect(computed).toMatchObject({
+        kind: "computed",
+        handle: "DOC_1, DOC_2",
+        field: reference,
+        program: source,
+      });
+      expect(computed?.inputs).toContainEqual({
+        handle: "DOC_2",
+        field: "amount",
+        written: "SAR 900,000",
+        quote: "SAR 900,000",
+        line: 3,
+      });
+      // A document that does not state a field gave the program nothing to show for it.
+      expect(
+        computed?.inputs?.some((input) => input.field === "items" && input.handle === "DOC_2"),
+      ).toBe(false);
+    }
+    const told = JSON.stringify(sealed.payload);
+    for (const kept of ["SAR 900,000", "source", "sum(d", "DOC_1, DOC_2"]) {
+      expect(told).not.toContain(kept);
+    }
+  });
+
+  const table: SealedTable = {
+    columns: ["vendor", "amount"],
+    rows: [
+      [{ written: 'Al "Noor", Co' }, { written: "SAR 140,500.00", number: "140500" }],
+      [{ written: "A|B" }, { written: "35,000", number: "35000" }],
+    ],
+  };
+  const from = (field: string) => ({ kind: "document" as const, handle: "DOC_1", field });
+  const known: Record<string, SealedValue> = {
+    "DOC_1.cap": {
+      written: "SAR 125,000.00",
+      number: "125000",
+      token: "[AMOUNT_CAPAA]",
+      source: from("cap"),
+    },
+    "DOC_1.rate": { written: "8.40%", number: "8.4", source: from("rate") },
+    "DOC_1.party": { written: 'Al "Noor"\nCo', source: from("party") },
+    "calc.t": {
+      written: tableText(table, "markdown"),
+      table,
+      source: { kind: "computed", handle: "DOC_1, DOC_2", field: "calc.t", program: "x" },
+    },
+  };
+  /** Every span is exactly the text it covers; what each holds, and which marker or stand-in. */
+  const placed = (done: FilledText) => {
+    for (const span of done.spans) {
+      expect(done.text.slice(span.start, span.end), JSON.stringify(span)).toBe(span.written);
+      expect(span.source, span.written).toBeDefined();
+    }
+    return done.spans.map((span) => [span.written, span.reference ?? span.token]);
+  };
+
+  it("spans each value of a text exactly, with a unit taken off and a table written out", () => {
+    const done = fillMarkers(
+      "Cap SAR {{DOC_1.cap}}, rate {{DOC_1.rate}}% for {{DOC_1.party}}.\n{{calc.t}}\n{{ DOC_1.cap | number }} {{DOC_9.x}} {{calc.t|lines}}",
+      known,
+    );
+    expect(placed(done)).toEqual([
+      ["125,000.00", "DOC_1.cap"],
+      ["8.40", "DOC_1.rate"],
+      ['Al "Noor"\nCo', "DOC_1.party"],
+      [tableText(table, "markdown"), "calc.t"],
+      ["125000", "DOC_1.cap"],
+      [tableText(table, "lines"), "calc.t"],
+    ]);
+    expect(done.spans[0]?.token).toBe("[AMOUNT_CAPAA]");
+    expect(placed(fillMarkers("{{calc.t}}\n{{DOC_1.cap}},{{DOC_1.rate}}", known, "csv"))).toEqual([
+      [tableText(table, "csv"), "calc.t"],
+      ["125000", "DOC_1.cap"],
+      ["8.4", "DOC_1.rate"],
+    ]);
+  });
+
+  it("spans each value of a JSON file inside its quotes, escaped as the file writes it", () => {
+    const lookup = (token: string) => (token === "[AMOUNT_CAPAA]" ? known["DOC_1.cap"] : undefined);
+    const done = fillJson(
+      '{"cap": {{DOC_1.cap}}, "who": "{{DOC_1.party}}", "note": "for {{DOC_1.party}} at {{DOC_1.rate}} [ID_ZZZZZ]", "{{DOC_1.party}}": [AMOUNT_CAPAA], "rows": "{{calc.t}}"}',
+      known,
+      lookup,
+    );
+    const party = JSON.stringify('Al "Noor"\nCo').slice(1, -1);
+    expect(placed(done)).toEqual([
+      ["125000", "DOC_1.cap"],
+      [party, "DOC_1.party"],
+      [party, "DOC_1.party"],
+      ["8.4", "DOC_1.rate"],
+      [party, "DOC_1.party"],
+      ["125000", "[AMOUNT_CAPAA]"],
+      [tableText(table, "json"), "calc.t"],
+    ]);
+    expect(JSON.parse(done.text)).toMatchObject({ 'Al "Noor"\nCo': 125000, cap: 125000 });
+    expect(done.unknown).toEqual(["[ID_ZZZZZ]"]);
   });
 });
 

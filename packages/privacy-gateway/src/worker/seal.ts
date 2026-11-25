@@ -85,6 +85,41 @@ export interface ClearAnswer {
   readonly value: string | null;
 }
 
+/** A document value a program read, kept with what the program computed from it. */
+export interface SealedValueSourceInput {
+  readonly handle: string;
+  readonly field: string;
+  readonly written: string;
+  readonly quote?: string;
+  readonly line?: number;
+}
+
+/**
+ * Where a sealed value came from, so the person can check it against its document. Kept on this
+ * machine with the value and never put in what the remote model is told.
+ */
+export interface SealedValueSource {
+  readonly kind: "document" | "computed";
+  /** The document's handle, or for a computed value the handles the program read, joined by ", ". */
+  readonly handle: string;
+  /** `assessed_loss` or `invoices[0].amount` for a document value; `calc.net` for a computed one. */
+  readonly field: string;
+  /** document: the checked quote that states it. */
+  readonly quote?: string;
+  /** document: the quote's line, from 1. */
+  readonly line?: number;
+  /** computed: the program's text. */
+  readonly program?: string;
+  /** computed: the document values the program read, at most `MAX_SOURCE_INPUTS`. */
+  readonly inputs?: ReadonlyArray<SealedValueSourceInput>;
+}
+
+/** Document values kept with a computed value's source. */
+export const MAX_SOURCE_INPUTS = 24;
+
+const evidenceOf = (answer: FieldAnswer): { quote?: string; line?: number } =>
+  answer.evidence === null ? {} : { quote: answer.evidence.quote, line: answer.evidence.line };
+
 /** A sealed value as a deliverable would write it, kept on this machine for filling files. */
 export interface SealedValue {
   /** As the document writes it, or for a computed number as `formatNumber` writes it. */
@@ -99,6 +134,8 @@ export interface SealedValue {
   readonly token?: string;
   /** A program's `sealed_list()`: `written` is its Markdown, and a file can ask for other forms. */
   readonly table?: SealedTable;
+  /** Where it came from, for the person. Unset on values kept before sources were. */
+  readonly source?: SealedValueSource;
 }
 
 /** One value in a sealed list. */
@@ -404,16 +441,17 @@ export const sealBatch = (
   };
 
   /** Files a stated value for filling files and gives its stand-in. */
-  const sealStated = (reference: string, answer: FieldAnswer): string => {
+  const sealStated = (handle: string, field: string, answer: FieldAnswer): string => {
     const surface = answer.surface ?? String(answer.value);
     const filedAs =
       answer.type === "number" && answer.percent === true ? `percent:${answer.value}` : undefined;
     const token = sealedToken(vault, answer.type, surface, answer.value, filedAs);
-    file(reference, {
+    file(ledgerKey(handle, field), {
       written: surface,
       ...(answer.type === "number" ? { number: String(answer.value) } : {}),
       ...(answer.type === "date" ? { iso: String(answer.value) } : {}),
       token,
+      source: { kind: "document", handle, field, ...evidenceOf(answer) },
     });
     return token;
   };
@@ -433,11 +471,14 @@ export const sealBatch = (
     file(reference, { ...value, token });
     return token;
   };
-  const sealChoice = (reference: string, value: boolean | string): string =>
-    sealFresh(reference, {
+  const sealChoice = (handle: string, answer: FieldAnswer): string => {
+    const value = answer.value as boolean | string;
+    return sealFresh(ledgerKey(handle, answer.name), {
       written: String(value),
       ...(typeof value === "boolean" ? { literal: value ? "true" : "false" } : {}),
+      source: { kind: "document", handle, field: answer.name, ...evidenceOf(answer) },
     });
+  };
 
   /**
    * A list as the remote model sees it: its rows, with a stand-in in every cell that holds a
@@ -483,7 +524,7 @@ export const sealBatch = (
                   ? cell.type === "identifier"
                     ? (cell.surface ?? cell.value)
                     : cell.value
-                  : sealStated(`${ledgerKey(handle, spec.name)}[${index}].${cell.name}`, cell),
+                  : sealStated(handle, `${spec.name}[${index}].${cell.name}`, cell),
           ]),
         ),
       ),
@@ -503,12 +544,11 @@ export const sealBatch = (
       const key = JSON.stringify([questionKey(handle, spec), "kept"]);
       if (!allow([handle], key, describeQuestion(spec), null)) return { note: LIMIT_NOTE };
       if (spec.type === "list") return { sealed: true };
-      const reference = ledgerKey(handle, answer.name);
       return {
         value:
           answer.status === "absent"
-            ? sealFresh(reference, { written: "null", literal: "null" })
-            : sealChoice(reference, answer.value as boolean | string),
+            ? sealFresh(ledgerKey(handle, answer.name), { written: "null", literal: "null" })
+            : sealChoice(handle, answer),
       };
     }
     if (spec !== undefined && answer.type === "list" && answer.status === "ok") {
@@ -580,15 +620,54 @@ export const sealBatch = (
         return { value: text };
       }
       default:
-        return { value: sealStated(ledgerKey(handle, answer.name), answer) };
+        return { value: sealStated(handle, answer.name, answer) };
     }
   };
 
   /** The value of one leaf of a program's result with nothing sealed: for files the model can read. */
   const plainLeaf = (leaf: ProgramLeaf): unknown => leaf.value;
 
+  /** Where the values of the program's run came from: set before its result is shaped. */
+  let computed: ((field: string) => SealedValueSource) | undefined;
+  const computedFrom = (source: string, read: ReadonlyArray<string>) => {
+    const handles = read.length > 0 ? read : [...new Set(results.map((result) => result.handle))];
+    const inputs: Array<SealedValueSourceInput> = [];
+    const add = (handle: string, field: string, answer: FieldAnswer) => {
+      if (answer.status !== "ok" || answer.evidence === null || answer.value === null) return;
+      inputs.push({
+        handle,
+        field,
+        written: answer.surface ?? String(answer.value),
+        ...evidenceOf(answer),
+      });
+    };
+    for (const result of results.filter((each) => handles.includes(each.handle))) {
+      for (const answer of result.fields) {
+        if (answer.type !== "list") add(result.handle, answer.name, answer);
+        for (const [index, cells] of (answer.rows ?? []).entries()) {
+          for (const cell of cells) {
+            add(result.handle, `${answer.name}[${index}].${cell.name}`, cell);
+          }
+        }
+      }
+    }
+    const kept = inputs.slice(0, MAX_SOURCE_INPUTS);
+    computed = (field) => ({
+      kind: "computed",
+      handle: handles.join(", "),
+      field,
+      program: source,
+      inputs: kept,
+    });
+  };
+  const sealComputed = (reference: string, value: Omit<SealedValue, "token">): string =>
+    sealFresh(
+      reference,
+      computed === undefined ? value : { ...value, source: computed(reference) },
+    );
+
   const sealLeaf = (reference: string, leaf: ProgramLeaf): unknown =>
-    leaf.shown ? leaf.value : sealFresh(reference, leafCell(leaf));
+    leaf.shown ? leaf.value : sealComputed(reference, leafCell(leaf));
 
   const shape = (output: ProgramOutput, path: string, shown: Array<string>): unknown => {
     if ("sealedList" in output) {
@@ -607,7 +686,10 @@ export const sealBatch = (
       }
       const table: SealedTable = { columns, rows: cells.map((row) => row.map(leafCell)) };
       // One stand-in, new every time, whatever the rows: how many there are is not shown.
-      return sealFresh(ledgerKey("calc", path), { written: tableText(table, "markdown"), table });
+      return sealComputed(ledgerKey("calc", path), {
+        written: tableText(table, "markdown"),
+        table,
+      });
     }
     if ("list" in output) {
       return output.list.map((item, index) => shape(item, `${path}[${index}]`, shown));
@@ -667,6 +749,7 @@ export const sealBatch = (
       return { error: PROGRAM_FAILED };
     }
     const shown: Array<string> = [];
+    computedFrom(program.source, outcome.read);
     const result = shape(outcome.output, "", shown);
     record({ kind: "ran", value: shown.length === 0 ? null : shown.join("; ") });
     return { result };
@@ -786,12 +869,96 @@ const markerJson = (value: SealedValue, form: string | undefined): string =>
         ? JSON.stringify(value.iso)
         : jsonForm(value);
 
+/** Where one sealed value was put in a filled text: `text.slice(start, end) === written`. */
+export interface FilledSpan {
+  readonly start: number;
+  readonly end: number;
+  readonly written: string;
+  /** The marker's reference, such as `DOC_1.fee_amount`; unset for a stand-in. */
+  readonly reference?: string;
+  /** The stand-in written in the file, or the stand-in of the value a marker named. */
+  readonly token?: string;
+  readonly source?: SealedValueSource;
+}
+
 export interface FilledText {
   readonly text: string;
   readonly filled: number;
   /** Markers and stand-ins that name no sealed value, as written. */
   readonly unknown: ReadonlyArray<string>;
+  /** Every value put in, in the order of the text. */
+  readonly spans: ReadonlyArray<FilledSpan>;
 }
+
+/** Text to put in place of a match, with the spans of values in it, from its own start. */
+export interface PlacedText {
+  readonly text: string;
+  readonly spans: ReadonlyArray<FilledSpan>;
+}
+
+/** One value put in whole: its span is all of `text`. */
+export const placedValue = (
+  text: string,
+  value: SealedValue,
+  item: { readonly reference?: string; readonly token?: string },
+): PlacedText => {
+  const token = item.token ?? value.token;
+  return {
+    text,
+    spans: [
+      {
+        start: 0,
+        end: text.length,
+        written: text,
+        ...(item.reference === undefined ? {} : { reference: item.reference }),
+        ...(token === undefined ? {} : { token }),
+        ...(value.source === undefined ? {} : { source: value.source }),
+      },
+    ],
+  };
+};
+
+/**
+ * Replaces every match of a global `pattern` with what `place` gives, or leaves it when that is
+ * undefined, and moves the spans of each placed text to where it lands in the result.
+ */
+export const replaceTracked = (
+  text: string,
+  pattern: RegExp,
+  place: (match: string, offset: number) => PlacedText | undefined,
+): PlacedText => {
+  let result = "";
+  let cursor = 0;
+  const spans: Array<FilledSpan> = [];
+  for (const found of text.matchAll(pattern)) {
+    const placed = place(found[0], found.index);
+    result += text.slice(cursor, found.index);
+    cursor = found.index + found[0].length;
+    if (placed === undefined) {
+      result += found[0];
+      continue;
+    }
+    const at = result.length;
+    for (const span of placed.spans)
+      spans.push({ ...span, start: at + span.start, end: at + span.end });
+    result += placed.text;
+  }
+  return { text: result + text.slice(cursor), spans };
+};
+
+/** A JSON string's span covers what is between its quotes. */
+const withinQuotes = (placed: PlacedText): PlacedText => {
+  const { text } = placed;
+  if (text.length < 2 || !text.startsWith('"') || !text.endsWith('"')) return placed;
+  return {
+    text,
+    spans: placed.spans.map((span) =>
+      span.start === 0 && span.end === text.length
+        ? { ...span, start: 1, end: text.length - 1, written: text.slice(1, -1) }
+        : span,
+    ),
+  };
+};
 
 const JSON_ITEM_SOURCE = `${MARKER_SOURCE}|${PLACEHOLDER_SOURCE}`;
 const JSON_PART = new RegExp(`"(?:[^"\\\\]|\\\\.)*"|${JSON_ITEM_SOURCE}`, "gu");
@@ -811,7 +978,7 @@ const fillJsonWith = (
 ): FilledText => {
   let filled = 0;
   const unknown: Array<string> = [];
-  const read = (item: string): { readonly json: string; readonly text: string } | undefined => {
+  const read = (item: string) => {
     const isMarker = item.startsWith("{{");
     const { reference, form } = readMarker(item);
     const value = isMarker ? marker(reference, form) : standIn(item);
@@ -820,26 +987,29 @@ const fillJsonWith = (
       return undefined;
     }
     filled += 1;
+    const place = (text: string) =>
+      placedValue(text, value, isMarker ? { reference } : { token: item });
     return isMarker
-      ? { json: markerJson(value, form), text: markerText(value, form, "csv") }
-      : { json: jsonForm(value), text: plainForm(value) };
+      ? { json: markerJson(value, form), text: markerText(value, form, "csv"), place }
+      : { json: jsonForm(value), text: plainForm(value), place };
   };
-  const text = source.replace(JSON_PART, (match: string, offset: number) => {
+  const done = replaceTracked(source, JSON_PART, (match, offset) => {
     const quoted = match.startsWith('"');
     const inner = quoted ? match.slice(1, -1) : match;
     if (quoted && !JSON_ITEM_ALONE.test(inner)) {
-      return match.replace(JSON_ITEM, (item) => {
+      const within = replaceTracked(match, JSON_ITEM, (item) => {
         const value = read(item);
-        return value === undefined ? item : JSON.stringify(value.text).slice(1, -1);
+        return value?.place(JSON.stringify(value.text).slice(1, -1));
       });
+      return within.spans.length === 0 ? undefined : within;
     }
     const value = read(inner);
-    if (value === undefined) return match;
+    if (value === undefined) return undefined;
     // The name of an object's member is a string whatever the value is.
     const isName = /^\s*:/.test(source.slice(offset + match.length, offset + match.length + 8));
-    return isName ? JSON.stringify(value.text) : value.json;
+    return withinQuotes(value.place(isName ? JSON.stringify(value.text) : value.json));
   });
-  return { text, filled, unknown };
+  return { text: done.text, filled, unknown, spans: done.spans };
 };
 
 /** `lookup` gives the value of a stand-in, or undefined for one it does not know. */
@@ -1013,7 +1183,7 @@ export const fillMarkers = (
   values: Readonly<Record<string, SealedValue>>,
   data: DataFile | false = false,
   /** What a value is written as instead, to keep it out of a later pass (see `fill`). */
-  hold: (value: string) => string = (value) => value,
+  hold: (placed: PlacedText) => PlacedText = (placed) => placed,
 ): FilledText => {
   let filled = 0;
   const unknown: Array<string> = [];
@@ -1023,25 +1193,26 @@ export const fillMarkers = (
     const value = markerValue(values, reference, form);
     return value === undefined ? undefined : markerText(value, form, data);
   };
-  const result = text.replace(MARKER, (whole: string, offset: number) => {
+  const done = replaceTracked(text, MARKER, (whole, offset) => {
     const { reference, form } = readMarker(whole);
     const value = markerValue(values, reference, form);
     if (value === undefined) {
       unknown.push(whole);
-      return whole;
+      return undefined;
     }
     filled += 1;
     const chosen = markerText(value, form, data);
     // A form the model asked for, a data file's plain form, or a table, is written as it is.
-    if (form !== undefined || data !== false || value.table !== undefined) return hold(chosen);
-    return hold(
-      withoutRepeatedUnit(
-        chosen,
-        text.slice(Math.max(0, offset - UNIT_REACH), offset),
-        text.slice(offset + whole.length, offset + whole.length + UNIT_REACH),
-        writtenAs,
-      ),
-    );
+    const written =
+      form !== undefined || data !== false || value.table !== undefined
+        ? chosen
+        : withoutRepeatedUnit(
+            chosen,
+            text.slice(Math.max(0, offset - UNIT_REACH), offset),
+            text.slice(offset + whole.length, offset + whole.length + UNIT_REACH),
+            writtenAs,
+          );
+    return hold(placedValue(written, value, { reference }));
   });
-  return { text: result, filled, unknown };
+  return { text: done.text, filled, unknown, spans: done.spans };
 };
