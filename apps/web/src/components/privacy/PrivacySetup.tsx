@@ -52,7 +52,7 @@ export function PrivacySetup({
 }: {
   readonly status: PrivacyStatus;
   readonly onStatus: (status: PrivacyStatus) => void;
-  /** Settings offers turning masking off here; setup offers it as a choice of its own. */
+  /** Settings offers turning de-identification off here; setup offers it as a choice of its own. */
   readonly allowTurningOff?: boolean;
 }) {
   const gt = useGT();
@@ -89,9 +89,9 @@ export function PrivacySetup({
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 py-2">
         <div className="flex min-w-0 items-center gap-3">
-          <ShieldCheckIcon className="size-5 shrink-0 text-success" />
+          <ShieldCheckIcon className="size-4 shrink-0 text-success" />
           <div className="min-w-0">
-            <p className="text-sm text-foreground">{gt("Masking is on")}</p>
+            <p className="text-sm text-foreground">{gt("De-identification is on")}</p>
             <p className="truncate text-xs text-muted-foreground">
               <bdi>{(status.mode === "cloud" ? status.accountLabel : status.endpoint) ?? ""}</bdi>
             </p>
@@ -113,9 +113,9 @@ export function PrivacySetup({
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 py-2">
         <div className="flex min-w-0 items-center gap-3">
-          <ShieldOffIcon className="size-5 shrink-0 text-warning" />
+          <ShieldOffIcon className="size-4 shrink-0 text-warning" />
           <div className="min-w-0">
-            <p className="text-sm text-foreground">{gt("Masking is off")}</p>
+            <p className="text-sm text-foreground">{gt("De-identification is off")}</p>
             <p className="text-xs text-muted-foreground">
               {gt("Your messages and files reach the AI as written.")}
             </p>
@@ -194,7 +194,7 @@ function SignedOut({
             className={LINK_CLASS}
             onClick={() => void configure({ mode: "off" })}
           >
-            {gt("Use DoeDesk without masking")}
+            {gt("Use DoeDesk without de-identification")}
           </button>
         ) : null}
       </div>

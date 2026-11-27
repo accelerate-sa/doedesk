@@ -153,6 +153,7 @@ import {
   type ComposerAttachmentInsertion,
 } from "./composerAttachmentInsertion";
 import type { ComposerDraftContextRecords } from "./composerContextPresentation";
+import { ComposerMentionSealAction } from "./privacy/ComposerFileActions";
 import { SharedTooltipTrigger } from "./ui/shared-tooltip";
 
 export interface ComposerPromptEditorHandle {
@@ -336,6 +337,7 @@ function ComposerMentionNodeView({ node }: NodeViewProps) {
         }
         className="pointer-events-auto"
       />
+      <ComposerMentionSealAction path={path} />
     </NodeViewWrapper>
   );
 }

@@ -72,7 +72,7 @@ const setup = (privacy: PrivacyStatus, record?: PrivacyTurnRecord) => {
   );
 };
 
-describe("the line under a turn and its Inspect view", () => {
+describe("the badge under a turn and its detail", () => {
   it("counts what was replaced and shows a real value only once asked", async () => {
     setup(status(), MASKED);
     client.fetchTurnValues.mockResolvedValue([
@@ -82,17 +82,16 @@ describe("the line under a turn and its Inspect view", () => {
     await using screen = await render(
       <TurnPrivacyLine threadRef={threadRef} runId={runId} environmentId={environmentId} />,
     );
-    await press(
-      screen.getByRole("button", {
-        name: "2 values replaced with stand-ins before sending Inspect",
-      }),
-    );
-    await expect.element(screen.getByText("What DoeDesk did in this turn")).toBeInTheDocument();
+    const badge = screen.getByRole("button", {
+      name: "2 values de-identified before sending",
+    });
+    // The badge is an outcome and a count; the sentence is its name and its tooltip.
+    await expect.element(badge).toHaveTextContent("De-identified · 2");
+    await press(badge);
+    await expect.element(screen.getByText("Privacy in this turn")).toBeInTheDocument();
     // Counts by kind are on the turn; the values are not read until the person asks.
     await expect.element(screen.getByText("People 1")).toBeInTheDocument();
-    await expect
-      .element(screen.getByText("1 image sent with the details DoeDesk found covered"))
-      .toBeInTheDocument();
+    await expect.element(screen.getByText("1 image redacted")).toBeInTheDocument();
     expect(client.fetchTurnValues).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain("Khalid");
 
@@ -138,13 +137,15 @@ describe("the line under a turn and its Inspect view", () => {
     await using screen = await render(
       <TurnPrivacyLine threadRef={threadRef} runId={runId} environmentId={environmentId} />,
     );
-    // DOC_2 was unsealed since, so the line knows it by its handle; the turn's record has its name.
-    await press(
-      screen.getByRole("button", {
-        // Each name is kept left to right inside the sentence, whichever way the sentence runs.
-        name: `2 values replaced with stand-ins before sending · 2 sealed files asked: ${fileNameInText("lease.pdf")}, ${fileNameInText("DOC_2")} · 1 answer reached your AI as it is Inspect`,
-      }),
-    );
+    // DOC_2 was unsealed since, so the badge knows it by its handle; the turn's record has its name.
+    const badge = screen.getByRole("button", {
+      // Each name is kept left to right inside the sentence, whichever way the sentence runs.
+      name: `2 values de-identified before sending · 2 sealed files asked: ${fileNameInText("lease.pdf")}, ${fileNameInText("DOC_2")} · 1 answer reached your AI as it is`,
+    });
+    // On the badge the sealed files are a lock and their number; the names are on hover.
+    await expect.element(badge).toHaveTextContent("De-identified · 22");
+    expect(screen.container.querySelector("[data-turn-sealed-asked]")?.textContent).toBe("2");
+    await press(badge);
     await expect.element(screen.getByText("Sara_AlDossari_payroll.csv")).toBeInTheDocument();
     // Beside the file's own name, which stays on this computer, the name that was sent for it.
     await expect.element(screen.getByText("[PERSON_K2M4P]_payroll.csv")).toBeInTheDocument();
@@ -171,11 +172,7 @@ describe("the line under a turn and its Inspect view", () => {
       }),
     );
     await expect
-      .element(
-        screen.getByText(
-          "The file names and the answers are kept on the computer this chat runs on. Open DoeDesk there to see them.",
-        ),
-      )
+      .element(screen.getByText("File names and answers stay on the computer this chat runs on."))
       .toBeInTheDocument();
     expect(client.fetchSealedTurn).not.toHaveBeenCalled();
     expect(client.useSealedDocuments).toHaveBeenCalledWith(null);
@@ -204,29 +201,27 @@ describe("the status beside the message box", () => {
   it("follows the setting both ways, and keeps its words when it is a warning", async () => {
     setup(status({ mode: "off", active: false }));
     await using screen = await render(chip("claudeAgent", true));
-    const trigger = screen.getByRole("button", { name: "Privacy of this chat: Not masked" });
+    const trigger = screen.getByRole("button", { name: "Privacy of this chat: Unprotected" });
     // Narrow, and still labelled: an unlabelled warning is too easy to miss before Send.
-    await expect.element(trigger).toHaveTextContent("Not masked");
+    await expect.element(trigger).toHaveTextContent("Unprotected");
     await press(trigger);
     await expect
       .element(
-        screen.getByText(
-          "Masking is turned off. Your messages and files in this chat reach Anthropic as they are.",
-        ),
+        screen.getByText("De-identification is off. This chat reaches Anthropic as written."),
       )
       .toBeInTheDocument();
 
-    // Masking is turned back on in Settings: the same chat reads Masked again.
+    // Turned back on in Settings: the same chat reads De-identified again.
     client.usePrivacyStatus.mockReturnValue({ kind: "ready", status: status() });
     await screen.rerender(chip("claudeAgent", true));
-    const masked = screen.getByRole("button", { name: "Privacy of this chat: Masked" });
+    const masked = screen.getByRole("button", { name: "Privacy of this chat: De-identified" });
     await expect.element(masked).toBeInTheDocument();
     await expect.element(masked).toHaveTextContent("");
-    // Without sealed files, the open popover says what masking still sends.
+    // Without sealed files, the open popover says what still reaches the AI company.
     await expect
       .element(
         screen.getByText(
-          "Amounts, dates and the wording of your documents still reach Anthropic. To keep a file's contents away from it, seal the file.",
+          "Amounts, dates and wording still reach Anthropic. Seal a file to keep it away.",
         ),
       )
       .toBeInTheDocument();
@@ -234,7 +229,7 @@ describe("the status beside the message box", () => {
     // The chat's provider changes to one DoeDesk was never tested with.
     await screen.rerender(chip("kiro"));
     await expect
-      .element(screen.getByRole("button", { name: "Privacy of this chat: Masking not confirmed" }))
+      .element(screen.getByRole("button", { name: "Privacy of this chat: Unconfirmed" }))
       .toBeInTheDocument();
   });
 
@@ -250,7 +245,26 @@ describe("the status beside the message box", () => {
     ]);
     await screen.rerender(chip("claudeAgent"));
     await expect
-      .element(screen.getByRole("button", { name: "Privacy of this chat: Not masked" }))
+      .element(screen.getByRole("button", { name: "Privacy of this chat: Unprotected" }))
+      .toBeInTheDocument();
+  });
+
+  it("puts what sealed files cost in the popover, not in a notice above the message box", async () => {
+    setup(status({ sealedDocuments: 2 }));
+    client.useSealedDocuments.mockReturnValue({
+      documents: [{ handle: "DOC_1" }, { handle: "DOC_2" }],
+      outputs: [],
+      clear: { mostOnOneDocument: 0, perDocument: 40 },
+    });
+    await using screen = await render(chip("claudeAgent"));
+    const trigger = screen.getByRole("button", { name: "Privacy of this chat: De-identified" });
+    // One word on the pill, however many files are sealed.
+    await expect.element(trigger).toHaveTextContent("De-identified");
+    await press(trigger);
+    await expect
+      .element(
+        screen.getByText("2 sealed files here. Work on them is slower and runs no commands."),
+      )
       .toBeInTheDocument();
   });
 });

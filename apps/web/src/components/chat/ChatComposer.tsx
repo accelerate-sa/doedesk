@@ -221,7 +221,6 @@ import {
   ComposerAttachButton,
   ComposerAttachInput,
   ComposerAttachmentFileList,
-  ComposerMentionSealList,
   ComposerAttachmentMediaRow,
   ComposerFilePreviewDialog,
   ComposerQueuedAttachmentRow,
@@ -230,7 +229,7 @@ import {
 import { CollapsedComposerStopAction, ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { useFolderSealing } from "../privacy/useFolderSealing";
 import { fileNameOf } from "../privacy/sealedFiles.logic";
-import { mentionedPathList, replaceMentionedPath } from "./composerMentionedPaths";
+import { replaceMentionedPath } from "./composerMentionedPaths";
 import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
 import { attachedFilePathInFolder, requestSeal } from "~/privacy/sealPrompt";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
@@ -755,13 +754,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     composerFiles,
     environmentId,
     inlineFileIdSet,
-    sealing.offered,
   );
-  // The folder's files this message mentions: an agent reads a mentioned file as an attached one.
-  const mentionedPaths =
-    sealing.offered && gitCwd !== null && !questionAttachmentTarget
-      ? mentionedPathList(prompt)
-      : "";
   const composerTerminalContexts = composerDraft.terminalContexts;
   const composerPreviewAnnotations = composerDraft.previewAnnotations;
   const composerReviewComments = composerDraft.reviewComments;
@@ -850,6 +843,21 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     openPullRequest: (event: React.MouseEvent<HTMLElement>, url: string) => {
       openPrLink(event, url);
     },
+    // A file's chip is the one place it shows, so Seal, Review and Remove are on the chip.
+    removeFile: (fileId: string) => removeComposerFileFromDraft(fileId),
+    ...(sealing.offered
+      ? {
+          sealFile: (fileId: string) => {
+            const file = composerFiles.find((candidate) => candidate.id === fileId);
+            if (file) sealComposerFile(file);
+          },
+          reviewFile: (fileId: string) => setPreviewFileId(fileId),
+          // An agent reads a mentioned file as an attached one.
+          ...(gitCwd !== null && !questionAttachmentTarget
+            ? { sealMention: (path: string) => sealMentionedFile(path) }
+            : {}),
+        }
+      : {}),
   };
   const composerContextRecords = composerContextRecordsFromDraft({
     terminalContexts: composerTerminalContexts,
@@ -3696,16 +3704,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onPreviewFile={setPreviewFileId}
         onRemoveFile={removeComposerFileFromDraft}
         onSealFile={sealing.offered ? sealComposerFile : undefined}
-      />
-    ) : null;
-  const composerMentionSealList =
-    !isComposerCollapsedMobile && mentionedPaths !== "" && gitCwd !== null ? (
-      <ComposerMentionSealList
-        pathList={mentionedPaths}
-        environmentId={environmentId}
-        cwd={gitCwd}
-        resolvedTheme={resolvedTheme}
-        onSeal={sealMentionedFile}
+        onReviewFile={sealing.offered ? setPreviewFileId : undefined}
       />
     ) : null;
   const composerAttachButton = showComposerAttachAction ? (
@@ -3988,8 +3987,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               {composerAttachmentMediaRow}
 
               {composerAttachmentFileList}
-
-              {composerMentionSealList}
 
               <div
                 className={cn(

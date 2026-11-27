@@ -20,7 +20,7 @@ import { useFolderSealing } from "./useFolderSealing";
 
 const EMPTY: ReadonlyArray<ComposerBannerStackItem> = [];
 
-// Refusals by host and time, and the sealed-files note by chat, that the person waved away.
+// Refusals by host and time that the person waved away.
 const dismissedAtom = Atom.make<ReadonlySet<string>>(new Set<string>()).pipe(
   Atom.keepAlive,
   Atom.withLabel("privacy:dismissed-composer-notes"),
@@ -33,8 +33,6 @@ const dismissedAtom = Atom.make<ReadonlySet<string>>(new Set<string>()).pipe(
 export function usePrivacyComposerBanners(
   environmentId: EnvironmentId | null,
   projectId: string | null,
-  /** Names the chat, so that waving the sealed-files note away holds for this chat only. */
-  chatKey: string,
   /** The chat's turn has been sent and its AI has not started yet. */
   turnStarting = false,
 ): ReadonlyArray<ComposerBannerStackItem> {
@@ -54,24 +52,6 @@ export function usePrivacyComposerBanners(
   if (environmentId === null || environmentId !== primary || privacy.kind !== "ready") return EMPTY;
   const dismiss = (key: string) => appAtomRegistry.set(dismissedAtom, new Set([...dismissed, key]));
   const refused = refusedHostsToShow(privacy.status, dismissed);
-  const sealedNoteKey = `sealed-note:${chatKey}`;
-  // Work that sealing does badly cannot be told from the request without sending it somewhere,
-  // in two languages, so the note states the costs once a chat, while the folder has sealed files.
-  const sealedNote: ReadonlyArray<ComposerBannerStackItem> =
-    (sealing.listing?.documents.length ?? 0) > 0 && !dismissed.has(sealedNoteKey)
-      ? [
-          {
-            id: "privacy-sealed-files",
-            variant: "info",
-            icon: <FileLock2Icon />,
-            title: gt(
-              "This folder has sealed files. Work that uses them is slower, weaker for drafting long text, and closed to shell commands.",
-            ),
-            dismissLabel: gt("Dismiss"),
-            onDismiss: () => dismiss(sealedNoteKey),
-          },
-        ]
-      : EMPTY;
   const hold = turnStarting
     ? privacy.status.sealingBeforeTurn?.find((entry) => entry.project === projectId)
     : undefined;
@@ -84,12 +64,12 @@ export function usePrivacyComposerBanners(
             variant: "info",
             icon: <FileLock2Icon />,
             title: gt(
-              "{count, plural, one {Sealing {count} file that is still arriving in {folder}. Your AI starts once it is sealed.} other {Sealing {count} files that are still arriving in {folder}. Your AI starts once they are sealed.}}",
+              "{count, plural, one {Sealing {count} new file in {folder}…} other {Sealing {count} new files in {folder}…}}",
               { count: hold.files, folder: hold.folder },
             ),
           },
         ];
-  if (refused.length === 0) return [...holdNote, ...sealedNote];
+  if (refused.length === 0) return holdNote;
   const allow = (host: string, lasting: boolean) =>
     void setPrivacyPreference({ kind: "allowHost", host, lasting }).then(
       () =>
@@ -105,19 +85,11 @@ export function usePrivacyComposerBanners(
     id: `privacy-refused-host:${entry.host}`,
     variant: "warning",
     icon: <GlobeLockIcon />,
-    title: entry.canAllowAlways
-      ? gt(
-          "DoeDesk did not let the agent reach {host}, because your privacy settings allow listed hosts only.",
-          { host: entry.host },
-        )
-      : gt(
-          "DoeDesk did not let the agent reach {host}, because your privacy settings allow AI hosts only.",
-          { host: entry.host },
-        ),
+    title: gt("{host} was blocked", { host: entry.host }),
     actions: (
       <>
         <Button size="xs" variant="ghost" onClick={() => allow(entry.host, false)}>
-          {gt("Allow until DoeDesk is closed")}
+          {gt("Allow for now")}
         </Button>
         {entry.canAllowAlways ? (
           <Button size="xs" variant="ghost" onClick={() => allow(entry.host, true)}>
@@ -129,7 +101,7 @@ export function usePrivacyComposerBanners(
     dismissLabel: gt("Keep {host} blocked", { host: entry.host }),
     onDismiss: () => dismiss(entry.key),
   }));
-  return [...holdNote, ...refusedItems, ...sealedNote];
+  return [...holdNote, ...refusedItems];
 }
 
 /**

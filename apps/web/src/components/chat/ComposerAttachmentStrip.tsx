@@ -13,9 +13,10 @@ import {
   ImageIcon,
   PaperclipIcon,
   PlayIcon,
+  ScanEyeIcon,
   XIcon,
 } from "lucide-react";
-import { type ComponentProps, type Ref, useLayoutEffect, useRef, useState } from "react";
+import { type ComponentProps, type Ref, useLayoutEffect, useRef } from "react";
 
 import {
   type ComposerFileAttachment,
@@ -52,17 +53,10 @@ import {
   type ExpandedImagePreview,
 } from "./ExpandedImagePreview";
 import { PierreEntryIcon } from "./PierreEntryIcon";
-import { fileNameOf, sealableImage } from "../privacy/sealedFiles.logic";
-import {
-  readableForSuggestion,
-  type SealSuggestion,
-  sealSuggestionFor,
-  SUGGESTION_SAMPLE_BYTES,
-} from "../privacy/sealSuggestion.logic";
+import { sealTooltip } from "../privacy/ComposerFileActions";
+import { sealableImage } from "../privacy/sealedFiles.logic";
+import type { SealSuggestion } from "../privacy/sealSuggestion.logic";
 import { useSealSuggestions } from "../privacy/useSealSuggestions";
-import { useFileMetadata } from "../../hooks/useFileMetadata";
-import { projectEnvironment } from "../../state/projects";
-import { useEnvironmentQuery } from "../../state/query";
 import {
   SNAP_SHOT_ATTACHMENT_FRAME_CLASS,
   SnapShotAttachmentDetails,
@@ -322,7 +316,6 @@ export function ComposerAttachmentMediaRow({
                   )}
                 </span>
               )}
-              {/* A thumbnail has room for the label along its lower edge only. */}
               {onSealImage !== undefined &&
               ready &&
               sealableImage(ready.name) &&
@@ -330,7 +323,11 @@ export function ComposerAttachmentMediaRow({
               upload?.status !== "uploading" &&
               upload?.status !== "failed" ? (
                 <span className="absolute bottom-1 left-1">
-                  <SealAttachmentButton onSeal={() => onSealImage(ready)} overlay />
+                  <SealAttachmentButton
+                    name={ready.name}
+                    onSeal={() => onSealImage(ready)}
+                    overlay
+                  />
                 </span>
               ) : null}
               {ready && upload?.status === "failed" && (
@@ -367,7 +364,11 @@ export function ComposerAttachmentMediaRow({
                 ready &&
                 sealableImage(ready.name) &&
                 source?.kind === "snap-shot" ? (
-                  <SealAttachmentButton onSeal={() => onSealImage(ready)} overlay />
+                  <SealAttachmentButton
+                    name={ready.name}
+                    onSeal={() => onSealImage(ready)}
+                    overlay
+                  />
                 ) : null}
                 <Button
                   variant="media-close"
@@ -474,7 +475,11 @@ export function ComposerAttachmentMediaRow({
   );
 }
 
-/** Non-media file attachments, listed under the media row. */
+/**
+ * Attached files that have no chip in the text, as pills under the media row. A file shows in one
+ * place only: a file with a chip is left to its chip, which carries the same Seal, Review and
+ * Remove.
+ */
 export function ComposerAttachmentFileList({
   files,
   resolvedTheme,
@@ -487,10 +492,13 @@ export function ComposerAttachmentFileList({
   onPreviewFile,
   onRemoveFile,
   onSealFile,
+  onReviewFile,
 }: {
   readonly files: ReadonlyArray<ComposerFileAttachment>;
   /** Present when this folder's files can be sealed: the file is then kept from the AI company. */
   readonly onSealFile?: ((file: ComposerFileAttachment) => void) | undefined;
+  /** Opens the file as it will be sent. De-identification review hangs off this. */
+  readonly onReviewFile?: ((fileId: string) => void) | undefined;
   readonly resolvedTheme: "light" | "dark";
   readonly supportsAttachmentUploads: boolean;
   readonly maxFileAttachmentBytes: number | null;
@@ -506,11 +514,9 @@ export function ComposerAttachmentFileList({
   const uploadsByImageId = useAttachmentUploadStore((state) => state.uploadsByImageId);
   // Offered only where the file can be sealed from here.
   const suggestions = useSealSuggestions(onSealFile === undefined ? NO_FILES : files);
-  const [dismissedSuggestions, setDismissedSuggestions] = useState<ReadonlySet<string>>(new Set());
   return (
-    <div className="mb-3 flex flex-col gap-1">
+    <div className="mb-3 flex flex-wrap gap-1.5">
       {files.map((file) => {
-        const suggestion = dismissedSuggestions.has(file.id) ? undefined : suggestions.get(file.id);
         const fileCanUpload =
           supportsAttachmentUploads &&
           maxFileAttachmentBytes !== null &&
@@ -519,35 +525,39 @@ export function ComposerAttachmentFileList({
         const needsReattach = composerFileNeedsReattach(file);
         const canReattachFile = fileStagingLimit !== null && file.sizeBytes <= fileStagingLimit;
         return (
-          <div key={file.id} className="flex min-w-0 flex-col">
-            <div className="flex min-w-0 items-center gap-2 py-1 text-sm text-foreground">
-              <PierreEntryIcon pathValue={file.name} kind="file" theme={resolvedTheme} />
-              <button
-                type="button"
-                disabled={needsReattach}
-                dir="auto"
-                className="file-name min-w-0 flex-1 truncate text-start hover:underline focus-visible:outline-2"
-                onClick={() => onPreviewFile(file.id)}
-              >
-                {file.name}
-              </button>
-              <span className="shrink-0 text-xs text-secondary-label">
-                {needsReattach ? (
-                  canReattachFile ? (
-                    gt("Attach again")
-                  ) : (
-                    gt("Remove to send")
-                  )
-                ) : upload?.status === "uploading" ? (
-                  <ComposerAttachmentUploadProgress
-                    id={file.id}
-                    upload={upload}
-                    fallback={formatAttachmentSize(file.sizeBytes, messages)}
-                  />
+          <div
+            key={file.id}
+            data-composer-file-pill={file.id}
+            className="flex h-8 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 ps-2 pe-1 text-sm text-foreground sm:h-7"
+          >
+            <PierreEntryIcon pathValue={file.name} kind="file" theme={resolvedTheme} />
+            <button
+              type="button"
+              disabled={needsReattach}
+              dir="auto"
+              className="file-name min-w-0 max-w-64 truncate rounded-sm text-start outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              onClick={() => onPreviewFile(file.id)}
+            >
+              {file.name}
+            </button>
+            <span className="shrink-0 text-xs text-secondary-label tabular-nums">
+              {needsReattach ? (
+                canReattachFile ? (
+                  gt("Attach again")
                 ) : (
-                  formatAttachmentSize(file.sizeBytes, messages)
-                )}
-              </span>
+                  gt("Remove to send")
+                )
+              ) : upload?.status === "uploading" ? (
+                <ComposerAttachmentUploadProgress
+                  id={file.id}
+                  upload={upload}
+                  fallback={formatAttachmentSize(file.sizeBytes, messages)}
+                />
+              ) : (
+                formatAttachmentSize(file.sizeBytes, messages)
+              )}
+            </span>
+            <span className="flex shrink-0 items-center">
               {!needsReattach && upload?.status === "failed" ? (
                 <SharedTooltipTrigger
                   render={
@@ -571,24 +581,41 @@ export function ComposerAttachmentFileList({
                 </SharedTooltipTrigger>
               ) : null}
               {onSealFile !== undefined && file.file !== null ? (
-                <SealAttachmentButton onSeal={() => onSealFile(file)} />
+                <SealAttachmentButton
+                  name={file.name}
+                  suggestion={suggestions.get(file.id) ?? null}
+                  onSeal={() => onSealFile(file)}
+                />
               ) : null}
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => onRemoveFile(file.id)}
-                aria-label={gt("Remove {name}", { name: file.name })}
+              {onReviewFile !== undefined && !needsReattach ? (
+                <SharedTooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => onReviewFile(file.id)}
+                      aria-label={gt("Review {name}", { name: file.name })}
+                    />
+                  }
+                  label={gt("Review before sending")}
+                >
+                  <ScanEyeIcon />
+                </SharedTooltipTrigger>
+              ) : null}
+              <SharedTooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => onRemoveFile(file.id)}
+                    aria-label={gt("Remove {name}", { name: file.name })}
+                  />
+                }
+                label={gt("Remove")}
               >
                 <XIcon />
-              </Button>
-            </div>
-            {suggestion !== undefined && onSealFile !== undefined && file.file !== null ? (
-              <SealSuggestionNote
-                suggestion={suggestion}
-                onSeal={() => onSealFile(file)}
-                onDismiss={() => setDismissedSuggestions((before) => new Set(before).add(file.id))}
-              />
-            ) : null}
+              </SharedTooltipTrigger>
+            </span>
           </div>
         );
       })}
@@ -598,142 +625,18 @@ export function ComposerAttachmentFileList({
 
 const NO_FILES: ReadonlyArray<ComposerFileAttachment> = [];
 
-/** Why a file looks like one to seal, with Seal beside it. Shown under the file's row. */
-function SealSuggestionNote({
-  suggestion,
-  onSeal,
-  onDismiss,
-}: {
-  readonly suggestion: SealSuggestion;
-  readonly onSeal: () => void;
-  readonly onDismiss: () => void;
-}) {
-  const gt = useGT();
-  return (
-    <p
-      role="note"
-      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pb-1 ps-6 text-xs text-muted-foreground"
-    >
-      <span className="min-w-0">
-        {suggestion.reason === "columns"
-          ? gt("This file has payroll or identity columns. Seal it instead?")
-          : gt("This file has {count} ID numbers, IBANs or phone numbers. Seal it instead?", {
-              count: suggestion.count,
-            })}{" "}
-        {gt("Checked on this computer; nothing was sent.")}
-      </span>
-      <Button variant="outline" size="xs" onClick={onSeal}>
-        {gt("Seal", { $context: "button on an attached file: seal it instead of sending it" })}
-      </Button>
-      <Button variant="ghost" size="xs" onClick={onDismiss}>
-        {gt("Dismiss")}
-      </Button>
-    </p>
-  );
-}
-
-/** Larger than this, a mentioned file is not read to decide: Seal is offered without a reason. */
-const MENTION_SUGGESTION_MAX_BYTES = 2 * SUGGESTION_SAMPLE_BYTES;
-
 /**
- * The folder's files that the message mentions, each with Seal. A mention sends the path and the
- * agent reads the file, so it is offered what an attached file is: Seal, and the same suggestion.
- */
-export function ComposerMentionSealList({
-  pathList,
-  environmentId,
-  cwd,
-  resolvedTheme,
-  onSeal,
-}: {
-  /** As written in the message, from the folder or absolute; one to a line, so typing keeps it equal. */
-  readonly pathList: string;
-  readonly environmentId: EnvironmentId;
-  readonly cwd: string;
-  readonly resolvedTheme: "light" | "dark";
-  readonly onSeal: (path: string) => void;
-}) {
-  return (
-    <div className="mb-3 flex flex-col gap-1">
-      {pathList.split("\n").map((path) => (
-        <MentionSealRow
-          key={path}
-          path={path}
-          environmentId={environmentId}
-          cwd={cwd}
-          resolvedTheme={resolvedTheme}
-          onSeal={() => onSeal(path)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function MentionSealRow({
-  path,
-  environmentId,
-  cwd,
-  resolvedTheme,
-  onSeal,
-}: {
-  readonly path: string;
-  readonly environmentId: EnvironmentId;
-  readonly cwd: string;
-  readonly resolvedTheme: "light" | "dark";
-  readonly onSeal: () => void;
-}) {
-  const messages = useMessages();
-  const metadata = useFileMetadata(environmentId, path, cwd);
-  const name = fileNameOf(path);
-  const isFile = metadata?.kind === "file";
-  const read =
-    isFile &&
-    readableForSuggestion(name) &&
-    metadata.byteLength !== undefined &&
-    metadata.byteLength <= MENTION_SUGGESTION_MAX_BYTES;
-  const contents = useEnvironmentQuery(
-    read
-      ? projectEnvironment.readFile({ environmentId, input: { cwd, relativePath: path } })
-      : null,
-  ).data?.contents;
-  const suggestion =
-    contents === undefined
-      ? null
-      : sealSuggestionFor(name, contents.slice(0, SUGGESTION_SAMPLE_BYTES));
-  const [dismissed, setDismissed] = useState(false);
-  // A folder, or a path that is not there: a sealed file's mention among them.
-  if (!isFile) return null;
-  return (
-    <div className="flex min-w-0 flex-col">
-      <div className="flex min-w-0 items-center gap-2 py-1 text-sm text-foreground">
-        <PierreEntryIcon pathValue={name} kind="file" theme={resolvedTheme} />
-        <bdi className="file-name min-w-0 flex-1 truncate text-start">{name}</bdi>
-        {metadata.byteLength === undefined ? null : (
-          <span className="shrink-0 text-xs text-secondary-label">
-            {formatAttachmentSize(metadata.byteLength, messages)}
-          </span>
-        )}
-        <SealAttachmentButton onSeal={onSeal} />
-      </div>
-      {suggestion !== null && !dismissed ? (
-        <SealSuggestionNote
-          suggestion={suggestion}
-          onSeal={onSeal}
-          onDismiss={() => setDismissed(true)}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * Seal on an attached file, with its name written out: a bare lock reads as "this is locked",
- * not as something to press.
+ * Seal on an attached file: the lock alone, with what it does on hover. A file that looks like
+ * one to seal gets the word and a tint, and the reason on hover.
  */
 function SealAttachmentButton({
+  name,
+  suggestion = null,
   onSeal,
   overlay = false,
 }: {
+  readonly name: string;
+  readonly suggestion?: SealSuggestion | null;
   readonly onSeal: () => void;
   /** On top of a thumbnail. */
   readonly overlay?: boolean;
@@ -741,11 +644,21 @@ function SealAttachmentButton({
   const gt = useGT();
   return (
     <SharedTooltipTrigger
-      render={<Button variant={overlay ? "overlay" : "ghost"} size="xs" onClick={onSeal} />}
-      label={gt("Keep this file from your AI company. Your AI can still ask about it.")}
+      render={
+        <Button
+          data-seal-action={suggestion === null ? "offered" : "suggested"}
+          variant={overlay ? "overlay" : suggestion === null ? "ghost" : "warning-outline"}
+          size={suggestion === null ? "icon-xs" : "xs"}
+          aria-label={gt("Seal {name}", { name })}
+          onClick={onSeal}
+        />
+      }
+      label={sealTooltip(suggestion, gt)}
     >
       <FileLock2Icon />
-      {gt("Seal", { $context: "button on an attached file: seal it instead of sending it" })}
+      {suggestion === null
+        ? null
+        : gt("Seal", { $context: "button on an attached file: seal it instead of sending it" })}
     </SharedTooltipTrigger>
   );
 }

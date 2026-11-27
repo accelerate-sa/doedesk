@@ -64,7 +64,7 @@ function NoticeDialog({
             </ul>
             <p className="mt-3 text-start">
               <T>
-                To use <Var>{name}</Var> without masking, open Settings, then Privacy.
+                To use <Var>{name}</Var> without de-identification, open Settings, then Privacy.
               </T>
             </p>
           </AlertDialogDescription>
@@ -136,7 +136,7 @@ function ProviderRow({
             {direct ? directRowText(words, resolve) : maskedRowText(words, resolve)}{" "}
             <button
               type="button"
-              className="underline underline-offset-2"
+              className="rounded-sm underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               onClick={() => setReading(true)}
             >
               {gt("What DoeDesk changes")}
@@ -149,7 +149,7 @@ function ProviderRow({
         control={
           <Switch
             checked={!direct}
-            aria-label={gt("Mask what {tool} sends to {company}", { tool, company })}
+            aria-label={gt("De-identify what {tool} sends to {company}", { tool, company })}
             onCheckedChange={(checked) => {
               if (!checked) {
                 setConfirming(true);
@@ -171,18 +171,15 @@ function ProviderRow({
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>{gt("Stop masking {name}?", { name })}</AlertDialogTitle>
+            <AlertDialogTitle>{gt("Stop de-identifying {name}?", { name })}</AlertDialogTitle>
             <AlertDialogDescription>
               {stopMaskingWarning(words, resolve)}{" "}
-              {gt(
-                "Chats with {name} that are running now are stopped, so that none keeps the old setting.",
-                { name },
-              )}
+              {gt("Running chats with {name} are stopped.", { name })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogClose render={<Button variant="outline" />}>
-              {gt("Keep masking")}
+              {gt("Keep de-identifying")}
             </AlertDialogClose>
             <Button
               variant="destructive"
@@ -195,7 +192,7 @@ function ProviderRow({
                 });
               }}
             >
-              {gt("Stop masking {name}", { name })}
+              {gt("Stop de-identifying {name}", { name })}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -204,7 +201,7 @@ function ProviderRow({
   );
 }
 
-/** Settings, Privacy: masking for one AI company at a time, and Claude Code's usage reports. */
+/** Settings, Privacy: de-identification for one AI company at a time, and Claude Code's usage reports. */
 export function ProviderMaskingSection({ status }: { readonly status: PrivacyStatus }) {
   const gt = useGT();
   const developerMode = useDeveloperMode();
@@ -229,15 +226,9 @@ export function ProviderMaskingSection({ status }: { readonly status: PrivacySta
       ))}
       <SettingsRow
         title={gt("Claude Code usage reports")}
-        description={
-          reportsOn
-            ? gt(
-                "Claude Code tells Anthropic how it is used: timings and error counts, not your messages or files. DoeDesk leaves these reports on.",
-              )
-            : gt(
-                "Claude Code tells Anthropic how it is used: timings and error counts, not your messages or files. DoeDesk turns these reports off.",
-              )
-        }
+        description={gt(
+          "Timings and error counts sent to Anthropic. Never your messages or files.",
+        )}
         control={
           <Switch
             checked={reportsOn}
@@ -250,14 +241,11 @@ export function ProviderMaskingSection({ status }: { readonly status: PrivacySta
       >
         <p className="px-4 pb-3 text-xs text-muted-foreground">
           {developerMode
-            ? gt(
-                "For a masked chat DoeDesk sets these Claude Code switches and no others: {switches}.",
-                {
-                  switches: isolateLeftToRight(switches),
-                },
-              )
+            ? gt("De-identified chats set only these Claude Code switches: {switches}.", {
+                switches: isolateLeftToRight(switches),
+              })
             : gt(
-                "For a masked chat, DoeDesk turns off the parts of Claude Code that would send your text to Anthropic unmasked: error reports, feedback, published artifacts and claude.ai connectors.",
+                "De-identified chats also turn off Claude Code's error reports, feedback, published artifacts and claude.ai connectors.",
               )}
         </p>
       </SettingsRow>
