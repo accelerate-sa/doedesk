@@ -9,6 +9,7 @@ import {
   type PrivacyEvaluationOptions,
   type PrivacyPreferenceInput,
   type PrivacyProfileInput,
+  type PrivacyProviderInput,
   type PrivacyReadMaskedResult,
   type PrivacySealedListing,
   type PrivacySignInInput,
@@ -26,7 +27,12 @@ import {
   type UnsealFileResult,
   type UnsealFolderResult,
 } from "@t3tools/privacy-gateway";
-import { MAX_TURN_SEALED_HANDLES, type PrivacyTurnRecord } from "@t3tools/contracts";
+import {
+  MAX_TURN_SEALED_HANDLES,
+  type PrivacyProviderHealth,
+  type PrivacyProviders,
+  type PrivacyTurnRecord,
+} from "@t3tools/contracts";
 import { setGatewayRefusalSource } from "@t3tools/provider-core/server/failure";
 import {
   setProviderEnvironmentOverlay,
@@ -104,6 +110,19 @@ export class PrivacyGateway extends Context.Service<
     readonly unmaskedValues: Effect.Effect<ReturnType<PrivacyController["unmaskedValues"]>>;
     /** Stops masking one value, or masks it again. False when there is no such entry. */
     readonly setValueMasked: (token: string, masked: boolean) => Effect.Effect<boolean>;
+    /**
+     * The service chosen for reading, for detection and for the worker, with the providers each
+     * can be. A secret is only said to be set or not.
+     */
+    readonly providers: Effect.Effect<PrivacyProviders>;
+    /** Chooses one service's provider and leaves the other two as they are. */
+    readonly configureProvider: (input: PrivacyProviderInput) => Effect.Effect<{
+      readonly ok: boolean;
+      readonly message: string | null;
+      readonly health?: PrivacyProviderHealth;
+    }>;
+    /** Asks a choice's service one small thing, without storing the choice. */
+    readonly testProvider: (input: PrivacyProviderInput) => Effect.Effect<PrivacyProviderHealth>;
     /** Connects, changes or removes the worker that reads sealed documents. */
     readonly configureWorker: (
       input: PrivacyWorkerInput,
@@ -309,6 +328,48 @@ const requestsRecordWith = (
   return input.completed ? { state: "unseen" } : undefined;
 };
 
+type ControllerProviders = ReturnType<PrivacyController["providers"]>;
+type ControllerHealth = Awaited<ReturnType<PrivacyController["testProvider"]>>;
+
+/** A health result as it is sent: what a worker's test also found stays on the server. */
+const publicHealth = (health: ControllerHealth): PrivacyProviderHealth => ({
+  ok: health.ok,
+  kind: health.kind,
+  message: health.message,
+  ...(health.host === undefined ? {} : { host: health.host }),
+  ...(health.status === undefined ? {} : { status: health.status }),
+  latencyMs: Math.round(health.latencyMs),
+});
+
+const publicProvider = (detail: ControllerProviders["ocr"]): PrivacyProviders["ocr"] => ({
+  config: detail.config,
+  catalog: detail.catalog.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    description: entry.description,
+    capabilities: entry.capabilities,
+    ...(entry.docsUrl === undefined ? {} : { docsUrl: entry.docsUrl }),
+    fields: entry.fields.map((field) => ({
+      name: field.name,
+      in: field.in,
+      label: field.label,
+      input: field.input,
+      required: field.required,
+      ...(field.oneOf === undefined ? {} : { oneOf: field.oneOf }),
+      ...(field.options === undefined ? {} : { options: field.options }),
+      ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+      ...(field.help === undefined ? {} : { help: field.help }),
+    })),
+  })),
+});
+
+/** The three services as they are sent to a settings screen. */
+const publicProviders = (providers: ControllerProviders): PrivacyProviders => ({
+  ocr: publicProvider(providers.ocr),
+  detect: publicProvider(providers.detect),
+  worker: publicProvider(providers.worker),
+});
+
 let offered: () => boolean = () => false;
 /**
  * Whether the reading tool is offered now, for a tool's listing, which runs outside any fiber
@@ -359,68 +420,12 @@ export const evaluationOptionsFromEnvironment = (
 export const sealedAskFreelyFromEnvironment = (environment: NodeJS.ProcessEnv): boolean =>
   environment.DOEDESK_EVAL_SEALED_ASK_FREELY?.trim() === "1";
 
-/**
- * Starts the gateway and returns its service. Run this before any provider is set up: a provider
- * captures its process environment when it is created, and for a masked provider that
- * environment has to route through the gateway already.
- */
-export const make = Effect.fn("PrivacyGateway.make")(function* (stateDirectory: string) {
-  const platform = yield* HostProcess.Platform;
-  const hostEnvironment = yield* HostProcess.Environment;
-  const evaluation = evaluationOptionsFromEnvironment(hostEnvironment);
-  if (sealedAskFreelyFromEnvironment(hostEnvironment)) {
-    yield* Effect.logWarning("Sealed documents: agents are not told to ask the minimum");
-  }
-  if (evaluation !== undefined) {
-    yield* Effect.logWarning("Privacy gateway evaluation switches are on", {
-      ocrOnly: evaluation.attachmentsOnly,
-      sentBodiesFile: evaluation.sentBodiesPath ?? null,
-      eventsFile: evaluation.eventsPath ?? null,
-      workerFile: evaluation.workerPath ?? null,
-      hostsFile: evaluation.otherHostsPath ?? null,
-      workerUnchecked: evaluation.workerUnchecked,
-      workerFreeText: evaluation.workerFreeText,
-    });
-  }
-  // Unbounded: each change names its own providers, so none may be dropped. Changes are rare.
-  const routingChanges = yield* PubSub.unbounded<(provider: string) => boolean>();
-  const sealedChanges = yield* makeSealedChanges;
-  const controller = yield* Effect.acquireRelease(
-    Effect.promise(() =>
-      startPrivacyController({
-        dataDirectory: `${stateDirectory}/privacy`,
-        onRoutingChange: (changed) => PubSub.publishUnsafe(routingChanges, changed),
-        platform,
-        appVersion: packageJson.version,
-        evaluation,
-        workspaceRoots: agentWorkspaceRoots,
-        hostEnvironment,
-        onSealChange: sealChanged,
-        onSealedListingChange: sealedChanges.changed,
-      }),
-    ),
-    (running) => Effect.promise(() => running.close()),
-  );
-  setProviderEnvironmentOverlay(controller.environmentFor);
-  setGatewayRefusalSource(controller.refusingNow);
-  setSealedValuesInUse(() => controller.workerOffered());
-  setSealedFilesSource((project, cwd) => ({
-    ...controller.sealedForAgents(project, cwd),
-    askOffered: controller.workerOffered(),
-  }));
-  setSealedFolderLookup(controller.sealedFolderContaining);
-  setSealedFolderPaths(controller.sealedFolderPaths);
-  setSealedFolderChecks({
-    beforeTurn: controller.sealedFoldersBeforeTurn,
-    sweepSoon: controller.sweepSealedFoldersSoon,
-  });
-  offered = () => {
-    const status = controller.status();
-    return status.active && status.readingTool;
-  };
-  workerOffered = () => controller.workerOffered();
-  workerFreeText = () => controller.workerFreeText();
-  return PrivacyGateway.of({
+/** The service over a running controller: what the transport handlers and the tools call. */
+export const serviceOver = (
+  controller: PrivacyController,
+  changes: Pick<PrivacyGateway["Service"], "routingChanges" | "sealedChanges">,
+): PrivacyGateway["Service"] =>
+  PrivacyGateway.of({
     status: Effect.sync(() => controller.status()),
     configure: Effect.fn("PrivacyGateway.configure")((input: PrivacyConfigureInput) =>
       Effect.promise(() => controller.configure(input)),
@@ -437,7 +442,7 @@ export const make = Effect.fn("PrivacyGateway.make")(function* (stateDirectory: 
     setPreference: Effect.fn("PrivacyGateway.setPreference")((input: PrivacyPreferenceInput) =>
       Effect.sync(() => controller.setPreference(input)),
     ),
-    routingChanges: Stream.fromPubSub(routingChanges),
+    routingChanges: changes.routingChanges,
     accountToken: Effect.fn("PrivacyGateway.accountToken")((audience: string) =>
       Effect.promise(() => controller.accountToken(audience)),
     ),
@@ -466,6 +471,19 @@ export const make = Effect.fn("PrivacyGateway.make")(function* (stateDirectory: 
     ),
     configureWorker: Effect.fn("PrivacyGateway.configureWorker")((input: PrivacyWorkerInput) =>
       Effect.promise(() => controller.configureWorker(input)),
+    ),
+    providers: Effect.sync(() => publicProviders(controller.providers())),
+    configureProvider: Effect.fn("PrivacyGateway.configureProvider")(
+      (input: PrivacyProviderInput) =>
+        Effect.promise(() => controller.configureProvider(input)).pipe(
+          Effect.map(({ health, ...outcome }) => ({
+            ...outcome,
+            ...(health === undefined ? {} : { health: publicHealth(health) }),
+          })),
+        ),
+    ),
+    testProvider: Effect.fn("PrivacyGateway.testProvider")((input: PrivacyProviderInput) =>
+      Effect.promise(() => controller.testProvider(input)).pipe(Effect.map(publicHealth)),
     ),
     documentText: Effect.fn("PrivacyGateway.documentText")((name: string, bytes: Buffer) =>
       Effect.promise(() => controller.documentText(name, bytes)),
@@ -566,6 +584,72 @@ export const make = Effect.fn("PrivacyGateway.make")(function* (stateDirectory: 
       (project: string, name: string, template: string) =>
         Effect.sync(() => controller.fillSealed(project, name, template)),
     ),
+    sealedChanges: changes.sealedChanges,
+  });
+
+/**
+ * Starts the gateway and returns its service. Run this before any provider is set up: a provider
+ * captures its process environment when it is created, and for a masked provider that
+ * environment has to route through the gateway already.
+ */
+export const make = Effect.fn("PrivacyGateway.make")(function* (stateDirectory: string) {
+  const platform = yield* HostProcess.Platform;
+  const hostEnvironment = yield* HostProcess.Environment;
+  const evaluation = evaluationOptionsFromEnvironment(hostEnvironment);
+  if (sealedAskFreelyFromEnvironment(hostEnvironment)) {
+    yield* Effect.logWarning("Sealed documents: agents are not told to ask the minimum");
+  }
+  if (evaluation !== undefined) {
+    yield* Effect.logWarning("Privacy gateway evaluation switches are on", {
+      ocrOnly: evaluation.attachmentsOnly,
+      sentBodiesFile: evaluation.sentBodiesPath ?? null,
+      eventsFile: evaluation.eventsPath ?? null,
+      workerFile: evaluation.workerPath ?? null,
+      hostsFile: evaluation.otherHostsPath ?? null,
+      workerUnchecked: evaluation.workerUnchecked,
+      workerFreeText: evaluation.workerFreeText,
+    });
+  }
+  // Unbounded: each change names its own providers, so none may be dropped. Changes are rare.
+  const routingChanges = yield* PubSub.unbounded<(provider: string) => boolean>();
+  const sealedChanges = yield* makeSealedChanges;
+  const controller = yield* Effect.acquireRelease(
+    Effect.promise(() =>
+      startPrivacyController({
+        dataDirectory: `${stateDirectory}/privacy`,
+        onRoutingChange: (changed) => PubSub.publishUnsafe(routingChanges, changed),
+        platform,
+        appVersion: packageJson.version,
+        evaluation,
+        workspaceRoots: agentWorkspaceRoots,
+        hostEnvironment,
+        onSealChange: sealChanged,
+        onSealedListingChange: sealedChanges.changed,
+      }),
+    ),
+    (running) => Effect.promise(() => running.close()),
+  );
+  setProviderEnvironmentOverlay(controller.environmentFor);
+  setGatewayRefusalSource(controller.refusingNow);
+  setSealedValuesInUse(() => controller.workerOffered());
+  setSealedFilesSource((project, cwd) => ({
+    ...controller.sealedForAgents(project, cwd),
+    askOffered: controller.workerOffered(),
+  }));
+  setSealedFolderLookup(controller.sealedFolderContaining);
+  setSealedFolderPaths(controller.sealedFolderPaths);
+  setSealedFolderChecks({
+    beforeTurn: controller.sealedFoldersBeforeTurn,
+    sweepSoon: controller.sweepSealedFoldersSoon,
+  });
+  offered = () => {
+    const status = controller.status();
+    return status.active && status.readingTool;
+  };
+  workerOffered = () => controller.workerOffered();
+  workerFreeText = () => controller.workerFreeText();
+  return serviceOver(controller, {
+    routingChanges: Stream.fromPubSub(routingChanges),
     sealedChanges: sealedChanges.stream,
   });
 });

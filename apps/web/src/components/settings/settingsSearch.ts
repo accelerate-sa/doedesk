@@ -636,6 +636,17 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("beta link another machine vps peer agents work there delegate")],
   },
   {
+    id: "privacy-masking",
+    title: msg("De-identification"),
+    to: "/settings/privacy",
+    scope: "environment",
+    searchTerms: [
+      msg(
+        "masking anonymize personal data PII OCR document reading entity detection provider Azure AWS Google Presidio Mistral Reducto own service API key sign in account",
+      ),
+    ],
+  },
+  {
     id: "privacy-images",
     title: msg("Images and documents"),
     to: "/settings/privacy",
