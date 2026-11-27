@@ -17,6 +17,7 @@ import {
   USAGE_REPORTS_OFF_SWITCHES,
 } from "./index.ts";
 import type { ImageHandling } from "./attachments.ts";
+import type { DeidentifyContext } from "./deidentify/formats/shared.ts";
 import { cacheReader, makeRemoteReader, type Reader, type ReaderUsage } from "./reader.ts";
 import { type ImageRedactor, makeImageRedactor } from "./redaction/redactImage.ts";
 import { type RedactionFile, type RedactionRecord, RedactionStore } from "./redaction/store.ts";
@@ -506,6 +507,11 @@ export interface PrivacyController {
   /** A short-lived signed token proving the signed-in account to another DoeDesk service. */
   readonly accountToken: (audience: string) => Promise<string | null>;
   readonly activity: () => ReadonlyArray<GatewayRecord>;
+  /**
+   * What de-identifying a file works with: this gateway's detector and vault, and the reading
+   * service while one is connected. Undefined when the gateway could not start.
+   */
+  readonly deidentifyContext: () => DeidentifyContext | undefined;
   /**
    * The text of an image or PDF with every personal value replaced by its stand-in: what the
    * agent's reading tool returns. Nothing unmasked is returned on any path.
@@ -1232,6 +1238,9 @@ export const startPrivacyController = async (
     problem = `The privacy gateway could not start: ${String(cause)}`;
   }
   const maskingGateway = gateway;
+  let deidentification:
+    | { readonly readLayout: Reader["readLayout"]; readonly context: DeidentifyContext }
+    | undefined;
 
   // If the gateway could not start, agents get a proxy address nothing listens on. Their model
   // requests fail instead of leaving unmasked.
@@ -2529,6 +2538,21 @@ export const startPrivacyController = async (
           sealed: entry.sealed === true,
         }));
       return { values, turns: kept };
+    },
+    deidentifyContext: () => {
+      if (maskingGateway === undefined) return undefined;
+      const readLayout = reader?.readLayout;
+      // Kept while the reader is the same one: the engine keeps its own state by this object.
+      if (deidentification === undefined || deidentification.readLayout !== readLayout) {
+        deidentification = {
+          readLayout,
+          context: {
+            pseudonymizer: maskingGateway.pseudonymizer,
+            ...(readLayout === undefined ? {} : { reader: { readLayout } }),
+          },
+        };
+      }
+      return deidentification.context;
     },
     readMasked: async (bytes, mediaType) => {
       if (config.mode === "off" || config.mode === "unconfigured" || maskingGateway === undefined) {

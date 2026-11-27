@@ -237,7 +237,12 @@ const loadDecoder = (): Promise<ReadSymbols> => {
         },
       });
       return (image, options) =>
-        zxing.readBarcodes({ ...image, colorSpace: "srgb" } as ImageData, options);
+        zxing.readBarcodes(
+          // Typed by the reader's own parameter: the browser's `ImageData` is not a type of every
+          // program this is compiled into.
+          { ...image, colorSpace: "srgb" } as Parameters<typeof zxing.readBarcodes>[0],
+          options,
+        );
     } catch (cause) {
       decoder = undefined;
       throw new CodeReaderUnavailableError("The barcode reader could not be loaded.", { cause });
