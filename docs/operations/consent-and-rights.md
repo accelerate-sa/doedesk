@@ -16,7 +16,7 @@ The window never calls DoeDesk Cloud. It asks the DoeDesk server on the same com
 | [Privacy controller](../../packages/privacy-gateway/src/controller.ts)    | Sign-in, `/v1/me`, acceptance, export, deletion, detection                | `privacy/config.json`: the sign-in, the account's identifier, where it stands on the Terms, the documents in force |
 | [Usage-data consent](../../apps/server/src/telemetry/UsageDataConsent.ts) | `GET /v1/auth/options` (no sign-in, no identifier), `POST /ingest/choice` | `usage-data.json`: the state, the rule and signal that decided it, the wording shown, the installation identifier  |
 
-`DOEDESK_CLOUD_URL` and `T3CODE_POSTHOG_HOST` point both at another copy of the service.
+`DOEDESK_CLOUD_URL` and `T3CODE_TELEMETRY_HOST` point both at another copy of the service.
 
 ## Accepting the Terms of Use
 
@@ -165,7 +165,7 @@ service. A new consent region needs none either, unless the time zone table has 
 ## Checking against a local copy of the service
 
 DoeDesk Cloud's `test/local-service.mjs` starts the service on a throwaway database with stand-ins
-for SMS, mail and the detection engine. Start the app with `DOEDESK_CLOUD_URL` and `T3CODE_POSTHOG_HOST` set to
+for SMS, mail and the detection engine. Start the app with `DOEDESK_CLOUD_URL` and `T3CODE_TELEMETRY_HOST` set to
 it, `T3CODE_TELEMETRY_ENABLED=true`, and its own `--home-dir`. With `EXPOSE_LOGIN_SECRETS=1` the
 service returns the code or link and takes the country from an `x-test-country` header, so a small
 proxy in front of it can place the app in any country. Never use the production service for

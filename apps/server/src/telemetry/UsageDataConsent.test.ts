@@ -70,7 +70,7 @@ const layerFor = (
     Layer.provide(
       ConfigProvider.layer(
         ConfigProvider.fromUnknown({
-          T3CODE_POSTHOG_HOST: "http://ingest.test",
+          T3CODE_TELEMETRY_HOST: "http://ingest.test",
           DOEDESK_CLOUD_URL: "http://cloud.test",
         }),
       ),

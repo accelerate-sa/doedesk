@@ -27,6 +27,8 @@ interface BufferedAnalyticsEvent {
   readonly event: string;
   readonly properties?: Readonly<Record<string, unknown>>;
   readonly capturedAt: string;
+  /** Sent under its own id, without the install id, so it links to nothing else. */
+  readonly anonymous?: true;
 }
 
 interface DeliveryState {
@@ -66,13 +68,40 @@ const TelemetryEnvConfig = Config.all({
   wslDistroName: Config.String("WSL_DISTRO_NAME").pipe(Config.option),
 });
 
+// Users name or import their own distros, so only well-known families are reported.
+const WSL_DISTRO_FAMILIES = [
+  ["ubuntu", "Ubuntu"],
+  ["debian", "Debian"],
+  ["kali", "Kali"],
+  ["opensuse", "openSUSE"],
+  ["suse", "SUSE"],
+  ["sles", "SUSE"],
+  ["oraclelinux", "OracleLinux"],
+  ["almalinux", "AlmaLinux"],
+  ["rockylinux", "RockyLinux"],
+  ["fedora", "Fedora"],
+  ["archlinux", "Arch"],
+  ["alpine", "Alpine"],
+  ["nixos", "NixOS"],
+  ["pengwin", "Pengwin"],
+  ["docker-desktop", "docker-desktop"],
+] as const;
+
+export const wslDistroFamily = (distroName: string): string | undefined => {
+  const name = distroName.trim().toLowerCase();
+  if (name === "") return undefined;
+  return WSL_DISTRO_FAMILIES.find(([prefix]) => name.startsWith(prefix))?.[1] ?? "other";
+};
+
 export class AnalyticsService extends Context.Service<
   AnalyticsService,
   {
+    /** Whether the event was queued to send; false when telemetry is off. */
     readonly record: (
       event: string,
       properties?: Readonly<Record<string, unknown>>,
-    ) => Effect.Effect<void>;
+      options?: { readonly anonymous?: boolean },
+    ) => Effect.Effect<boolean>;
 
     readonly flush: Effect.Effect<void>;
   }
@@ -117,11 +146,15 @@ export const make = Effect.gen(function* () {
   const clientType = serverConfig.mode === "desktop" ? "desktop-app" : "cli-web-client";
   const hostPlatform = yield* HostProcess.Platform;
   const hostArchitecture = yield* HostProcess.Architecture;
+  const wslDistro = Option.getOrUndefined(
+    Option.flatMapNullishOr(telemetryConfig.wslDistroName, wslDistroFamily),
+  );
 
   const enqueueBufferedEvent = (
     uuid: string,
     event: string,
-    properties?: Readonly<Record<string, unknown>>,
+    properties: Readonly<Record<string, unknown>> | undefined,
+    anonymous: boolean,
   ) =>
     Effect.flatMap(DateTime.now, (now) =>
       Ref.modify(bufferRef, (current) => {
@@ -132,6 +165,7 @@ export const make = Effect.gen(function* () {
             event,
             ...(properties ? { properties } : {}),
             capturedAt: DateTime.formatIso(now),
+            ...(anonymous ? { anonymous: true as const } : {}),
           } satisfies BufferedAnalyticsEvent,
         ];
 
@@ -163,25 +197,33 @@ export const make = Effect.gen(function* () {
       batch: events.map((event) => ({
         uuid: event.uuid,
         event: event.event,
-        // One random identifier names the installation in both places.
-        distinct_id: installId,
-        properties: {
-          ...event.properties,
-          installId,
-          ...(stamp === undefined ? {} : { consent: stamp }),
-          $process_person_profile: false,
-          platform: hostPlatform,
-          wsl: Option.getOrUndefined(telemetryConfig.wslDistroName),
-          arch: hostArchitecture,
-          t3CodeVersion: packageJson.version,
-          telemetryChannel: ServerConfig.telemetryChannel,
-          clientType,
-          serverOs: serverOsFromNodePlatform(hostPlatform),
-          serverArch: hostArchitecture,
-          serverWslDistro: Option.getOrUndefined(telemetryConfig.wslDistroName),
-          serverAppVersion: packageJson.version,
-          serverMode: serverConfig.mode,
-        },
+        // One random identifier names the installation in both places. An anonymous event
+        // carries its own instead, and nothing of the installation or the choice.
+        distinct_id: event.anonymous ? event.uuid : installId,
+        properties: event.anonymous
+          ? {
+              ...event.properties,
+              $process_person_profile: false,
+              t3CodeVersion: packageJson.version,
+              telemetryChannel: ServerConfig.telemetryChannel,
+            }
+          : {
+              ...event.properties,
+              installId,
+              ...(stamp === undefined ? {} : { consent: stamp }),
+              $process_person_profile: false,
+              platform: hostPlatform,
+              wsl: wslDistro,
+              arch: hostArchitecture,
+              t3CodeVersion: packageJson.version,
+              telemetryChannel: ServerConfig.telemetryChannel,
+              clientType,
+              serverOs: serverOsFromNodePlatform(hostPlatform),
+              serverArch: hostArchitecture,
+              serverWslDistro: wslDistro,
+              serverAppVersion: packageJson.version,
+              serverMode: serverConfig.mode,
+            },
         timestamp: event.capturedAt,
       })),
     };
@@ -194,9 +236,13 @@ export const make = Effect.gen(function* () {
     );
   });
 
+  // An anonymous event goes out alone, or the ingest could link it to the other events by request.
   const takeBatch = Ref.modify(bufferRef, (current) => {
-    const nextBatch = current.slice(0, telemetryConfig.flushBatchSize);
-    return [nextBatch, current.slice(nextBatch.length)] as const;
+    const next = current.findIndex((event) => event.anonymous);
+    if (next === 0) return [current.slice(0, 1), current.slice(1)] as const;
+    const linked = current.slice(0, next === -1 ? current.length : next);
+    const batch = linked.slice(0, telemetryConfig.flushBatchSize);
+    return [batch, current.slice(batch.length)] as const;
   });
 
   // Back off even after dropping rejected batches so bad API keys cannot drain the queue in a tight loop.
@@ -269,21 +315,27 @@ export const make = Effect.gen(function* () {
   });
 
   const record: AnalyticsService["Service"]["record"] = Effect.fn("AnalyticsService.record")(
-    function* (event, properties) {
+    function* (event, properties, options) {
       // Nothing is kept for later: an event from before the person's choice is never sent.
-      if (Option.isNone(yield* consent.sending)) return;
+      if (Option.isNone(yield* consent.sending)) return false;
 
       // Catch Node UUID defects too; best-effort telemetry drops events without UUIDs.
       const uuid = yield* Effect.exit(crypto.uuidV7());
-      if (Exit.isFailure(uuid)) return;
+      if (Exit.isFailure(uuid)) return false;
 
-      const enqueueResult = yield* enqueueBufferedEvent(uuid.value, event, properties);
+      const enqueueResult = yield* enqueueBufferedEvent(
+        uuid.value,
+        event,
+        properties,
+        options?.anonymous === true,
+      );
       if (enqueueResult.dropped) {
         yield* Effect.logDebug("analytics buffer full; dropping oldest event", {
           size: enqueueResult.size,
           event,
         });
       }
+      return true;
     },
   );
 

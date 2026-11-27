@@ -219,6 +219,7 @@ export interface SnoozePreset {
 export interface SnoozePresetOptions {
   readonly presets?: ReadonlyArray<SnoozePresetSetting>;
   readonly formatTime?: (date: Date) => string;
+  readonly locale?: string | undefined;
   /** A short weekday name. A name is a word, so an app gives it in its own language. */
   readonly formatWeekday?: (date: Date) => string;
 }
@@ -227,8 +228,8 @@ function snoozeTimeOfDayLabel(date: Date): string {
   return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-function snoozeWeekdayLabel(date: Date): string {
-  return date.toLocaleDateString(undefined, { weekday: "short" });
+function snoozeWeekdayLabel(date: Date, locale?: string): string {
+  return date.toLocaleDateString(locale, { weekday: "short" });
 }
 
 // Calendar-day advance instead of adding DAY_MS: fixed millisecond offsets
@@ -322,7 +323,8 @@ export function resolveSnoozePreset(
   now: Date,
   formatTime: (date: Date) => string = snoozeTimeOfDayLabel,
   resolve: MFunctionType = mFallback,
-  formatWeekday: (date: Date) => string = snoozeWeekdayLabel,
+  locale?: string,
+  formatWeekday: (date: Date) => string = (date) => snoozeWeekdayLabel(date, locale),
 ): SnoozePreset | null {
   let wake: Date;
   let daysAhead = 0;
@@ -364,8 +366,14 @@ export function resolveSnoozePresets(
     (options.presets ?? DEFAULT_SNOOZE_PRESETS)
       .flatMap(
         (setting) =>
-          resolveSnoozePreset(setting, now, options.formatTime, resolve, options.formatWeekday) ??
-          [],
+          resolveSnoozePreset(
+            setting,
+            now,
+            options.formatTime,
+            resolve,
+            options.locale,
+            options.formatWeekday,
+          ) ?? [],
       )
       // flatMap returned a new array; Hermes has no `toSorted`.
       .sort((a, b) => wakeMinute(a) - wakeMinute(b))
@@ -387,6 +395,7 @@ export function pickSnoozePreset(input: {
   readonly now: Date;
   readonly presets?: ReadonlyArray<SnoozePresetSetting>;
   readonly formatTime?: (date: Date) => string;
+  readonly locale?: string | undefined;
   readonly formatWeekday?: (date: Date) => string;
   readonly resolve?: MFunctionType;
 }): SnoozePreset | undefined {
@@ -403,6 +412,7 @@ export function pickSnoozePreset(input: {
         input.now,
         input.formatTime,
         input.resolve,
+        input.locale,
         input.formatWeekday,
       )) ??
     ahead

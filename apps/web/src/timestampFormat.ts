@@ -88,8 +88,21 @@ function getTimestampFormatter(
   timestampFormat: TimestampFormat,
   includeSeconds: boolean,
   timeZone = "UTC",
+  locale = timestampLocale,
 ): Intl.DateTimeFormat {
-  return formatterFor({ ...getTimestampFormatOptions(timestampFormat, includeSeconds), timeZone });
+  // A language chosen in the app words the time; the region still decides 12 or 24 hours.
+  const hourCycle =
+    timestampFormat === "locale" && locale !== timestampLocale
+      ? getTimestampFormatter(timestampFormat, includeSeconds).resolvedOptions().hourCycle
+      : undefined;
+  return formatterFor(
+    {
+      ...getTimestampFormatOptions(timestampFormat, includeSeconds),
+      ...(hourCycle === undefined ? {} : { hourCycle }),
+      timeZone,
+    },
+    locale,
+  );
 }
 
 /**
@@ -195,10 +208,14 @@ export function formatFullTimestamp(isoDate: string, timestampFormat: TimestampF
   ).format(new Date(isoDate));
 }
 
-export function formatShortTimestamp(isoDate: string, timestampFormat: TimestampFormat): string {
+export function formatShortTimestamp(
+  isoDate: string,
+  timestampFormat: TimestampFormat,
+  locale?: string,
+): string {
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
-  return formatTime(date, timestampFormat);
+  return getTimestampFormatter(timestampFormat, false, "UTC", locale).format(wallClockAsUtc(date));
 }
 
 /** A weekday's short name in the app's language: a name is a word, unlike a clock time. */

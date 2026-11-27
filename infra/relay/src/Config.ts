@@ -63,6 +63,8 @@ export class RelayConfiguration extends Context.Service<
     readonly fcmServiceAccount?: Redacted.Redacted<string>;
     /** Whose signed-in accounts this relay accepts, and under which audience. */
     readonly accountTokens: AccountTokenSettings;
+    /** Verifies Clerk `user.deleted` webhooks; unset leaves the webhook route disabled. */
+    readonly clerkWebhookSigningSecret?: Redacted.Redacted<string>;
     readonly apnsDeliveryJobSigningSecret: Redacted.Redacted<string>;
     readonly cloudMintPrivateKey: Redacted.Redacted<string>;
     readonly cloudMintPublicKey: string;

@@ -1,8 +1,4 @@
-import {
-  localeDirection,
-  prefersArabicLanguage,
-  resolveLocale,
-} from "@t3tools/client-runtime/locales";
+import { localeDirection, prefersArabicLanguage } from "@t3tools/client-runtime/locales";
 import { getTranslationsSnapshot } from "gt-react";
 
 import {
@@ -13,7 +9,7 @@ import {
   updateClientSettings,
 } from "../hooks/useSettings";
 import { initializeI18n } from "./initializeI18n";
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./locales";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, resolveWebLocaleSelection } from "./locales";
 import { setActiveLocale } from "./messages";
 
 /** Mirrored for the inline boot script in `index.html`, which runs before IPC hydration. */
@@ -23,14 +19,22 @@ type LocaleTranslations = Awaited<ReturnType<typeof getTranslationsSnapshot>>;
 
 export interface I18nSnapshot {
   readonly locale: string;
+  readonly formattingLocale: string | undefined;
   readonly translations: LocaleTranslations;
 }
 
 const loadedTranslations: LocaleTranslations = { [DEFAULT_LOCALE]: {} };
 const pendingLoads = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
-let snapshot: I18nSnapshot = { locale: DEFAULT_LOCALE, translations: { ...loadedTranslations } };
-let requestedLocale = DEFAULT_LOCALE;
+let snapshot: I18nSnapshot = {
+  locale: DEFAULT_LOCALE,
+  formattingLocale: undefined,
+  translations: { ...loadedTranslations },
+};
+let requestedLocale: ReturnType<typeof resolveWebLocaleSelection> = {
+  catalogLocale: DEFAULT_LOCALE,
+  formattingLocale: undefined,
+};
 
 function getPreferredSystemLanguages(): ReadonlyArray<string> {
   if (typeof window !== "undefined") {
@@ -64,7 +68,7 @@ function applyDocumentLocale(locale: string): void {
   document.documentElement.dir = localeDirection(locale);
 }
 
-function resolveActiveLocale(): string {
+function resolveActiveLocale(): ReturnType<typeof resolveWebLocaleSelection> {
   const settings = getClientSettings();
   const language = isClientSettingsHydrated()
     ? settings.language
@@ -78,9 +82,10 @@ function resolveActiveLocale(): string {
     SUPPORTED_LOCALES.includes("ar") &&
     prefersArabicLanguage(systemLanguages)
   ) {
-    return "ar";
+    // Setup guessed Arabic and no language was chosen, so dates keep the computer's region.
+    return { catalogLocale: "ar", formattingLocale: undefined };
   }
-  return resolveLocale(language, systemLanguages, SUPPORTED_LOCALES, DEFAULT_LOCALE);
+  return resolveWebLocaleSelection(language, systemLanguages);
 }
 
 function loadLocale(locale: string): Promise<void> {
@@ -102,12 +107,17 @@ function loadLocale(locale: string): Promise<void> {
 }
 
 function activateLocale(locale: string): void {
-  if (requestedLocale !== locale) return;
+  if (requestedLocale.catalogLocale !== locale) return;
+  const { formattingLocale } = requestedLocale;
   applyDocumentLocale(locale);
-  if (snapshot.locale === locale && snapshot.translations[locale] === loadedTranslations[locale]) {
+  if (
+    snapshot.locale === locale &&
+    snapshot.formattingLocale === formattingLocale &&
+    snapshot.translations[locale] === loadedTranslations[locale]
+  ) {
     return;
   }
-  snapshot = { locale, translations: { ...loadedTranslations } };
+  snapshot = { locale, formattingLocale, translations: { ...loadedTranslations } };
   setActiveLocale(locale);
   for (const listener of listeners) listener();
 }
@@ -122,7 +132,8 @@ function applyLanguageSetting(): void {
       mirrorBootLanguage(settings.language);
     }
   }
-  void loadLocale(requestedLocale).then(() => activateLocale(requestedLocale));
+  const locale = requestedLocale.catalogLocale;
+  void loadLocale(locale).then(() => activateLocale(locale));
 }
 
 /** GT's own locale setters write the saved setting, which stays the only source of truth. */
@@ -143,7 +154,7 @@ export function whenLocaleReady(): Promise<void> {
     .catch(() => undefined)
     .then(() => {
       applyLanguageSetting();
-      const locale = requestedLocale;
+      const locale = requestedLocale.catalogLocale;
       return loadLocale(locale).then(() => activateLocale(locale));
     });
 }
@@ -157,4 +168,8 @@ export function subscribeI18n(listener: () => void): () => void {
 
 export function getI18nSnapshot(): I18nSnapshot {
   return snapshot;
+}
+
+export function getFormattingLocale(): string | undefined {
+  return snapshot.formattingLocale;
 }

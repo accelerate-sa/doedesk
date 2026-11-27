@@ -13,6 +13,7 @@ import {
 } from "@t3tools/contracts";
 import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { isCiEnvironment, isDoNotTrackSet } from "@t3tools/shared/otelEnvironment";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Context from "effect/Context";
@@ -81,8 +82,8 @@ const UNSET: StoredUsageData = {
 
 /** Where usage events and the record of the choice are sent. The key is public; it is not a secret. */
 export const IngestConfig = Config.all({
-  key: Config.String("T3CODE_POSTHOG_KEY").pipe(Config.withDefault("doedesk-client")),
-  host: Config.String("T3CODE_POSTHOG_HOST").pipe(
+  key: Config.String("T3CODE_TELEMETRY_KEY").pipe(Config.withDefault("doedesk-client")),
+  host: Config.String("T3CODE_TELEMETRY_HOST").pipe(
     Config.withDefault("https://api.doedesk.com/ingest"),
   ),
 });
@@ -98,7 +99,9 @@ const NetworkAnswer = Schema.Struct({
 });
 const decodeNetworkAnswer = Schema.decodeUnknownOption(NetworkAnswer);
 
-const EnabledConfig = Config.Boolean("T3CODE_TELEMETRY_ENABLED").pipe(Config.withDefault(true));
+/** A CI runner is no one's installation, so it sends nothing unless the variable says to. */
+const enabledConfig = (byDefault: boolean) =>
+  Config.Boolean("T3CODE_TELEMETRY_ENABLED").pipe(Config.withDefault(byDefault));
 
 /** This computer's own time zone, as a second witness beside the one the window reports. */
 export const HostTimeZone = Context.Reference<string | null>(
@@ -160,7 +163,8 @@ const make = Effect.gen(function* () {
   const hostTimeZone = yield* HostTimeZone;
   const ingest = yield* IngestConfig;
   const cloudUrl = (yield* CloudUrlConfig).replace(/\/+$/, "");
-  const enabledAtStart = yield* EnabledConfig;
+  const enabledByDefault = !isCiEnvironment(hostEnvironment);
+  const enabledAtStart = yield* enabledConfig(enabledByDefault);
   const httpClient = yield* HttpClient.HttpClient;
   const crypto = yield* SecureRandom.SecureRandom;
   const platform = yield* HostProcess.Platform;
@@ -172,12 +176,12 @@ const make = Effect.gen(function* () {
 
   // A cached PATH does not establish consent from the current login shell.
   const environmentAllows = Effect.suspend(() => {
-    if (!enabledAtStart) return Effect.succeed(false);
+    if (!enabledAtStart || isDoNotTrackSet(hostEnvironment)) return Effect.succeed(false);
     if (!awaitingShellConsent) return Effect.succeed(true);
     if (hostEnvironment.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING === "1")
       return Effect.succeed(false);
     const preference = hostEnvironment.T3CODE_TELEMETRY_ENABLED;
-    return EnabledConfig.pipe(
+    return enabledConfig(enabledByDefault).pipe(
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromEnv({
