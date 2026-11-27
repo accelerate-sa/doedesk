@@ -74,6 +74,7 @@ See [00_development.md](docs/operations/00_development.md) for setup, ports, see
 - **Sharing (`vp run dev --share`):** Wait for `pairingUrl:` and hand the full URL to the user. Never wire `tailscale serve` by hand, open the URL yourself, or consume the user's one-time pairing link. Mint another with `node apps/server/src/bin.ts pair` if needed.
 - **Test data:** Always copy in (never symlink) and refresh `statev2.sqlite`, not `state.sqlite`. Bring `secrets` / `settings.json` only if the flow under test needs them.
 - **Extra checkouts:** Put `git worktree add` next to this worktree, not in `/tmp`, and remove it when done.
+- **CI/CD & release builds:** Run builds locally on this Mac (macOS) and on the Windows PC via `ssh pc` (Windows/Linux). Do not rely on paid Blacksmith.sh hosted runners.
 
 ## Verifying
 
