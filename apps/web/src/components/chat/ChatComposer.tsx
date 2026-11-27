@@ -759,25 +759,38 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     attachments: [
       ...composerImages.map((image) => {
         const upload = uploadsByImageId[image.id];
+        const uploadedAttachmentId =
+          upload?.status === "ready" && upload.environmentId === environmentId
+            ? upload.attachmentId
+            : undefined;
         return {
           ...image,
-          uploadedAttachmentId:
-            upload?.status === "ready" && upload.environmentId === environmentId
-              ? upload.attachmentId
-              : undefined,
-          uploading: supportsAttachmentUploads && upload?.status === "uploading",
+          uploadedAttachmentId,
+          // Wait for pending upload while uploads are supported and not failed, so inspection uses the attachmentId claimed on Send.
+          uploading:
+            supportsAttachmentUploads &&
+            canOperateThread &&
+            uploadedAttachmentId === undefined &&
+            upload?.status !== "failed",
         };
       }),
       ...composerFiles.map((file) => {
         const upload = uploadsByImageId[file.id];
+        const uploadedAttachmentId =
+          file.uploadedAttachmentId ??
+          (upload?.status === "ready" && upload.environmentId === environmentId
+            ? upload.attachmentId
+            : undefined);
+        const canUpload =
+          supportsAttachmentUploads &&
+          canOperateThread &&
+          !composerFileNeedsReattach(file) &&
+          maxFileAttachmentBytes !== null &&
+          file.sizeBytes <= maxFileAttachmentBytes;
         return {
           ...file,
-          uploadedAttachmentId:
-            file.uploadedAttachmentId ??
-            (upload?.status === "ready" && upload.environmentId === environmentId
-              ? upload.attachmentId
-              : undefined),
-          uploading: supportsAttachmentUploads && upload?.status === "uploading",
+          uploadedAttachmentId,
+          uploading: canUpload && uploadedAttachmentId === undefined && upload?.status !== "failed",
         };
       }),
     ],

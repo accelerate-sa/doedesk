@@ -71,7 +71,6 @@ import { useUsageLimitsPanel } from "./chat/useUsageLimitsPanel";
 import { useWorktreeSetup } from "./chat/useWorktreeSetup";
 import { useChatShortcuts } from "./chat/useChatShortcuts";
 import { ChatBannerLane } from "./chat/ChatBannerLane";
-import { WorkspaceDeidentifyButton } from "./deidentify/WorkspaceDeidentifyButton";
 import { usePrivacyComposerBanners, useRefusedHostCheck } from "./privacy/privacyComposerBanners";
 import * as Schema from "effect/Schema";
 import {
@@ -3633,10 +3632,6 @@ export default function ChatView(props: ChatViewProps) {
                 ? { onOpenProjectSettings: handleOpenDraftProjectSettingsStable }
                 : {})}
               {...(threadFindEnabled ? { onFindInThread: openThreadFindStable } : {})}
-            />
-            <WorkspaceDeidentifyButton
-              environmentId={activeThread.environmentId}
-              projectId={activeProject?.id ?? null}
             />
           </header>
         )}
