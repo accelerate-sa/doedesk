@@ -1,6 +1,6 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useGT } from "gt-react";
-import { FileLock2Icon, ScanEyeIcon, XIcon } from "lucide-react";
+import { CheckIcon, FileLock2Icon, ScanEyeIcon, XIcon } from "lucide-react";
 import { use } from "react";
 
 import { type ComposerFileAttachment, composerFileNeedsReattach } from "~/composerDraftStore";
@@ -11,6 +11,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { ComposerContextActionsContext } from "../composerContextActions";
 import { ContextChipAction } from "../ContextChip";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
+import { Spinner } from "../ui/spinner";
 import { fileNameOf } from "./sealedFiles.logic";
 import {
   readableForSuggestion,
@@ -87,8 +88,15 @@ export function ComposerFileChipActions({ file }: { readonly file: ComposerFileA
   const seal = file.file === null ? undefined : actions.sealFile;
   // A file that has to be attached again has nothing to open.
   const reviewFile = composerFileNeedsReattach(file) ? undefined : actions.reviewFile;
+  const review = composerFileNeedsReattach(file) ? undefined : actions.reviewStatus?.(file.id);
   const suggestion = useSealSuggestion(file.name, seal === undefined ? null : file.file);
   if (seal === undefined && reviewFile === undefined && removeFile === undefined) return null;
+  const reviewLabel =
+    review?.status === "scanning"
+      ? gt("Checking…")
+      : review?.status === "reviewed"
+        ? gt("Reviewed")
+        : gt("Review before sending");
   return (
     <span data-composer-file-actions className="inline-flex shrink-0 items-center gap-0.5">
       {seal === undefined ? null : (
@@ -99,13 +107,30 @@ export function ComposerFileChipActions({ file }: { readonly file: ComposerFileA
           render={
             <ContextChipAction
               aria-label={gt("Review {name}", { name: file.name })}
-              className={CHIP_ACTION_CLASS}
+              data-review-status={review?.status}
+              className={cn(
+                CHIP_ACTION_CLASS,
+                review?.status === "reviewed" && "text-success hover:text-success",
+                review !== undefined &&
+                  review.status !== "reviewed" &&
+                  review.itemCount > 0 &&
+                  "w-auto gap-[0.2em] rounded-full bg-warning/12 px-1.5 text-warning-foreground hover:bg-warning/20 hover:text-warning-foreground",
+              )}
               onClick={() => reviewFile(file.id)}
             />
           }
-          label={gt("Review before sending")}
+          label={reviewLabel}
         >
-          <ScanEyeIcon aria-hidden />
+          {review?.status === "scanning" ? (
+            <Spinner className="size-[0.9em]" />
+          ) : review?.status === "reviewed" ? (
+            <CheckIcon aria-hidden />
+          ) : (
+            <ScanEyeIcon aria-hidden />
+          )}
+          {review !== undefined && review.status !== "reviewed" && review.itemCount > 0 ? (
+            <span className="text-xs leading-none tabular-nums">{review.itemCount}</span>
+          ) : null}
         </SharedTooltipTrigger>
       )}
       {removeFile === undefined ? null : (

@@ -48,6 +48,7 @@ import {
   sealedFilesNote,
   sealedFoldersBeforeTurn,
 } from "../privacy/agentWorkspaces.ts";
+import * as Deidentification from "../privacy/DeidentificationService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ProviderAuthService from "../provider/ProviderAuthService.ts";
@@ -1025,6 +1026,44 @@ export const layer: Layer.Layer<
           message: sealedFolderRefusal.message,
         });
         return;
+      }
+      const deidentification = yield* Effect.serviceOption(
+        Deidentification.DeidentificationService,
+      );
+      if (Option.isSome(deidentification)) {
+        const policy = yield* deidentification.value.policy({
+          projectId: projection.thread.projectId,
+        });
+        if (policy.requireReviewBeforeAi) {
+          const workspace = yield* deidentification.value
+            .workspace(projection.thread.projectId)
+            .pipe(Effect.result);
+          const unreviewed =
+            workspace._tag === "Success"
+              ? workspace.success.files.filter((file) => file.status !== "reviewed")
+              : null;
+          if (unreviewed === null || unreviewed.length > 0) {
+            const sample =
+              unreviewed === null
+                ? ""
+                : unreviewed
+                    .slice(0, 3)
+                    .map((file) => file.path)
+                    .join(", ");
+            const title = "Folder files need review before AI reads them";
+            const message =
+              unreviewed === null
+                ? "DoeDesk could not check this folder's de-identification review status, so the turn was not started. Open Review files in the header and try again."
+                : `${unreviewed.length} file${unreviewed.length === 1 ? "" : "s"} in this folder ${unreviewed.length === 1 ? "has" : "have"} not been reviewed yet (${sample}${unreviewed.length > 3 ? ", …" : ""}). Open Review files in the header to review them, or turn off "Require review before AI".`;
+            yield* settleStartFailure({
+              signal: "deidentification-review-required",
+              title,
+              error: new ProviderTurnStartError({ runId: run.id, cause: title }),
+              message,
+            });
+            return;
+          }
+        }
       }
       if (!(yield* isCurrentAttemptInStatus("starting"))) return;
       const existingSessionProjection = projection.providerSessions.find(

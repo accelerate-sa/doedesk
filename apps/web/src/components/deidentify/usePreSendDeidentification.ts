@@ -13,6 +13,8 @@ export interface PreSendAttachment {
   readonly name: string;
   readonly file?: File | null | undefined;
   readonly uploadedAttachmentId?: string | undefined;
+  /** True while the composer is still uploading this file to the server's pending attachment store. */
+  readonly uploading?: boolean | undefined;
 }
 
 /** `ready`: checked and waiting for a look. `stale`: changed since it was reviewed. */
@@ -37,6 +39,8 @@ export interface PreSendController {
   readonly deidentify: DeidentifyClient;
   /** The attachments that can be de-identified, in the order they were attached. */
   readonly entries: ReadonlyArray<PreSendEntry>;
+  /** Lookup one attachment's live review entry by composer attachment id. */
+  readonly entryOf: (id: string) => PreSendEntry | undefined;
   /**
    * Call before sending. True: send now. False: the message waits for a review, and `send` is
    * called once the person has given it and asks to send.
@@ -87,7 +91,10 @@ export function usePreSendDeidentification({
   const supported = enabled
     ? attachments.filter((attachment) => canDeidentify(attachment.name))
     : [];
-  const check = async (attachment: PreSendAttachment, known: DeidentifyFileRef | null) => {
+  const check = async (
+    attachment: PreSendAttachment,
+    known: DeidentifyFileRef | null,
+  ): Promise<Checked> => {
     let ref = known;
     if (ref === null && attachment.uploadedAttachmentId !== undefined) {
       ref = {
@@ -101,20 +108,18 @@ export function usePreSendDeidentification({
       if (staged.ok) ref = { kind: "staged", stagedId: staged.stagedId, name: attachment.name };
     }
     const result = ref === null ? null : await client.inspect(ref);
-    const next: Checked =
-      result === null || !result.ok
-        ? { ref, status: "failed", itemCount: 0 }
-        : {
-            ref,
-            status:
-              result.layer.reviewState === "reviewed"
-                ? "reviewed"
-                : result.layer.reviewState === "stale"
-                  ? "stale"
-                  : "ready",
-            itemCount: hiddenCount(result.layer.items),
-          };
-    setChecked((current) => ({ ...current, [attachment.id]: next }));
+    return result === null || !result.ok
+      ? { ref, status: "failed", itemCount: 0 }
+      : {
+          ref,
+          status:
+            result.layer.reviewState === "reviewed"
+              ? "reviewed"
+              : result.layer.reviewState === "stale"
+                ? "stale"
+                : "ready",
+          itemCount: hiddenCount(result.layer.items),
+        };
   };
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the folder's review policy from the server
@@ -133,8 +138,12 @@ export function usePreSendDeidentification({
   useEffect(() => {
     for (const attachment of supported) {
       if (started.current.has(attachment.id)) continue;
+      // Wait for an in-flight upload so inspection targets the pending attachmentId claimed on Send.
+      if (attachment.uploading === true && attachment.uploadedAttachmentId === undefined) continue;
       started.current.add(attachment.id);
-      void check(attachment, null);
+      void check(attachment, null).then((next) =>
+        setChecked((current) => ({ ...current, [attachment.id]: next })),
+      );
     }
     // Runs again whenever the attachments do: a file already started is passed over.
   }, [supported, check]);
@@ -159,6 +168,7 @@ export function usePreSendDeidentification({
         ),
     };
   });
+  const entryById = new Map(entries.map((entry) => [entry.id, entry]));
   const unreviewed = entries.filter((entry) => entry.status !== "reviewed");
 
   const guardSend = (send: () => void): boolean => {
@@ -177,6 +187,7 @@ export function usePreSendDeidentification({
   return {
     deidentify: client,
     entries,
+    entryOf: (id) => entryById.get(id),
     guardSend,
     waitingOn: held === null ? null : unreviewed,
     sendHeld: () => {
@@ -226,7 +237,11 @@ export function usePreSendDeidentification({
               // What was decided in the studio may have changed the counts and the state.
               for (const attachment of supported) {
                 const state = checked[attachment.id];
-                if (state?.ref != null) void check(attachment, state.ref);
+                if (state?.ref != null) {
+                  void check(attachment, state.ref).then((next) =>
+                    setChecked((current) => ({ ...current, [attachment.id]: next })),
+                  );
+                }
               }
             },
           },

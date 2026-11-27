@@ -5,6 +5,7 @@ import {
   type ChatAttachment,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { isSvgAttachment } from "@t3tools/shared/image";
 
@@ -15,6 +16,7 @@ import {
   resolveAttachmentPath,
 } from "../attachmentStore.ts";
 import * as ServerConfig from "../config.ts";
+import * as Deidentification from "../privacy/DeidentificationService.ts";
 import * as DocumentText from "../provider/DocumentText.ts";
 
 export class AttachmentClaimError extends Schema.TaggedError<AttachmentClaimError>()(
@@ -85,6 +87,7 @@ export const claimPendingAttachments = Effect.fn("AttachmentClaims.claimPendingA
     const fileSystem = yield* FileSystem.FileSystem;
     const claimedPaths: string[] = [];
     const documents = yield* DocumentText.DocumentText;
+    const deidentification = yield* Effect.serviceOption(Deidentification.DeidentificationService);
     const attachments = yield* Effect.forEach(
       input.attachments,
       (attachment) =>
@@ -136,8 +139,33 @@ export const claimPendingAttachments = Effect.fn("AttachmentClaims.claimPendingA
               message: `Attachment '${attachment.name}' cannot be sent: attachment type does not match the upload.`,
             });
           }
+          const reviewed = Option.isSome(deidentification)
+            ? yield* deidentification.value
+                .reviewedCopy({
+                  kind: "attachment",
+                  attachmentId: attachment.id,
+                  name: attachment.name,
+                })
+                .pipe(Effect.orElseSucceed(() => Option.none<Deidentification.ReviewedCopy>()))
+            : Option.none<Deidentification.ReviewedCopy>();
           // Copies isolate edits from the retry source. Keep the uncancellable copy and rollback registration
           // uninterruptible so cleanup always sees completed writes.
+          if (Option.isSome(reviewed)) {
+            yield* fileSystem.writeFile(claim.finalPath, reviewed.value.bytes).pipe(
+              Effect.mapError(
+                (cause) =>
+                  new AttachmentClaimError({
+                    message: `Failed to claim attachment '${attachment.name}' for this thread.`,
+                    cause,
+                  }),
+              ),
+              Effect.andThen(Effect.sync(() => claimedPaths.push(claim.finalPath))),
+              Effect.uninterruptible,
+            );
+            const extracted = yield* documents.ensure(claim.finalPath);
+            if (extracted) claimedPaths.push(extracted);
+            return { ...normalized, sizeBytes: reviewed.value.bytes.byteLength };
+          }
           yield* fileSystem.copyFile(claim.currentPath, claim.finalPath).pipe(
             Effect.mapError(
               (cause) =>

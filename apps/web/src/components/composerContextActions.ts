@@ -17,6 +17,15 @@ export interface ComposerContextActions {
   sealFile?: ((fileId: string) => void) | undefined;
   /** Opens the file as it will be sent. De-identification review hangs off this. */
   reviewFile?: ((fileId: string) => void) | undefined;
+  /** Live pre-send de-identification state for an attached file, when checked. */
+  reviewStatus?:
+    | ((fileId: string) =>
+        | {
+            readonly status: "scanning" | "ready" | "stale" | "reviewed" | "failed";
+            readonly itemCount: number;
+          }
+        | undefined)
+    | undefined;
   removeFile?: ((fileId: string) => void) | undefined;
   /** Present when this folder's files can be sealed: a mentioned file's chip offers Seal. */
   sealMention?: ((path: string) => void) | undefined;

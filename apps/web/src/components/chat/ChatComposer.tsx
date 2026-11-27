@@ -752,10 +752,35 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     isPreviewableComposerVideo(file, environmentId),
   );
   const sealing = useFolderSealing(environmentId, activeProjectId);
+  const uploadsByImageId = useAttachmentUploadStore((state) => state.uploadsByImageId);
   const preSendDeidentification = usePreSendDeidentification({
     environmentId,
     projectId: activeProjectId,
-    attachments: [...composerImages, ...composerFiles],
+    attachments: [
+      ...composerImages.map((image) => {
+        const upload = uploadsByImageId[image.id];
+        return {
+          ...image,
+          uploadedAttachmentId:
+            upload?.status === "ready" && upload.environmentId === environmentId
+              ? upload.attachmentId
+              : undefined,
+          uploading: supportsAttachmentUploads && upload?.status === "uploading",
+        };
+      }),
+      ...composerFiles.map((file) => {
+        const upload = uploadsByImageId[file.id];
+        return {
+          ...file,
+          uploadedAttachmentId:
+            file.uploadedAttachmentId ??
+            (upload?.status === "ready" && upload.environmentId === environmentId
+              ? upload.attachmentId
+              : undefined),
+          uploading: supportsAttachmentUploads && upload?.status === "uploading",
+        };
+      }),
+    ],
   });
   const composerOtherFiles = composerOtherFilesForPresentation(
     composerFiles,
@@ -787,10 +812,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     },
   );
   const nonPersistedComposerImageIds = attachmentDraft.nonPersistedImageIds;
-  const uploadsByImageId = useAttachmentUploadStore((state) => state.uploadsByImageId);
   const openPrLink = useOpenPrLink(routeThreadRef);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const previewFile = composerFiles.find((file) => file.id === previewFileId);
+  const openComposerFileReview = (fileId: string) => {
+    const entry = preSendDeidentification.entryOf(fileId);
+    if (entry !== undefined) {
+      entry.openStudio();
+      return;
+    }
+    setPreviewFileId(fileId);
+  };
   const composerContextActions = {
     environmentId,
     cwd: gitCwd ?? undefined,
@@ -852,13 +884,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     },
     // A file's chip is the one place it shows, so Seal, Review and Remove are on the chip.
     removeFile: (fileId: string) => removeComposerFileFromDraft(fileId),
+    ...(sealing.offered || preSendDeidentification.entries.length > 0
+      ? {
+          reviewFile: openComposerFileReview,
+          reviewStatus: (fileId: string) => preSendDeidentification.entryOf(fileId),
+        }
+      : {}),
     ...(sealing.offered
       ? {
           sealFile: (fileId: string) => {
             const file = composerFiles.find((candidate) => candidate.id === fileId);
             if (file) sealComposerFile(file);
           },
-          reviewFile: (fileId: string) => setPreviewFileId(fileId),
           // An agent reads a mentioned file as an attached one.
           ...(gitCwd !== null && !questionAttachmentTarget
             ? { sealMention: (path: string) => sealMentionedFile(path) }
@@ -3704,6 +3741,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onRemoveImage={removeComposerImage}
         onRemoveFile={removeComposerFileFromDraft}
         onSealImage={sealing.offered ? sealComposerImage : undefined}
+        onReviewImage={(imageId) => preSendDeidentification.entryOf(imageId)?.openStudio()}
+        imageReviewStatus={(imageId) => preSendDeidentification.entryOf(imageId)}
       />
     ) : null;
   const composerAttachmentFileList =
@@ -3720,7 +3759,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onPreviewFile={setPreviewFileId}
         onRemoveFile={removeComposerFileFromDraft}
         onSealFile={sealing.offered ? sealComposerFile : undefined}
-        onReviewFile={sealing.offered ? setPreviewFileId : undefined}
+        onReviewFile={
+          sealing.offered || preSendDeidentification.entries.length > 0
+            ? openComposerFileReview
+            : undefined
+        }
       />
     ) : null;
   const composerAttachButton = showComposerAttachAction ? (

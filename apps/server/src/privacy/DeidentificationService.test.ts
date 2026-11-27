@@ -4,7 +4,12 @@ import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
-import type { DeidentifyFileRef, DeidentifyItem } from "@t3tools/contracts";
+import {
+  ChatAttachmentId,
+  type ChatFileAttachment,
+  type DeidentifyFileRef,
+  type DeidentifyItem,
+} from "@t3tools/contracts";
 import {
   type DeidentifyContext,
   patternDetector,
@@ -19,6 +24,10 @@ import * as Option from "effect/Option";
 import type * as Scope from "effect/Scope";
 import sharp from "sharp";
 
+import { createPendingAttachmentId, resolveAttachmentPath } from "../attachmentStore.ts";
+import * as ServerConfig from "../config.ts";
+import * as AttachmentClaims from "../orchestration-v2/AttachmentClaims.ts";
+import * as DocumentText from "../provider/DocumentText.ts";
 import * as Deidentification from "./DeidentificationService.ts";
 
 /** Made-up values in the fixed formats the pattern detector finds without any service. */
@@ -453,6 +462,79 @@ describe("DeidentificationService", () => {
           service.inspect({ file: { kind: "staged", stagedId: "../vault.json" } }),
         );
         assert.strictEqual(missing.reason, "missing");
+      }),
+    ),
+  );
+
+  it.effect("claims a reviewed pending attachment using its de-identified copy on Send", () =>
+    withService(({ service, stateDir }) =>
+      Effect.gen(function* () {
+        const attachmentsDir = NodePath.join(stateDir, "attachments");
+        NodeFS.mkdirSync(attachmentsDir, { recursive: true });
+        const pendingId = createPendingAttachmentId("txt");
+        const bytes = Buffer.from(LETTER, "utf8");
+        const pending: ChatFileAttachment = {
+          type: "file",
+          id: ChatAttachmentId.make(pendingId),
+          name: "letter.txt",
+          mimeType: "text/plain",
+          sizeBytes: bytes.byteLength,
+        };
+        const pendingPath = resolveAttachmentPath({ attachmentsDir, attachment: pending })!;
+        NodeFS.writeFileSync(pendingPath, bytes);
+
+        const ref: DeidentifyFileRef = {
+          kind: "attachment",
+          attachmentId: pendingId,
+          name: "letter.txt",
+        };
+        yield* service.inspect({ file: ref });
+        yield* service.updateLayer({
+          file: ref,
+          changes: [
+            { type: "setDefaultMode", mode: "redact" },
+            { type: "setReviewState", state: "reviewed" },
+          ],
+        });
+
+        const claimEnv = Layer.mergeAll(
+          ServerConfig.ServerConfig.layerTest(stateDir, { prefix: "deidentify-claim-" }),
+          Layer.succeed(Deidentification.DeidentificationService, service),
+          Layer.succeed(DocumentText.DocumentText, {
+            ensure: () => Effect.succeed(null),
+          }),
+        );
+        // Point ServerConfig.attachmentsDir at the fixture's attachmentsDir.
+        const configLayer = Layer.succeed(ServerConfig.ServerConfig, {
+          ...(yield* ServerConfig.ServerConfig.pipe(Effect.provide(claimEnv))),
+          attachmentsDir,
+        });
+        const claimed = yield* AttachmentClaims.claimPendingAttachments({
+          threadId: "thread-1",
+          attachments: [pending],
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              configLayer,
+              Layer.succeed(Deidentification.DeidentificationService, service),
+              Layer.succeed(DocumentText.DocumentText, { ensure: () => Effect.succeed(null) }),
+            ),
+          ),
+        );
+
+        assert.strictEqual(claimed.attachments.length, 1);
+        const claimedAttachment = claimed.attachments[0]!;
+        const finalPath = resolveAttachmentPath({
+          attachmentsDir,
+          attachment: claimedAttachment,
+        })!;
+        const sentText = NodeFS.readFileSync(finalPath, "utf8");
+        assert.notInclude(sentText, IBAN);
+        assert.notInclude(sentText, EMAIL);
+        assert.include(sentText, REDACTED_LABEL);
+        assert.strictEqual(claimedAttachment.sizeBytes, Buffer.byteLength(sentText, "utf8"));
+        // The pending upload stays untouched so retries/non-destructive layer invariants hold.
+        assert.strictEqual(NodeFS.readFileSync(pendingPath, "utf8"), LETTER);
       }),
     ),
   );

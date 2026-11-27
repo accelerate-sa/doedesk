@@ -8,6 +8,7 @@ import type {
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
 import { T, useGT, useMessages } from "gt-react";
 import {
+  CheckIcon,
   CircleAlertIcon,
   FileLock2Icon,
   ImageIcon,
@@ -171,9 +172,21 @@ export function ComposerAttachmentMediaRow({
   onRemoveImage,
   onRemoveFile,
   onSealImage,
+  onReviewImage,
+  imageReviewStatus,
 }: {
   /** Present when this folder's files can be sealed: the image is then kept from the AI company. */
   readonly onSealImage?: ((image: ComposerImageAttachment) => void) | undefined;
+  /** Opens de-identification review for an attached image. */
+  readonly onReviewImage?: ((imageId: string) => void) | undefined;
+  readonly imageReviewStatus?:
+    | ((imageId: string) =>
+        | {
+            readonly status: "scanning" | "ready" | "stale" | "reviewed" | "failed";
+            readonly itemCount: number;
+          }
+        | undefined)
+    | undefined;
   readonly images: ReadonlyArray<ComposerImageAttachment>;
   readonly expandedImages: ReadonlyArray<ComposerImageAttachment>;
   readonly preparingImages: ReadonlyArray<PreparingComposerImage>;
@@ -316,18 +329,46 @@ export function ComposerAttachmentMediaRow({
                   )}
                 </span>
               )}
-              {onSealImage !== undefined &&
+              {(onSealImage !== undefined || onReviewImage !== undefined) &&
               ready &&
-              sealableImage(ready.name) &&
               source?.kind !== "snap-shot" &&
               upload?.status !== "uploading" &&
               upload?.status !== "failed" ? (
-                <span className="absolute bottom-1 left-1">
-                  <SealAttachmentButton
-                    name={ready.name}
-                    onSeal={() => onSealImage(ready)}
-                    overlay
-                  />
+                <span className="absolute bottom-1 left-1 flex items-center gap-1">
+                  {onSealImage !== undefined && sealableImage(ready.name) ? (
+                    <SealAttachmentButton
+                      name={ready.name}
+                      onSeal={() => onSealImage(ready)}
+                      overlay
+                    />
+                  ) : null}
+                  {(() => {
+                    const review = imageReviewStatus?.(ready.id);
+                    if (onReviewImage === undefined || review === undefined) return null;
+                    return (
+                      <SharedTooltipTrigger
+                        render={
+                          <Button
+                            variant="overlay"
+                            size="icon-xs"
+                            aria-label={gt("Review {name}", { name: ready.name })}
+                            onClick={() => onReviewImage(ready.id)}
+                          />
+                        }
+                        label={
+                          review.status === "reviewed"
+                            ? gt("Reviewed")
+                            : gt("Review before sending")
+                        }
+                      >
+                        {review.status === "reviewed" ? (
+                          <CheckIcon className="text-success" />
+                        ) : (
+                          <ScanEyeIcon />
+                        )}
+                      </SharedTooltipTrigger>
+                    );
+                  })()}
                 </span>
               ) : null}
               {ready && upload?.status === "failed" && (

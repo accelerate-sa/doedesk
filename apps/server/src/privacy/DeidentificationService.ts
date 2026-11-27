@@ -61,8 +61,8 @@ import * as Schema from "effect/Schema";
 
 import { resolveAttachmentPathById } from "../attachmentStore.ts";
 import * as ServerConfig from "../config.ts";
+import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ExternalLauncher from "../process/externalLauncher.ts";
-import * as Project from "../project/ProjectService.ts";
 import * as PrivacyGateway from "./PrivacyGateway.ts";
 
 /**
@@ -955,7 +955,7 @@ const layerSources = Layer.effect(
   Effect.gen(function* () {
     const config = yield* ServerConfig.ServerConfig;
     const privacy = yield* PrivacyGateway.PrivacyGateway;
-    const projects = yield* Project.ProjectService;
+    const projects = yield* ProjectStore.ProjectStoreV2;
     const launcher = yield* ExternalLauncher.ExternalLauncher;
     return DeidentificationSources.of({
       stateDir: config.stateDir,
@@ -963,7 +963,7 @@ const layerSources = Layer.effect(
       context: privacy.deidentifyContext,
       projectRoot: Effect.fn("DeidentificationSources.projectRoot")(function* (projectId: string) {
         const found = yield* projects
-          .getById(ProjectId.make(projectId))
+          .get(ProjectId.make(projectId))
           .pipe(Effect.orElseSucceed(() => Option.none()));
         return Option.isSome(found) ? found.value.workspaceRoot : undefined;
       }),

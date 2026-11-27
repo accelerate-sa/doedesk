@@ -250,6 +250,7 @@ import * as OrchestrationHttp from "./orchestration-v2/http.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as PrivacyGateway from "./privacy/PrivacyGateway.ts";
 import * as PrivacyTurnRecorder from "./privacy/PrivacyTurnRecorder.ts";
+import * as Deidentification from "./privacy/DeidentificationService.ts";
 import * as PrivacyHttp from "./privacy/http.ts";
 import * as SealedHistory from "./privacy/sealedHistory.ts";
 import * as ProjectHttp from "./project/http.ts";
@@ -800,8 +801,8 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ),
 ).pipe(
   Layer.provideMerge(layerOrchestrationApplication),
-  // One hub, which the feeders above and the workflow store inside the runtime publish to.
-  Layer.provideMerge(MilestoneHub.layer),
+  // One hub and one de-identification service for turns, claims, and HTTP routes.
+  Layer.provideMerge(Layer.merge(Deidentification.layer, MilestoneHub.layer)),
   Layer.provideMerge(Layer.merge(layerTaskFolders, LayoutCommandApprovalWrites.layer)),
   Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),
   Layer.provideMerge(Layer.merge(ProjectStore.layer, ThreadSearch.layer)),
