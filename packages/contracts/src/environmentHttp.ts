@@ -19,6 +19,10 @@ import {
   PrivacyKnownValuesRequest,
   PrivacyPreferenceRequest,
   PrivacyProfileRequest,
+  PrivacyProviderHealth,
+  PrivacyProviderRequest,
+  PrivacyProviderResult,
+  PrivacyProviders,
   PrivacyRedactionFile,
   PrivacyRedactionFileRequest,
   PrivacyRedactions,
@@ -1242,6 +1246,29 @@ class EnvironmentPrivacyHttpApi extends HttpApiGroup.make("privacy")
       headers: OptionalBearerHeaders,
       payload: PrivacyWorkerRequest,
       success: PrivacyConfigureResult,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("providers", "/api/privacy/providers", {
+      headers: OptionalBearerHeaders,
+      success: PrivacyProviders,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("configureProvider", "/api/privacy/providers", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyProviderRequest,
+      success: PrivacyProviderResult,
+      error: EnvironmentPrivacyErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("testProvider", "/api/privacy/providers/test", {
+      headers: OptionalBearerHeaders,
+      payload: PrivacyProviderRequest,
+      success: PrivacyProviderHealth,
       error: EnvironmentPrivacyErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
   )

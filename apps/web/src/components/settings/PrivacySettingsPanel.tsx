@@ -13,7 +13,6 @@ import {
   refreshPrivacyStatus,
   revealPrivacyVault,
   setPrivacyPreference,
-  setPrivacyStatus,
   usePrivacyActivity,
   usePrivacyStatus,
   usePrivacyVault,
@@ -24,7 +23,6 @@ import { ImageHandlingSection, RedactionsSection } from "../privacy/ImageRedacti
 import { EgressSection, SealedDocumentsSection, WorkerSection } from "../privacy/SealedWorker";
 import { useProjects } from "~/state/entities";
 import { usePrimaryEnvironmentId } from "~/state/environments";
-import { PrivacySetup } from "../privacy/PrivacySetup";
 import { ProviderMaskingSection } from "../privacy/ProviderMasking";
 import { UsageDataSettings } from "../privacy/UsageData";
 import { WhatLeavesOverview } from "../privacy/WhatLeavesOverview";
@@ -39,6 +37,7 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
+import { DeidentificationProvidersSection } from "./DeidentificationProvidersSection";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
 
@@ -54,24 +53,26 @@ export function PrivacySettingsPanel() {
   const projects = allProjects.filter((project) => project.environmentId === primary);
   return (
     <SettingsPageContainer>
-      <SettingsSection id="privacy-masking" title={gt("Masking")}>
-        <div className="px-4 py-2">
-          {state.kind === "ready" ? (
-            <PrivacySetup status={state.status} onStatus={setPrivacyStatus} allowTurningOff />
-          ) : state.kind === "loading" ? (
-            <p className="py-2 text-sm text-muted-foreground">{gt("Checking…")}</p>
-          ) : (
-            <div className="flex items-center gap-3 py-2">
-              <p className="text-sm text-destructive">
-                {gt("Could not read the privacy settings.")}
-              </p>
-              <Button variant="outline" size="sm" onClick={refreshPrivacyStatus}>
-                {gt("Retry")}
-              </Button>
-            </div>
-          )}
-        </div>
-      </SettingsSection>
+      {state.kind === "ready" ? (
+        <DeidentificationProvidersSection status={state.status} />
+      ) : (
+        <SettingsSection {...searchableSetting("privacy-masking")}>
+          <div className="px-4 py-2">
+            {state.kind === "loading" ? (
+              <p className="py-2 text-sm text-muted-foreground">{gt("Checking…")}</p>
+            ) : (
+              <div className="flex items-center gap-3 py-2">
+                <p className="text-sm text-destructive">
+                  {gt("Could not read the privacy settings.")}
+                </p>
+                <Button variant="outline" size="sm" onClick={refreshPrivacyStatus}>
+                  {gt("Retry")}
+                </Button>
+              </div>
+            )}
+          </div>
+        </SettingsSection>
+      )}
       {state.kind === "ready" ? <WhatLeavesOverview status={state.status} /> : null}
       <ActivitySection />
       {state.kind === "ready" ? (
@@ -82,7 +83,13 @@ export function PrivacySettingsPanel() {
         />
       ) : null}
       <AdvancedSettings>
-        {state.kind === "ready" ? <WorkerSection status={state.status} /> : null}
+        {state.kind === "ready" ? (
+          // Its form is filled once, so a worker chosen above starts it again.
+          <WorkerSection
+            key={`${state.status.worker?.kind}|${state.status.worker?.address}|${state.status.worker?.model}`}
+            status={state.status}
+          />
+        ) : null}
         {state.kind === "ready" ? <EgressSection status={state.status} /> : null}
         {state.kind === "ready" ? <ProviderMaskingSection status={state.status} /> : null}
         {state.kind === "ready" ? <ImageHandlingSection status={state.status} /> : null}

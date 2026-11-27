@@ -240,6 +240,33 @@ export const layer = HttpApiBuilder.group(
         }),
       )
       .handle(
+        "providers",
+        Effect.fn("environment.privacy.providers")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          // Addresses and key names of the organisation's own services: a settings right.
+          yield* requireEnvironmentScope(AuthSettingsWriteScope);
+          return yield* privacy.providers;
+        }),
+      )
+      .handle(
+        "configureProvider",
+        Effect.fn("environment.privacy.configureProvider")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthSettingsWriteScope);
+          const result = yield* privacy.configureProvider(args.payload);
+          return { ...result, providers: yield* privacy.providers, status: yield* privacy.status };
+        }),
+      )
+      .handle(
+        "testProvider",
+        Effect.fn("environment.privacy.testProvider")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          // A test sends the stored keys to the address in the request.
+          yield* requireEnvironmentScope(AuthSettingsWriteScope);
+          return yield* privacy.testProvider(args.payload);
+        }),
+      )
+      .handle(
         "sealed",
         Effect.fn("environment.privacy.sealed")(function* (args) {
           yield* annotateEnvironmentRequest(args.endpoint.name);

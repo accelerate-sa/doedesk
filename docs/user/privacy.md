@@ -114,6 +114,26 @@ Names, organizations and addresses need a detection service. Choose one in the w
 - **Without masking.** Nothing is checked or replaced: messages and files reach the AI as
   written. You can turn masking on later in **Settings → Privacy**.
 
+### Choosing each service
+
+**Settings → Privacy** lists three services, and each is chosen on its own, with or without a
+DoeDesk Cloud account:
+
+- **Document reading** turns scanned pages and images into text: DoeDesk Cloud, Azure AI Document
+  Intelligence, DEEP.SA, Reducto, Mistral OCR, Google Cloud Document AI, AWS Textract, or your
+  own service.
+- **Entity detection** finds names, organizations and addresses: DoeDesk Cloud, Microsoft
+  Presidio, Azure AI Language, AWS Comprehend, Google Cloud Sensitive Data Protection, a model
+  behind an OpenAI-compatible address, or your own service. **Local rules only** sends nothing
+  anywhere and finds the fixed-format identifiers alone: names are not masked.
+- **Sealed files model** is the worker (see Who runs the worker).
+
+So you can stay signed in to DoeDesk Cloud for reading and use your own detection, or use no
+account at all. Text and files go only to the service chosen for that step. A service with an
+address or a key is asked one small test question before it is saved, and is not saved if it
+does not answer; **Test** asks again at any time. A key you saved is never shown again: leave
+its field empty to keep it.
+
 With a worker connected (see Sealed files), a second check can be switched on in **Settings →
 Privacy → Advanced**. The worker then reads each message before it is masked and finds reference numbers,
 districts and similar details that point to a person. Messages then go to the worker as written,
@@ -189,7 +209,8 @@ Seal a file where you meet it: right-click it in the folder's file list (or use 
 button) and choose **Seal…**, press the seal button in the header of an open file, or press
 **Seal** on a file or an image you attached to a message. A PDF or an image is read by your reading
 service first, as it is for masking, and the worker reads that text. With a DoeDesk Cloud
-account the reading service is DoeDesk Cloud, in Saudi Arabia, whichever worker you use. A file
+account the reading service is DoeDesk Cloud, in Saudi Arabia, whichever worker you use, unless
+you chose another under **Document reading**. A file
 you only mentioned with `@` is sealed from the file list or from its header. Before you confirm,
 DoeDesk tells you who will read the file: with your own server, its address; with DoeDesk
 Cloud's worker, your account's region and where the file's text is sent, with **Change** beside
@@ -326,14 +347,14 @@ measurements. The figures are in
 ### Who runs the worker
 
 The worker reads sealed files whole, with nothing masked. Choose who runs it in **Settings →
-Privacy → Advanced → Who reads sealed files**:
+Privacy**, under **Sealed files model** or **Advanced → Who reads sealed files**:
 
 - **My own server**: any address that supports the Chat Completions or Responses format, with a
   model name and, if the server asks for one, a key. Sealed files then go from your computer
   straight to that address and not to DoeDesk Cloud. That can be a model on your own machine,
   or a hosted service you have a key for; with a hosted service, sealed files go to that
-  service. If you are signed in to DoeDesk Cloud for masking, it still reads PDFs and images
-  when you seal them.
+  service. If DoeDesk Cloud is your reading service, it still reads PDFs and images when you
+  seal them.
 - **None**. Masking works as before and sealed files stay sealed; agents cannot ask about them
   until a worker is chosen again.
 - **DoeDesk Cloud**, for organizations. A worker that DoeDesk Cloud manages in your region is

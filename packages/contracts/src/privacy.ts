@@ -94,8 +94,33 @@ export type PrivacyWorkerStatus = typeof PrivacyWorkerStatus.Type;
 export const PrivacyEgressPolicy = Schema.Literals(["open", "allowlist", "closed"]);
 export type PrivacyEgressPolicy = typeof PrivacyEgressPolicy.Type;
 
+/**
+ * The three services masking is made of, each chosen on its own and none needing an account:
+ * reading documents, detecting personal data, and the model that reads sealed files.
+ */
+export const PrivacyService = Schema.Literals(["ocr", "detect", "worker"]);
+export type PrivacyService = typeof PrivacyService.Type;
+
+const PrivacyProviderId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64));
+
+/** A service's provider, and whether it can be used now. */
+export const PrivacyProviderState = Schema.Struct({
+  provider: PrivacyProviderId,
+  /** False: DoeDesk Cloud is the choice and no signed-in account has it. */
+  ready: Schema.Boolean,
+});
+export type PrivacyProviderState = typeof PrivacyProviderState.Type;
+
 export const PrivacyStatus = Schema.Struct({
   mode: PrivacyMode,
+  /** Which provider each service uses. Optional so a client can read an older server's answer. */
+  providers: Schema.optionalKey(
+    Schema.Struct({
+      ocr: PrivacyProviderState,
+      detect: PrivacyProviderState,
+      worker: PrivacyProviderState,
+    }),
+  ),
   /** The worker that reads sealed documents. Optional so a client can read an older server's answer. */
   worker: Schema.optionalKey(PrivacyWorkerStatus),
   /** The rule the person chose for hosts that are not AI hosts. */
@@ -557,6 +582,117 @@ export const PrivacyRedactionFile = Schema.Struct({
   ),
 });
 export type PrivacyRedactionFile = typeof PrivacyRedactionFile.Type;
+
+const PrivacyProviderSettingValue = Schema.Union([
+  Schema.String.check(Schema.isMaxLength(4096)),
+  Schema.Number,
+  Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(200)),
+]);
+
+/** A key, a token or a key file as text, or extra request headers by name. */
+const PrivacyProviderSecretValue = Schema.Union([
+  Schema.String.check(Schema.isMaxLength(16_384)),
+  Schema.Record(Schema.String, Schema.String.check(Schema.isMaxLength(4096))),
+]);
+
+/** One thing a provider asks for. A field under `secrets` is write-only. */
+export const PrivacyProviderField = Schema.Struct({
+  name: Schema.String,
+  in: Schema.Literals(["settings", "secrets"]),
+  /** The English label. A client words the fields it knows in its own language. */
+  label: Schema.String,
+  input: Schema.Literals(["text", "url", "secret", "select", "list", "number", "headers"]),
+  required: Schema.Boolean,
+  /** Fields that share a group stand in for each other: one of them must be filled in. */
+  oneOf: Schema.optionalKey(Schema.String),
+  options: Schema.optionalKey(Schema.Array(Schema.String)),
+  placeholder: Schema.optionalKey(Schema.String),
+  help: Schema.optionalKey(Schema.String),
+});
+export type PrivacyProviderField = typeof PrivacyProviderField.Type;
+
+export const PrivacyProviderCatalogEntry = Schema.Struct({
+  id: PrivacyProviderId,
+  label: Schema.String,
+  description: Schema.String,
+  fields: Schema.Array(PrivacyProviderField),
+  capabilities: Schema.Struct({
+    supportsLayoutPolygons: Schema.Boolean,
+    supportsPdf: Schema.Boolean,
+    supportsArabic: Schema.Boolean,
+    /** Runs on this computer or on a server the organisation hosts. */
+    offline: Schema.Boolean,
+  }),
+  docsUrl: Schema.optionalKey(Schema.String),
+});
+export type PrivacyProviderCatalogEntry = typeof PrivacyProviderCatalogEntry.Type;
+
+/** A service's choice as a settings screen may see it: each secret is only said to be set or not. */
+export const PrivacyProviderConfig = Schema.Struct({
+  provider: PrivacyProviderId,
+  settings: Schema.Record(Schema.String, PrivacyProviderSettingValue),
+  secretsSet: Schema.Record(Schema.String, Schema.Boolean),
+});
+export type PrivacyProviderConfig = typeof PrivacyProviderConfig.Type;
+
+const PrivacyProviderDetail = Schema.Struct({
+  config: PrivacyProviderConfig,
+  /** Every provider the service can be, with the fields each asks for. */
+  catalog: Schema.Array(PrivacyProviderCatalogEntry),
+});
+
+export const PrivacyProviders = Schema.Struct({
+  ocr: PrivacyProviderDetail,
+  detect: PrivacyProviderDetail,
+  worker: PrivacyProviderDetail,
+});
+export type PrivacyProviders = typeof PrivacyProviders.Type;
+
+/**
+ * A choice for one service. `settings` is every setting of the choice. `secrets` is only what
+ * changes: a secret left out stays as stored, and null removes it.
+ */
+export const PrivacyProviderRequest = Schema.Struct({
+  service: PrivacyService,
+  provider: PrivacyProviderId,
+  settings: Schema.optionalKey(Schema.Record(Schema.String, PrivacyProviderSettingValue)),
+  secrets: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.NullOr(PrivacyProviderSecretValue)),
+  ),
+});
+export type PrivacyProviderRequest = typeof PrivacyProviderRequest.Type;
+
+/** How a service answered a connection test. `message` is the server's own English. */
+export const PrivacyProviderHealth = Schema.Struct({
+  ok: Schema.Boolean,
+  kind: Schema.Literals([
+    "ok",
+    "auth",
+    "busy",
+    "timeout",
+    "unreachable",
+    "failing",
+    "refused",
+    "unreadable",
+    "misconfigured",
+  ]),
+  message: Schema.String,
+  host: Schema.optionalKey(Schema.String),
+  status: Schema.optionalKey(Schema.Number),
+  latencyMs: Schema.Number,
+});
+export type PrivacyProviderHealth = typeof PrivacyProviderHealth.Type;
+
+export const PrivacyProviderResult = Schema.Struct({
+  ok: Schema.Boolean,
+  /** Why the choice was not stored. Null when `ok`. */
+  message: Schema.NullOr(Schema.String),
+  /** How the service answered when it was asked before being stored. */
+  health: Schema.optionalKey(PrivacyProviderHealth),
+  providers: PrivacyProviders,
+  status: PrivacyStatus,
+});
+export type PrivacyProviderResult = typeof PrivacyProviderResult.Type;
 
 /** Connects, changes or removes the worker that reads sealed documents. */
 export const PrivacyWorkerRequest = Schema.Union([

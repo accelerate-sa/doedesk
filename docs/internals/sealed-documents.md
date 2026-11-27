@@ -487,9 +487,9 @@ worker calls. A choice without a passage is accepted after the worker has been a
   included: an older DoeDesk Cloud, one not deployed with it, a missing field. Without it the
   hosted worker is never the default and never offered, and the account region is hidden,
   since it governs nothing else.
-- Who reads sealed files is `workerKindOf` in `controller.ts`: the stored choice, or, with none
-  stored, the person's own server when one is stored, and DoeDesk Cloud's worker only for a
-  signed-in account that has it. A stored choice of the hosted worker on an account without it
+- Who reads sealed files is `workerKindOf` in `controller.ts`: the stored choice
+  (`providers.worker`, kept apart from the choices for reading and detection), or, with none
+  stored, DoeDesk Cloud's worker only for a signed-in account that has it. A stored choice of the hosted worker on an account without it
   reads as none, never as the person's own server: losing the worker must not send a sealed
   file anywhere the person did not choose. The files stay sealed, DoeDesk Cloud answers
   `worker_not_included` to a call made before the app knew, and that answer ends the batch and

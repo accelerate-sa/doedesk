@@ -710,7 +710,7 @@ describe("the worker that reads sealed documents", () => {
       message: null,
     });
     expect(hosted.controller.status().worker).toMatchObject({ kind: "off", address: null });
-    expect(hosted.stored().workerChoice).toBe("off");
+    expect(hosted.stored().providers.worker).toMatchObject({ provider: "off" });
 
     await using own = await makeController({
       mode: "cloud",
@@ -792,7 +792,10 @@ describe("the worker that reads sealed documents", () => {
       model: "gpt-oss-120b",
       reasoningEffort: "low",
     });
-    expect(own.stored().worker).toMatchObject({ reasoningEffort: "low", structured: "jsonSchema" });
+    expect(own.stored().providers.worker.settings).toMatchObject({
+      reasoningEffort: "low",
+      structured: "jsonSchema",
+    });
   });
 
   it("changes the account's region at DoeDesk Cloud, and does not hold the last region's failures against the new one", async () => {
@@ -948,7 +951,7 @@ describe("DoeDesk Cloud's worker for an account that does not have it", () => {
         message:
           "DoeDesk Cloud's worker is not included in this account. Connect your own server to read sealed files.",
       });
-      expect(harness.stored().workerChoice).toBeUndefined();
+      expect(harness.stored().providers?.worker).toBeUndefined();
       expect(harness.controller.workerOffered()).toBe(false);
       // A file sealed without a worker stays sealed, and asking about it sends nothing.
       expect(
@@ -1011,7 +1014,7 @@ describe("DoeDesk Cloud's worker for an account that does not have it", () => {
     });
     expect(harness.callsTo("POST /v1/worker/chat/completions")).toHaveLength(1);
     expect(harness.calls.every((call) => call.path.startsWith("/v1/"))).toBe(true);
-    expect(harness.stored().worker).toBeUndefined();
+    expect(harness.stored().providers?.worker).toBeUndefined();
 
     // DoeDesk Cloud's own word, read with the account, says the same.
     included = false;

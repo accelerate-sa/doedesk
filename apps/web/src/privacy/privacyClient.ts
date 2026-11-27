@@ -11,6 +11,10 @@ import type {
   PrivacyConfigureResult,
   PrivacyPreferenceRequest,
   PrivacyProfileRequest,
+  PrivacyProviderHealth,
+  PrivacyProviderRequest,
+  PrivacyProviderResult,
+  PrivacyProviders,
   PrivacyRedaction,
   PrivacySealedListing,
   PrivacySealedRequest,
@@ -433,6 +437,86 @@ export const configurePrivacyWorker = async (
   setPrivacyStatus(result.status);
   return result;
 };
+
+/**
+ * What the providers were read for: a change made elsewhere on the page, such as the worker in
+ * Advanced, reads them again.
+ */
+const providersKey = (status: PrivacyStatus): string =>
+  [
+    status.providers?.ocr.provider,
+    status.providers?.detect.provider,
+    status.providers?.worker.provider,
+    status.worker?.address,
+    status.worker?.model,
+  ].join("|");
+
+const providersReadsAtom = counter("privacy:providers-reads");
+const fetchedProvidersAtom = Atom.family((key: string) =>
+  Atom.make((get) => {
+    get(providersReadsAtom);
+    return Effect.promise(() =>
+      runPrimaryHttp(
+        PrimaryEnvironmentHttpClient.pipe(
+          Effect.flatMap((client) => client.privacy.providers({ headers: {} })),
+        ),
+      ),
+    );
+  }).pipe(Atom.withLabel(`privacy:providers:${key}`)),
+);
+
+// The server returns the providers with every change, so a change needs no second request.
+const changedProvidersAtom = Atom.make<{
+  readonly key: string;
+  readonly providers: PrivacyProviders;
+} | null>(null).pipe(Atom.keepAlive, Atom.withLabel("privacy:changed-providers"));
+
+export type PrivacyProvidersState =
+  | { readonly kind: "loading" }
+  | { readonly kind: "error" }
+  | { readonly kind: "ready"; readonly providers: PrivacyProviders };
+
+export const refreshPrivacyProviders = (): void => {
+  appAtomRegistry.set(changedProvidersAtom, null);
+  bump(providersReadsAtom);
+};
+
+/** The service chosen for reading, detection and sealed files, with what each can be. */
+export function usePrivacyProviders(status: PrivacyStatus): PrivacyProvidersState {
+  const key = providersKey(status);
+  const fetched = useAtomValue(fetchedProvidersAtom(key));
+  const changed = useAtomValue(changedProvidersAtom);
+  if (changed?.key === key) return { kind: "ready", providers: changed.providers };
+  if (AsyncResult.isSuccess(fetched)) return { kind: "ready", providers: fetched.value };
+  return AsyncResult.isFailure(fetched) ? { kind: "error" } : { kind: "loading" };
+}
+
+/** Chooses one service's provider. The other two, and the account, stay as they are. */
+export const configurePrivacyProvider = async (
+  payload: PrivacyProviderRequest,
+): Promise<PrivacyProviderResult> => {
+  const result = await runPrimaryHttp(
+    PrimaryEnvironmentHttpClient.pipe(
+      Effect.flatMap((client) => client.privacy.configureProvider({ headers: {}, payload })),
+    ),
+  );
+  appAtomRegistry.set(changedProvidersAtom, {
+    key: providersKey(result.status),
+    providers: result.providers,
+  });
+  setPrivacyStatus(result.status);
+  return result;
+};
+
+/** Asks a choice's service one small thing. Nothing is saved. */
+export const testPrivacyProvider = (
+  payload: PrivacyProviderRequest,
+): Promise<PrivacyProviderHealth> =>
+  runPrimaryHttp(
+    PrimaryEnvironmentHttpClient.pipe(
+      Effect.flatMap((client) => client.privacy.testProvider({ headers: {}, payload })),
+    ),
+  );
 
 const sealedReadsAtom = counter("privacy:sealed-reads");
 // Counted apart from changes made here: a sealed folder seals files on the server, unasked.

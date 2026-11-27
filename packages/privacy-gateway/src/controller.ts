@@ -2,12 +2,7 @@ import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
-import {
-  type Detector,
-  type DetectorProblem,
-  DetectorUnavailableError,
-  makeRemoteDetector,
-} from "./detect.ts";
+import { type Detector, type DetectorProblem, DetectorUnavailableError } from "./detect.ts";
 import type { EgressPolicy, GatewayOptions, GatewayRecord } from "./gateway.ts";
 import { fetchThrough, readHostNetwork } from "./upstream.ts";
 import {
@@ -17,17 +12,37 @@ import {
   USAGE_REPORTS_OFF_SWITCHES,
 } from "./index.ts";
 import type { ImageHandling } from "./attachments.ts";
-import { cacheReader, makeRemoteReader, type Reader, type ReaderUsage } from "./reader.ts";
+import {
+  DOEDESK_CLOUD,
+  mergeChoice,
+  migrateProviders,
+  plainChoice,
+  type ProviderChoiceInput,
+  providerCatalog,
+  type PublicProviderChoice,
+  publicChoice,
+  type ServiceKind,
+  type StoredProviderChoice,
+  type StoredProviders,
+} from "./providerChoices.ts";
+import type { ProviderCatalogEntry } from "./providers/catalog.ts";
+import { makeDetectProvider } from "./providers/detectProviders.ts";
+import { makeOcrProvider } from "./providers/ocrProviders.ts";
+import type {
+  DetectProviderConfig,
+  OcrProviderConfig,
+  ProviderHealthResult,
+  WorkerHealthResult,
+  WorkerProvider,
+  WorkerProviderConfig,
+} from "./providers/types.ts";
+import { makeWorkerProvider } from "./providers/workerProviders.ts";
+import { cacheReader, type Reader, type ReaderUsage } from "./reader.ts";
 import { type ImageRedactor, makeImageRedactor } from "./redaction/redactImage.ts";
 import { type RedactionFile, type RedactionRecord, RedactionStore } from "./redaction/store.ts";
 import { ProxyRefusal } from "./refusals.ts";
 import { kindOfStandIn, TurnLedger, type TurnTally } from "./turns.ts";
-import {
-  probeWorker,
-  type StructuredOutput,
-  type WorkerDriver,
-  type WorkerEndpoint,
-} from "./worker/client.ts";
+import type { StructuredOutput, WorkerDriver, WorkerEndpoint } from "./worker/client.ts";
 import type { FieldSpec } from "./worker/fields.ts";
 import { DEFAULT_SEAL_POLICY, type SealPolicy } from "./worker/seal.ts";
 import { makeSecondPassDetector } from "./worker/secondPass.ts";
@@ -75,7 +90,13 @@ import { sealedTurn, takeSealedTurn } from "./worker/turnActivity.ts";
  */
 const DEFAULT_IMAGE_HANDLING: "redacted" | "text" | "withheld" = "redacted";
 
+/**
+ * What the app is told. `cloud`: an account is signed in. `selfHosted`: nobody is signed in and
+ * detection is a service of the person's own. `unconfigured`: nothing can detect yet.
+ */
 export type PrivacyMode = "unconfigured" | "cloud" | "selfHosted" | "off";
+/** What is kept. Which services are used is kept apart from it, in `providers`. */
+type StoredMode = "unconfigured" | "cloud" | "off";
 
 export type SignInMethod = "phone" | "email";
 
@@ -121,22 +142,9 @@ interface HostedWorker {
   readonly locationLabel?: string;
 }
 
-/** The name sent as the model to DoeDesk Cloud, which replaces it with the region's own. */
-const HOSTED_WORKER_MODEL = "doedesk-worker";
 /** Told to the person who asks for DoeDesk Cloud's worker on an account that does not have it. */
 const HOSTED_WORKER_NOT_INCLUDED =
   "DoeDesk Cloud's worker is not included in this account. Connect your own server to read sealed files.";
-
-interface StoredWorker {
-  readonly kind: "custom";
-  readonly baseUrl: string;
-  readonly apiKey?: string;
-  readonly model: string;
-  readonly driver?: WorkerDriver;
-  readonly reasoningEffort?: string;
-  /** How this server takes a request for JSON, as found when it was connected. */
-  readonly structured?: StructuredOutput;
-}
 
 /** A sealed document may be this long: about the context a 128K-token worker can hold. */
 const MAX_SEALED_CHARACTERS = 320_000;
@@ -153,14 +161,13 @@ const READER_MEDIA_TYPES: Readonly<Record<string, string>> = {
 };
 
 interface StoredConfig {
-  readonly mode: PrivacyMode;
-  /** The person's own server that reads sealed documents. Unset: they have connected none. */
-  readonly worker?: StoredWorker;
+  readonly mode: StoredMode;
   /**
-   * Who the person chose to read sealed documents. Unset, they have not chosen: their own server
-   * when one is stored, DoeDesk Cloud's worker when an account is signed in, nobody otherwise.
+   * The service chosen for reading, for detection and for the worker, each with its secrets.
+   * Unset, reading and detection are DoeDesk Cloud's, and the worker is DoeDesk Cloud's where the
+   * signed-in account has it and nobody otherwise.
    */
-  readonly workerChoice?: WorkerKind;
+  readonly providers?: StoredProviders;
   /** The signed-in account's region, as DoeDesk Cloud last said. */
   readonly accountRegion?: AccountRegion;
   /** DoeDesk Cloud last said its hosted worker is included for this account. Unset: it is not. */
@@ -174,7 +181,7 @@ interface StoredConfig {
   readonly secondPass?: boolean;
   /** True: public web pages and search results are checked for new values too. Unset: not. */
   readonly checkWebResults?: boolean;
-  readonly endpoint?: string;
+  /** The signed-in account's token at DoeDesk Cloud. */
   readonly token?: string;
   /** The email, or the phone number with its middle hidden, of the signed-in account. */
   readonly accountLabel?: string;
@@ -315,8 +322,37 @@ export interface PrivacyAskInput {
   readonly program?: string | undefined;
 }
 
+/** A service's provider, and whether it can be used now. */
+export interface PrivacyProviderState {
+  readonly provider: string;
+  /** False: DoeDesk Cloud is the choice and no signed-in account has it. */
+  readonly ready: boolean;
+}
+
+/** A service as a settings screen shows it. */
+export interface PrivacyProviderDetail {
+  readonly config: PublicProviderChoice;
+  /** Every provider the service can be, with the fields each asks for. */
+  readonly catalog: ReadonlyArray<ProviderCatalogEntry<string>>;
+}
+
+export type PrivacyProviders = { readonly [Service in ServiceKind]: PrivacyProviderDetail };
+
+export interface PrivacyProviderInput extends ProviderChoiceInput {
+  readonly service: ServiceKind;
+}
+
+export interface PrivacyProviderOutcome {
+  readonly ok: boolean;
+  /** Why the choice was not stored, in words the person can act on. Null when `ok`. */
+  readonly message: string | null;
+  /** How the service answered when it was asked. Unset when it was not asked. */
+  readonly health?: ProviderHealthResult;
+}
+
 export interface PrivacyControllerStatus {
   readonly mode: PrivacyMode;
+  readonly providers: { readonly [Service in ServiceKind]: PrivacyProviderState };
   readonly worker: PrivacyWorkerStatus;
   /** The rule the person chose for hosts that are not AI hosts. Sealing does not change it. */
   readonly egress: {
@@ -562,6 +598,16 @@ export interface PrivacyController {
   readonly configureWorker: (
     input: PrivacyWorkerInput,
   ) => Promise<{ readonly ok: boolean; readonly message: string | null }>;
+  /** The three services as a settings screen shows them: no secret is part of it. */
+  readonly providers: () => PrivacyProviders;
+  /**
+   * Chooses the service for reading, for detection or for the worker, and leaves the other two
+   * as they are. A service with an address or a key is asked once first, and is not stored when
+   * it does not answer.
+   */
+  readonly configureProvider: (input: PrivacyProviderInput) => Promise<PrivacyProviderOutcome>;
+  /** Asks a choice's service one small thing without storing the choice. */
+  readonly testProvider: (input: PrivacyProviderInput) => Promise<ProviderHealthResult>;
   /** Whether agents are offered the tools that ask about sealed documents. */
   readonly workerOffered: () => boolean;
   /** Evaluation only: the worker answers in free text, with no checks. */
@@ -909,48 +955,50 @@ const hostedIncluded = (config: StoredConfig): boolean =>
  * person's own server: sealed files go nowhere the person did not choose.
  */
 const workerKindOf = (config: StoredConfig): WorkerKind => {
-  const choice =
-    config.workerChoice ??
-    (config.worker !== undefined ? "custom" : hostedIncluded(config) ? "cloud" : "off");
-  if (choice === "custom") return config.worker === undefined ? "off" : "custom";
-  if (choice === "cloud") return hostedIncluded(config) ? "cloud" : "off";
-  return "off";
+  const chosen = config.providers?.worker?.provider;
+  if (chosen === "openaiCompatible") return "custom";
+  if (chosen === "off") return "off";
+  return hostedIncluded(config) ? "cloud" : "off";
 };
+
+/** The person's own server for sealed documents, when that is what reads them. */
+const ownWorkerOf = (config: StoredConfig): StoredProviderChoice | undefined =>
+  workerKindOf(config) === "custom" ? config.providers?.worker : undefined;
 
 /** Which worker answers now, as the record of clear answers names it. Null: none. */
 const workerRouteOf = (config: StoredConfig): string | null => {
   const kind = workerKindOf(config);
   if (kind === "cloud") return config.accountRegion ?? "cloud";
-  if (kind !== "custom" || config.worker === undefined) return null;
+  const own = ownWorkerOf(config);
+  if (own === undefined) return null;
   try {
-    return `custom:${new URL(config.worker.baseUrl).host}`;
+    return `custom:${new URL(String(own.settings.baseUrl)).host}`;
   } catch {
     return "custom";
   }
 };
 
-/**
- * The person's own server as stored. Test builds could store a vendor preset, which has the
- * person's own key: it reads as their own server. Anything without an address reads as none.
- */
-const readWorker = (value: unknown): StoredWorker | undefined => {
-  const worker = asRecord(value);
-  if (typeof worker?.baseUrl !== "string" || typeof worker.model !== "string") return undefined;
-  return { ...(worker as unknown as StoredWorker), kind: "custom" };
-};
+/** Detection is a service of the person's own: it needs no account. */
+const ownDetection = (config: StoredConfig): boolean =>
+  config.providers?.detect !== undefined && config.providers.detect.provider !== DOEDESK_CLOUD;
 
 const readConfig = (filePath: string): StoredConfig => {
   try {
-    const parsed = JSON.parse(NodeFS.readFileSync(filePath, "utf8")) as Partial<StoredConfig>;
+    const parsed: unknown = JSON.parse(NodeFS.readFileSync(filePath, "utf8"));
+    const stored = asRecord(parsed);
     if (
-      parsed.mode === "cloud" ||
-      parsed.mode === "selfHosted" ||
-      parsed.mode === "off" ||
-      parsed.mode === "unconfigured"
+      stored !== undefined &&
+      (stored.mode === "cloud" ||
+        stored.mode === "selfHosted" ||
+        stored.mode === "off" ||
+        stored.mode === "unconfigured")
     ) {
-      const { worker: stored, ...rest } = parsed as StoredConfig;
-      const worker = readWorker(stored);
-      return worker === undefined ? rest : { ...rest, worker };
+      const { providers, rest } = migrateProviders(stored);
+      return {
+        ...(rest as unknown as StoredConfig),
+        mode: stored.mode === "selfHosted" ? "unconfigured" : stored.mode,
+        ...(Object.keys(providers).length === 0 ? {} : { providers }),
+      };
     }
   } catch {
     // Missing or unreadable: start unconfigured, which sends nothing.
@@ -1016,49 +1064,87 @@ export const startPrivacyController = async (
     return response;
   };
 
-  const detectorFor = (current: StoredConfig, retry = true): Detector => {
-    if (current.mode === "cloud" && current.token !== undefined) {
-      return makeRemoteDetector({
-        endpoint: cloudUrl,
-        token: current.token,
-        fetch: cloudFetch,
-        sleep: options.sleep,
-      });
+  const cloudToken = (current: StoredConfig): string | undefined =>
+    current.mode === "cloud" ? current.token : undefined;
+  /**
+   * The choice for reading or detection as its adapter takes it, or undefined when it cannot be
+   * used: DoeDesk Cloud's with nobody signed in. A stored choice was checked against the catalog
+   * when it was stored, so it is one of the adapter's own shapes.
+   */
+  const choiceOf = <Config extends OcrProviderConfig | DetectProviderConfig>(
+    current: StoredConfig,
+    stored: StoredProviderChoice | undefined,
+  ): Config | undefined => {
+    if (stored !== undefined && stored.provider !== DOEDESK_CLOUD) {
+      return stored as unknown as Config;
     }
-    if (current.mode === "selfHosted" && current.endpoint !== undefined) {
-      return makeRemoteDetector({
-        endpoint: current.endpoint,
-        token: current.token,
-        fetch: fetchImpl,
-        sleep: options.sleep,
-        ownService: true,
-        retry,
-      });
-    }
-    return { detect: () => Promise.reject(new DetectorUnavailableError(NOT_SET_UP)) };
+    const token = cloudToken(current);
+    return token === undefined
+      ? undefined
+      : ({
+          provider: DOEDESK_CLOUD,
+          settings: { endpoint: cloudUrl },
+          secrets: { token },
+        } as Config);
+  };
+  /** DoeDesk Cloud's answers are watched for the one that asks the account to accept the Terms. */
+  const fetchFor = (provider: string): typeof fetch =>
+    provider === DOEDESK_CLOUD ? cloudFetch : fetchImpl;
+
+  const detectProviderOf = (choice: DetectProviderConfig, retry = true) =>
+    makeDetectProvider(choice, { fetch: fetchFor(choice.provider), sleep: options.sleep, retry });
+  const ocrProviderOf = (choice: OcrProviderConfig) =>
+    makeOcrProvider(choice, { fetch: fetchFor(choice.provider), sleep: options.sleep, onRead });
+
+  const detectorFor = (current: StoredConfig): Detector => {
+    const choice =
+      current.mode === "off"
+        ? undefined
+        : choiceOf<DetectProviderConfig>(current, current.providers?.detect);
+    return choice === undefined
+      ? { detect: () => Promise.reject(new DetectorUnavailableError(NOT_SET_UP)) }
+      : detectProviderOf(choice);
   };
 
   const readerFor = (current: StoredConfig): Reader | undefined => {
-    if (current.mode === "cloud" && current.token !== undefined) {
-      return cacheReader(
-        makeRemoteReader({ endpoint: cloudUrl, token: current.token, fetch: cloudFetch, onRead }),
-      );
-    }
-    if (current.mode === "selfHosted" && current.endpoint !== undefined) {
-      return cacheReader(
-        makeRemoteReader({
-          endpoint: current.endpoint,
-          token: current.token,
-          fetch: fetchImpl,
-          onRead,
-        }),
-      );
-    }
-    return undefined;
+    const choice =
+      current.mode === "off"
+        ? undefined
+        : choiceOf<OcrProviderConfig>(current, current.providers?.ocr);
+    return choice === undefined ? undefined : cacheReader(ocrProviderOf(choice));
   };
+
+  /** The worker's choice as its adapter takes it: DoeDesk Cloud's, the person's own, or none. */
+  const workerChoiceOf = (current: StoredConfig): WorkerProviderConfig => {
+    const kind = workerKindOf(current);
+    const hosted = current.hostedWorker;
+    if (kind === "cloud") {
+      // DoeDesk Cloud sends it on to the upstream for the account's region, which it alone knows.
+      return {
+        provider: DOEDESK_CLOUD,
+        settings: {
+          endpoint: cloudUrl,
+          ...(hosted?.structured == null ? {} : { structured: hosted.structured }),
+          ...(typeof hosted?.parallel === "number"
+            ? { parallel: hosted.parallel, maxWaitSeconds: hosted.maxWaitSeconds ?? 0 }
+            : {}),
+        },
+        secrets: { token: current.token ?? "" },
+      };
+    }
+    const own = ownWorkerOf(current);
+    return own === undefined
+      ? { provider: "off", settings: {}, secrets: {} }
+      : (own as unknown as WorkerProviderConfig);
+  };
+  const workerFor = (current: StoredConfig): WorkerProvider =>
+    makeWorkerProvider(workerChoiceOf(current), { fetch: fetchImpl });
 
   let detector = detectorFor(config);
   let reader = readerFor(config);
+  let workerProvider = workerFor(config);
+  /** The worker's own `fetch`: it adds what an endpoint's address cannot carry. */
+  const workerFetch: typeof fetch = (input, init) => workerProvider.fetch(input, init);
   // Redacted images and masked texts of recent attachments, for the user to download. A store
   // on disk that this feature adds: see redaction/store.ts for what it holds and for how long.
   const redactionStore = new RedactionStore(NodePath.join(options.dataDirectory, "redactions"));
@@ -1263,8 +1349,9 @@ export const startPrivacyController = async (
     ]);
 
   /**
-   * What stays when the detection service changes: answers and per-provider choices. Nothing that
-   * belongs to the account stays: its identifier, its acceptance and its answers go with it.
+   * What stays when the account changes: answers, per-provider choices and the three services.
+   * Nothing that belongs to the account stays: its identifier, its acceptance and its answers go
+   * with it.
    */
   const keptAnswers = (): Partial<StoredConfig> => ({
     ...(config.profileAnswered === true ? { profileAnswered: true } : {}),
@@ -1274,8 +1361,7 @@ export const startPrivacyController = async (
     ...(config.usageReports === undefined ? {} : { usageReports: config.usageReports }),
     ...(config.imageHandling === undefined ? {} : { imageHandling: config.imageHandling }),
     ...(config.readingTool === undefined ? {} : { readingTool: config.readingTool }),
-    ...(config.worker === undefined ? {} : { worker: config.worker }),
-    ...(config.workerChoice === undefined ? {} : { workerChoice: config.workerChoice }),
+    ...(config.providers === undefined ? {} : { providers: config.providers }),
     ...(config.egress === undefined ? {} : { egress: config.egress }),
     ...(config.sealing === undefined ? {} : { sealing: config.sealing }),
     ...(config.secondPass === undefined ? {} : { secondPass: config.secondPass }),
@@ -1291,8 +1377,11 @@ export const startPrivacyController = async (
     config = next;
     detector = detectorFor(next);
     reader = readerFor(next);
+    workerProvider = workerFor(next);
     NodeFS.mkdirSync(options.dataDirectory, { recursive: true, mode: 0o700 });
     NodeFS.writeFileSync(configPath, JSON.stringify(next), { mode: 0o600 });
+    // The mode above is only given to a new file, and this one now holds the services' keys.
+    NodeFS.chmodSync(configPath, 0o600);
     if (routingKey(next) !== routingBefore) {
       options.onRoutingChange?.(
         (provider) =>
@@ -1742,6 +1831,18 @@ export const startPrivacyController = async (
     }
   };
 
+  /** Changes one service's choice and leaves the other two as they are. */
+  const withProvider = (service: ServiceKind, choice: StoredProviderChoice): StoredConfig => ({
+    ...config,
+    providers: { ...config.providers, [service]: choice },
+  });
+
+  /**
+   * One's own service that speaks DoeDesk's contract, for detection and for reading at once, in
+   * place of an account: what the welcome page and the Terms sheet offer. It signs the account
+   * out, which is the way out of a sheet that waits for the Terms. `configureProvider` changes one
+   * service and keeps the account.
+   */
   const connectSelfHosted = async (
     input: Extract<PrivacyConfigureInput, { mode: "selfHosted" }>,
   ): Promise<PrivacyConfigureOutcome> => {
@@ -1755,14 +1856,15 @@ export const startPrivacyController = async (
         problem: { kind: "address" },
       };
     }
-    const next: StoredConfig = {
-      mode: "selfHosted",
-      endpoint: endpoint.toString().replace(/\/+$/, ""),
-      ...(input.token ? { token: input.token } : {}),
-      ...keptAnswers(),
+    const own: StoredProviderChoice = {
+      provider: "custom",
+      settings: { endpoint: endpoint.toString().replace(/\/+$/, "") },
+      secrets: input.token ? { token: input.token } : {},
     };
     try {
-      await detectorFor(next, false).detect(["Connection test."]);
+      await detectProviderOf(own as unknown as DetectProviderConfig, false).detect([
+        "Connection test.",
+      ]);
     } catch (cause) {
       return {
         ok: false,
@@ -1773,48 +1875,23 @@ export const startPrivacyController = async (
       };
     }
     await signOut();
-    apply(next);
+    const kept = keptAnswers();
+    apply({
+      mode: "unconfigured",
+      ...kept,
+      providers: { ...kept.providers, detect: own, ocr: own },
+    });
     return { ok: true, message: null };
   };
 
   const signedIn = () => config.mode === "cloud";
 
-  const endpointOf = (worker: StoredWorker): WorkerEndpoint => ({
-    baseUrl: worker.baseUrl,
-    apiKey: worker.apiKey,
-    model: worker.model,
-    driver: worker.driver ?? "chatCompletions",
-    structured: worker.structured ?? "jsonSchema",
-    ...(worker.reasoningEffort === undefined ? {} : { reasoningEffort: worker.reasoningEffort }),
-  });
   /** The worker to call now: DoeDesk Cloud's, the person's own server, or none. */
-  const workerEndpoint = (): WorkerEndpoint | undefined => {
-    const kind = workerKindOf(config);
-    if (kind === "custom")
-      return config.worker === undefined ? undefined : endpointOf(config.worker);
-    if (kind !== "cloud") return undefined;
-    // DoeDesk Cloud sends it on to the upstream for the account's region, which it alone knows.
-    return {
-      baseUrl: `${cloudUrl}/v1/worker`,
-      apiKey: config.token,
-      model: HOSTED_WORKER_MODEL,
-      driver: "chatCompletions",
-      structured: config.hostedWorker?.structured ?? "jsonSchema",
-      // DoeDesk Cloud queues calls for everyone in the region and says how many it takes at once.
-      ...(typeof config.hostedWorker?.parallel === "number"
-        ? {
-            queue: {
-              parallel: config.hostedWorker.parallel,
-              maxWaitMs: (config.hostedWorker.maxWaitSeconds ?? 0) * 1000,
-            },
-          }
-        : {}),
-    };
-  };
+  const workerEndpoint = (): WorkerEndpoint | undefined => workerProvider.endpoint;
   secondPass = makeSecondPassDetector({
     endpoint: () => workerEndpoint(),
     cachePath: NodePath.join(options.dataDirectory, "second-pass-cache.json"),
-    fetch: fetchImpl,
+    fetch: workerFetch,
     onCall: (call) => logEvent({ type: "second_pass", ...call }),
   });
   const sealPolicy = (): SealPolicy => ({ ...DEFAULT_SEAL_POLICY, ...config.sealing });
@@ -1837,7 +1914,7 @@ export const startPrivacyController = async (
     // DoeDesk Cloud can change a region's model without the region changing.
     model: () => (workerKindOf(config) === "cloud" ? (config.hostedWorker?.model ?? null) : null),
     policy: sealPolicy,
-    fetch: fetchImpl,
+    fetch: workerFetch,
     readLater: (project, handle) => readSealed(project, handle).then(() => undefined),
     // Nothing is sent for a region with no worker. DoeDesk Cloud may have begun to offer one since
     // the account was last read, so it is read again first, once a minute at most.
@@ -1872,18 +1949,54 @@ export const startPrivacyController = async (
     servedFrom = null;
   };
 
+  /** Why DoeDesk Cloud's worker cannot be chosen now, or null when it can. */
+  const hostedWorkerRefusal = (): string | null =>
+    !signedIn()
+      ? "Sign in to DoeDesk Cloud first to use its worker."
+      : hostedIncluded(config)
+        ? null
+        : HOSTED_WORKER_NOT_INCLUDED;
+
+  /**
+   * Asks the person's own server one question that holds nothing confidential, and gives the
+   * choice to store: with how the server takes JSON, and the reasoning setting it accepted.
+   */
+  const probedWorker = async (
+    choice: StoredProviderChoice,
+  ): Promise<{ readonly health: WorkerHealthResult; readonly choice: StoredProviderChoice }> => {
+    const { structured: _structured, ...unprobed } = choice.settings;
+    const health = await makeWorkerProvider(
+      { ...choice, settings: unprobed } as unknown as WorkerProviderConfig,
+      { fetch: fetchImpl },
+    ).testConnection();
+    if (!health.ok) return { health, choice };
+    // The server refused the reasoning setting typed and took another: that one is kept.
+    const { reasoningEffort: _refused, ...withoutEffort } = unprobed;
+    const taken =
+      health.reasoningEffort === undefined
+        ? unprobed
+        : health.reasoningEffort === null
+          ? withoutEffort
+          : { ...withoutEffort, reasoningEffort: health.reasoningEffort };
+    return {
+      health,
+      choice: {
+        ...choice,
+        settings: {
+          ...taken,
+          ...(health.structured === undefined ? {} : { structured: health.structured }),
+        },
+      },
+    };
+  };
+
   const configureWorker = async (
     input: PrivacyWorkerInput,
   ): Promise<{ readonly ok: boolean; readonly message: string | null }> => {
     if (input.kind === "off" || input.kind === "cloud") {
-      if (input.kind === "cloud" && !signedIn()) {
-        return { ok: false, message: "Sign in to DoeDesk Cloud first to use its worker." };
-      }
-      if (input.kind === "cloud" && !hostedIncluded(config)) {
-        return { ok: false, message: HOSTED_WORKER_NOT_INCLUDED };
-      }
-      const { worker: _worker, ...rest } = config;
-      apply({ ...rest, workerChoice: input.kind });
+      const refusal = input.kind === "cloud" ? hostedWorkerRefusal() : null;
+      if (refusal !== null) return { ok: false, message: refusal };
+      apply(withProvider("worker", plainChoice(input.kind === "cloud" ? DOEDESK_CLOUD : "off")));
       return { ok: true, message: null };
     }
     let address: URL;
@@ -1896,30 +2009,26 @@ export const startPrivacyController = async (
       };
     }
     if (input.model.trim().length === 0) return { ok: false, message: "Enter the model's name." };
-    const next: StoredWorker = {
-      kind: "custom",
-      baseUrl: address.toString().replace(/\/+$/, ""),
-      ...(input.apiKey?.trim() ? { apiKey: input.apiKey.trim() } : {}),
-      model: input.model.trim(),
-      driver: input.driver,
-      ...(input.reasoningEffort?.trim() ? { reasoningEffort: input.reasoningEffort.trim() } : {}),
-    };
-    const { structured: _structured, ...unprobed } = endpointOf(next);
-    const probe = await probeWorker(unprobed, fetchImpl);
-    if (!probe.ok) return { ok: false, message: probe.message };
-    // The server refused the reasoning setting typed and took another: that one is kept.
-    const { reasoningEffort: _refused, ...withoutEffort } = next;
-    const taken =
-      probe.reasoningEffort === undefined
-        ? next
-        : probe.reasoningEffort === null
-          ? withoutEffort
-          : { ...withoutEffort, reasoningEffort: probe.reasoningEffort };
-    apply({
-      ...config,
-      workerChoice: "custom",
-      worker: { ...taken, structured: probe.structured },
+    // This form has no fields for these, so what was stored for the same server stays.
+    const stored = ownWorkerOf(config);
+    const { authScheme, apiVersion } = stored?.settings ?? {};
+    const probed = await probedWorker({
+      provider: "openaiCompatible",
+      settings: {
+        baseUrl: address.toString().replace(/\/+$/, ""),
+        model: input.model.trim(),
+        driver: input.driver,
+        ...(input.reasoningEffort?.trim() ? { reasoningEffort: input.reasoningEffort.trim() } : {}),
+        ...(authScheme === undefined ? {} : { authScheme }),
+        ...(apiVersion === undefined ? {} : { apiVersion }),
+      },
+      secrets: {
+        ...(input.apiKey?.trim() ? { apiKey: input.apiKey.trim() } : {}),
+        ...(stored?.secrets.headers === undefined ? {} : { headers: stored.secrets.headers }),
+      },
     });
+    if (!probed.health.ok) return { ok: false, message: probed.health.message };
+    apply(withProvider("worker", probed.choice));
     return { ok: true, message: null };
   };
 
@@ -1930,8 +2039,8 @@ export const startPrivacyController = async (
   const hostedNotIncluded = (): boolean =>
     signedIn() &&
     !hostedIncluded(config) &&
-    (config.workerChoice === "cloud" ||
-      (config.workerChoice === undefined && config.worker === undefined && sealedCount() > 0));
+    (config.providers?.worker?.provider === DOEDESK_CLOUD ||
+      (config.providers?.worker === undefined && sealedCount() > 0));
 
   const workerStatus = (): PrivacyWorkerStatus => {
     const endpoint = workerEndpoint();
@@ -1949,6 +2058,113 @@ export const startPrivacyController = async (
       busy: sealedWorker.busy(),
       notIncluded: hostedNotIncluded(),
     };
+  };
+
+  /** What is told for a service: the stored choice, or the one that is used when none is. */
+  const chosenProvider = (service: ServiceKind): StoredProviderChoice => {
+    const stored = config.providers?.[service];
+    if (service !== "worker") return stored ?? plainChoice(DOEDESK_CLOUD);
+    const kind = workerKindOf(config);
+    // A stored choice of DoeDesk Cloud's worker stays the choice while the account lacks it.
+    if (stored !== undefined && kind !== "custom") return plainChoice(stored.provider);
+    return stored ?? plainChoice(kind === "cloud" ? DOEDESK_CLOUD : "off");
+  };
+  /** Whether a service's choice can be used now. DoeDesk Cloud's needs an account that has it. */
+  const providerReady = (service: ServiceKind): boolean => {
+    if (chosenProvider(service).provider !== DOEDESK_CLOUD) return true;
+    return service === "worker" ? hostedIncluded(config) : cloudToken(config) !== undefined;
+  };
+  const providerState = (service: ServiceKind): PrivacyProviderState => ({
+    provider: chosenProvider(service).provider,
+    ready: providerReady(service),
+  });
+  const providerDetail = (service: ServiceKind): PrivacyProviderDetail => ({
+    config: publicChoice(service, chosenProvider(service)),
+    catalog: providerCatalog(service),
+  });
+  const modeOf = (current: StoredConfig): PrivacyMode =>
+    current.mode === "unconfigured" && ownDetection(current) ? "selfHosted" : current.mode;
+  /** Where the person's own detection service is, when it has an address of its own. */
+  const ownDetectionAddress = (): string | null => {
+    const settings = config.providers?.detect?.settings ?? {};
+    const address = settings.endpoint ?? settings.baseUrl;
+    return typeof address === "string" ? address : null;
+  };
+
+  const NOT_SIGNED_IN_HEALTH: ProviderHealthResult = {
+    ok: false,
+    kind: "auth",
+    message: "Sign in to DoeDesk Cloud to use it.",
+    latencyMs: 0,
+  };
+  /**
+   * Asks a choice's service one small thing and says how it went. Nothing is stored. For the
+   * person's own worker the choice comes back as it is to be stored.
+   */
+  const checkProvider = async (
+    service: ServiceKind,
+    choice: StoredProviderChoice,
+  ): Promise<{ readonly health: ProviderHealthResult; readonly choice: StoredProviderChoice }> => {
+    if (service === "worker") {
+      if (choice.provider === "openaiCompatible") return probedWorker(choice);
+      const refusal = choice.provider === DOEDESK_CLOUD ? hostedWorkerRefusal() : null;
+      if (refusal !== null) {
+        const kind = signedIn() ? "refused" : "auth";
+        return { health: { ...NOT_SIGNED_IN_HEALTH, kind, message: refusal }, choice };
+      }
+      const provider =
+        choice.provider === DOEDESK_CLOUD
+          ? workerFor({ ...config, providers: { ...config.providers, worker: choice } })
+          : makeWorkerProvider({ provider: "off", settings: {}, secrets: {} });
+      return { health: await provider.testConnection(), choice };
+    }
+    const stored = choice.provider === DOEDESK_CLOUD ? undefined : choice;
+    if (service === "detect") {
+      const taken = choiceOf<DetectProviderConfig>(config, stored);
+      if (taken === undefined) return { health: NOT_SIGNED_IN_HEALTH, choice };
+      return { health: await detectProviderOf(taken, false).testConnection(), choice };
+    }
+    const taken = choiceOf<OcrProviderConfig>(config, stored);
+    if (taken === undefined) return { health: NOT_SIGNED_IN_HEALTH, choice };
+    return { health: await ocrProviderOf(taken).testConnection(), choice };
+  };
+
+  const misconfigured = (message: string): ProviderHealthResult => ({
+    ok: false,
+    kind: "misconfigured",
+    message,
+    latencyMs: 0,
+  });
+  const testProvider: PrivacyController["testProvider"] = async (input) => {
+    const merged = mergeChoice(input.service, input, config.providers?.[input.service]);
+    if (!merged.ok) return misconfigured(merged.message);
+    return (await checkProvider(input.service, merged.choice)).health;
+  };
+  const configureProvider: PrivacyController["configureProvider"] = async (input) => {
+    const { service } = input;
+    const merged = mergeChoice(service, input, config.providers?.[service]);
+    if (!merged.ok) return { ok: false, message: merged.message };
+    let { choice } = merged;
+    if (service === "worker" && choice.provider === DOEDESK_CLOUD) {
+      const refusal = hostedWorkerRefusal();
+      if (refusal !== null) return { ok: false, message: refusal };
+    }
+    // A service with something to fill in is asked once before it is used: detection that does
+    // not answer refuses every request to a model.
+    const filledIn = providerCatalog(service).some(
+      (entry) => entry.id === choice.provider && entry.fields.length > 0,
+    );
+    if (filledIn) {
+      const checked = await checkProvider(service, choice);
+      if (!checked.health.ok) {
+        return { ok: false, message: checked.health.message, health: checked.health };
+      }
+      choice = checked.choice;
+      apply(withProvider(service, choice));
+      return { ok: true, message: null, health: checked.health };
+    }
+    apply(withProvider(service, choice));
+    return { ok: true, message: null };
   };
 
   const documentText: PrivacyController["documentText"] = async (name, bytes) => {
@@ -2161,6 +2377,13 @@ export const startPrivacyController = async (
   return {
     documentText,
     configureWorker,
+    providers: () => ({
+      ocr: providerDetail("ocr"),
+      detect: providerDetail("detect"),
+      worker: providerDetail("worker"),
+    }),
+    configureProvider,
+    testProvider,
     // Where DoeDesk Cloud's worker is included it is there without a choice, so its tools wait for
     // something to be sealed or for the person to choose it. A worker the person connected is
     // offered at once.
@@ -2168,7 +2391,7 @@ export const startPrivacyController = async (
       gateway !== undefined &&
       config.mode !== "off" &&
       sealedWorker.connected() &&
-      (config.workerChoice !== undefined || config.worker !== undefined || sealedCount() > 0),
+      (config.providers?.worker !== undefined || sealedCount() > 0),
     workerFreeText: () => evaluation.workerFreeText === true,
     sealDocument,
     sealedListing: (project) => {
@@ -2350,7 +2573,12 @@ export const startPrivacyController = async (
     askDocumentsFreeText: (input) => sealedWorker.askFreeText(input),
     fillSealed: (project, name, template) => sealedWorker.fill(project, name, template),
     status: () => ({
-      mode: config.mode,
+      mode: modeOf(config),
+      providers: {
+        ocr: providerState("ocr"),
+        detect: providerState("detect"),
+        worker: providerState("worker"),
+      },
       worker: workerStatus(),
       egress: {
         policy: egressPolicy(),
@@ -2363,7 +2591,7 @@ export const startPrivacyController = async (
       webResultsChecked: config.checkWebResults === true,
       active: gateway !== undefined && config.mode !== "off",
       accountLabel: signedIn() ? (config.accountLabel ?? null) : null,
-      endpoint: config.mode === "selfHosted" ? (config.endpoint ?? null) : null,
+      endpoint: modeOf(config) === "selfHosted" ? ownDetectionAddress() : null,
       vaultSize: gateway?.vault.size ?? 0,
       problem:
         problem ??
@@ -2460,10 +2688,22 @@ export const startPrivacyController = async (
         case "selfHosted":
           return connectSelfHosted(input);
         case "off":
-        case "unconfigured":
           await signOut();
-          apply({ mode: input.mode, ...keptAnswers() });
+          apply({ mode: "off", ...keptAnswers() });
           return { ok: true, message: null };
+        case "unconfigured": {
+          const kept = keptAnswers();
+          // Signing out, or turning masking on again: the three services stay as chosen.
+          if (config.mode !== "unconfigured") {
+            await signOut();
+            apply({ mode: "unconfigured", ...kept });
+            return { ok: true, message: null };
+          }
+          // Nobody is signed in: this disconnects the person's own detection and reading.
+          const { ocr: _ocr, detect: _detect, ...others } = kept.providers ?? {};
+          apply({ mode: "unconfigured", ...kept, providers: others });
+          return { ok: true, message: null };
+        }
       }
     },
     signIn,
@@ -2507,7 +2747,7 @@ export const startPrivacyController = async (
     sealedTurn: (id) => sealedTurn(sealedStore, id),
     knownValues: (runIds) => {
       const vault = gateway?.vault;
-      if (vault === undefined || config.mode === "off" || config.mode === "unconfigured") {
+      if (vault === undefined || modeOf(config) === "off" || modeOf(config) === "unconfigured") {
         return { values: [], turns: [] };
       }
       const kept = (runIds ?? []).flatMap((runId) => {
@@ -2530,7 +2770,11 @@ export const startPrivacyController = async (
       return { values, turns: kept };
     },
     readMasked: async (bytes, mediaType) => {
-      if (config.mode === "off" || config.mode === "unconfigured" || maskingGateway === undefined) {
+      if (
+        modeOf(config) === "off" ||
+        modeOf(config) === "unconfigured" ||
+        maskingGateway === undefined
+      ) {
         return { ok: false, message: "DoeDesk privacy is not active, so nothing was read." };
       }
       if (config.readingTool === false) {
