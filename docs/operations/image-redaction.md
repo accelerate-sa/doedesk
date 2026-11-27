@@ -122,19 +122,14 @@ mentions, none legible. With none in 182, the rate could still be as high as abo
   reason. Above that height the same failure is possible and was not seen in the corpus.
 - **Parts of letters.** Up to 0.18% of sensitive ink: a letter of an account's country code
   run into the previous word, the first stroke of an Arabic name, a title before a name.
-- **Faces, ID photos, signatures, logos, drawings, maps.** Not covered. Nothing looks for them.
-- **QR codes and barcodes.** Not looked for. Rule 6 covered both in the one test card that had
-  them, because they are rows of small marks; that is a side effect, not a promise.
-- **PDFs** are not sent as images. They stay on the text path: see below.
+- **Faces, ID photos, signatures, logos, drawings, maps.** Not covered automatically; users can draw manual de-identification regions over them in the De-identification Studio.
+- **QR codes and barcodes.** Decoded locally (`packages/privacy-gateway/src/redaction/barcodes.ts`, `zxing-wasm`) on every image and rendered PDF page. Codes carrying personal/account identifiers, Saudi ZATCA TLV payloads, or document-verification links are covered automatically; benign codes are left open and reported so the user can override them in the Studio.
+- **PDFs.** Rendered locally to page images (`packages/privacy-gateway/src/deidentify/pdfPages.ts`, `pdfjs-dist` + `@napi-rs/canvas`) instead of trusting PDF text layers, then run through the same OCR, barcode, and manual region pipeline and rebuilt into a scrubbed multi-page PDF.
 - **Vertical writing in scripts other than upright Latin letters and digits** was not tested.
 
 ## PDFs
 
-A PDF is still replaced by its masked text. To send pages as redacted images each page has to be
-drawn on this computer and then treated as an image; the PDF's own text layer can differ from
-what the page shows and must never be the basis of a box. That needs a PDF renderer in the
-server, which it does not have, and costs two reader pages and about 1,500 model tokens a page.
-Not built. The reading tool covers the case where an agent needs a scan's text.
+File de-identification renders each PDF page locally as a picture (`pdfPages.ts`) rather than extracting the PDF text layer—avoiding reversed Arabic glyph streams, missing AcroForm field values, and embedded stamps/signatures. Each page runs through the same OCR layout, local QR/barcode scan, and manual region canvas as images, and exports as a scrubbed multi-page PDF of images.
 
 ## The reading tool
 

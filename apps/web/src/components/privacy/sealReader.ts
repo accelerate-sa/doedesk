@@ -74,8 +74,12 @@ export const managedWorkerNote = (
     );
   }
   if (status.hostedWorkerEntitled === true) return null;
-  // Only an account that masks through DoeDesk Cloud is told so.
-  return status.mode === "cloud"
+  // Only an account whose entity detection runs through DoeDesk Cloud is told so.
+  const cloudDetect =
+    status.providers !== undefined
+      ? status.providers.detect.provider === "doedeskCloud"
+      : status.mode === "cloud";
+  return cloudDetect
     ? resolve(
         msg(
           "Masking runs automatically on DoeDesk Cloud. Sealed files are read by a separate model you connect here. On your own computer or company server, they are read on hardware you control; under an API key, they go to that service. Organizations without their own model hardware yet can ask for a managed in-region worker at hello@doedesk.com.",
@@ -287,7 +291,10 @@ const readFirstSentence = (
   resolve: MessageResolver,
 ): string | null => {
   if (readFirst <= 0) return null;
-  const cloud = status.mode === "cloud";
+  const cloud =
+    status.providers !== undefined
+      ? status.providers.ocr.provider === "doedeskCloud"
+      : status.mode === "cloud";
   if (subject.kind === "file") {
     return cloud
       ? resolve(

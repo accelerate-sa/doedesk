@@ -25,9 +25,15 @@ import {
 import { ConsentBlock, ConsentLanguageSwitch, ConsentSentence } from "./ConsentText";
 import { OwnServiceForm } from "./PrivacySetup";
 
-/** True when the signed-in account has not accepted the Terms of Use required now. */
+const usesCloudService = (status: PrivacyStatus): boolean =>
+  status.providers === undefined ||
+  status.providers.ocr.provider === "doedeskCloud" ||
+  status.providers.detect.provider === "doedeskCloud" ||
+  status.providers.worker.provider === "doedeskCloud";
+
+/** True when the signed-in account uses DoeDesk Cloud and has not accepted the Terms of Use required now. */
 export const termsAcceptanceDue = (status: PrivacyStatus): boolean =>
-  status.mode === "cloud" && status.acceptance?.outstanding === true;
+  status.mode === "cloud" && status.acceptance?.outstanding === true && usesCloudService(status);
 
 /**
  * Asks a signed-in account to accept the Terms of Use: an account from before the checkbox

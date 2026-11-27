@@ -1,18 +1,10 @@
 import type { PrivacySealedListing, PrivacyStatus } from "@t3tools/contracts";
-import { page, userEvent } from "vite-plus/test/browser";
+import { userEvent } from "vite-plus/test/browser";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { render } from "../../../test/render";
 import { EgressSection, SealedDocumentsSection, WorkerSection } from "./SealedWorker";
-import {
-  egressOf,
-  parseHosts,
-  WORKER_CHOICES,
-  workerChoicesFor,
-  workerOf,
-  workerRequest,
-} from "./SealedWorker.logic";
-import { m } from "~/i18n/messages";
+import { egressOf, parseHosts, workerOf, workerRequest } from "./SealedWorker.logic";
 import { useSealPrompt } from "~/privacy/sealPrompt";
 
 const client = vi.hoisted(() => ({
@@ -74,22 +66,6 @@ describe("the worker's settings", () => {
       },
     });
     expect(workerRequest({ ...form, model: "" })).toEqual({ problem: "Enter the model's name." });
-    // The person's own server leads; DoeDesk Cloud's worker is offered only to a signed-in account that has it.
-    expect(WORKER_CHOICES.map((choice) => m(choice.label))).toEqual([
-      "My own server",
-      "DoeDesk Cloud",
-      "None",
-    ]);
-    expect(workerChoicesFor(status()).map((choice) => choice.value)).toEqual(["custom", "off"]);
-    expect(workerChoicesFor(status({ mode: "cloud" })).map((choice) => choice.value)).toEqual([
-      "custom",
-      "off",
-    ]);
-    expect(
-      workerChoicesFor(status({ mode: "cloud", hostedWorkerEntitled: true })).map(
-        (choice) => choice.value,
-      ),
-    ).toEqual(["custom", "cloud", "off"]);
     expect(workerRequest({ ...form, kind: "cloud" })).toEqual({ request: { kind: "cloud" } });
     // A server from before the worker existed reports no worker and an open rule.
     expect(workerOf(status()).kind).toBe("off");
@@ -99,9 +75,8 @@ describe("the worker's settings", () => {
     ).toEqual(["github.com", "registry.npmjs.org"]);
   });
 
-  it("says where sealed documents go before anything is connected", async () => {
+  it("shows sealed-file disclosure, status, and second-check switch without duplicating the provider picker", async () => {
     setup();
-    client.configurePrivacyWorker.mockResolvedValue({ ok: true, message: null, status: status() });
     await using screen = await render(
       <WorkerSection
         status={status({
@@ -112,7 +87,7 @@ describe("the worker's settings", () => {
             driver: "chatCompletions",
             reasoningEffort: null,
             available: true,
-            servedFrom: null,
+            servedFrom: "dmm",
           },
         })}
       />,
@@ -134,15 +109,20 @@ describe("the worker's settings", () => {
         ),
       )
       .toBeInTheDocument();
-    await userEvent.fill(screen.getByLabelText("Model"), "qwen3.8");
-    await userEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await expect.element(screen.getByText("Connected.")).toBeInTheDocument();
+    await expect.element(screen.getByText("Model: qwen3.")).toBeInTheDocument();
+    await expect
+      .element(screen.getByText(/Its last answer came from region dmm/))
+      .toBeInTheDocument();
+    // The provider picker lives in DeidentificationProvidersSection above, not here.
+    expect(screen.getByLabelText("Server address").query()).toBeNull();
+    const secondPassSwitch = screen.getByRole("switch", {
+      name: "Let the worker check messages before they are masked",
+    });
+    await expect.element(secondPassSwitch).toBeInTheDocument();
+    (secondPassSwitch.element() as HTMLElement).click();
     await vi.waitFor(() =>
-      expect(client.configurePrivacyWorker).toHaveBeenCalledWith({
-        kind: "custom",
-        baseUrl: "http://localhost:11434/v1",
-        model: "qwen3.8",
-        driver: "chatCompletions",
-      }),
+      expect(client.setPrivacyPreference).toHaveBeenCalledWith({ kind: "secondPass", on: true }),
     );
   });
 
@@ -186,13 +166,11 @@ describe("the worker's settings", () => {
     await expect
       .element(screen.getByText("Last answer came from European Union."))
       .toBeInTheDocument();
-    // Already the worker in use: there is nothing to connect.
-    expect(screen.getByRole("button", { name: "Connect" }).query()).toBeNull();
     await expect.element(screen.getByLabelText("Account region")).toBeInTheDocument();
     expect(screen.getByText(/managed in-region worker/).query()).toBeNull();
   });
 
-  it("offers a signed-in account without DoeDesk Cloud's worker its own server or none, and says how to ask for a managed one", async () => {
+  it("tells a signed-in account without DoeDesk Cloud's worker where its sealed files stand", async () => {
     setup();
     await using screen = await render(
       <WorkerSection
@@ -231,50 +209,6 @@ describe("the worker's settings", () => {
       )
       .toBeInTheDocument();
     expect(screen.getByLabelText("Account region").query()).toBeNull();
-    await userEvent.click(screen.getByLabelText("Who reads sealed files"));
-    await expect.element(page.getByRole("option", { name: "My own server" })).toBeVisible();
-    await expect.element(page.getByRole("option", { name: "None" })).toBeVisible();
-    expect(page.getByRole("option", { name: "DoeDesk Cloud" }).query()).toBeNull();
-  });
-
-  it("shows why the worker was not connected, in the server's words", async () => {
-    setup();
-    client.configurePrivacyWorker.mockResolvedValue({
-      ok: false,
-      message: "The worker answered 401: Invalid API Key",
-      status: status(),
-    });
-    await using screen = await render(
-      <WorkerSection
-        status={status({
-          worker: {
-            kind: "custom",
-            address: "https://api.example.com/openai/v1",
-            model: "small-model",
-            driver: "chatCompletions",
-            reasoningEffort: "none",
-            available: false,
-            servedFrom: "dmm",
-          },
-        })}
-      />,
-      // No route is read: the section is rendered on its own.
-      { router: false },
-    );
-    await expect
-      .element(screen.getByLabelText("Server address"))
-      .toHaveValue("https://api.example.com/openai/v1");
-    await userEvent.fill(screen.getByLabelText("API key"), "wrong");
-    await userEvent.click(screen.getByRole("button", { name: "Connect" }));
-    expect(client.configurePrivacyWorker).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "custom", baseUrl: "https://api.example.com/openai/v1" }),
-    );
-    await expect
-      .element(screen.getByText("The worker answered 401: Invalid API Key"))
-      .toBeInTheDocument();
-    await expect
-      .element(screen.getByText(/Its last answer came from region dmm/))
-      .toBeInTheDocument();
   });
 });
 

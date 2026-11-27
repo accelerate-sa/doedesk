@@ -83,13 +83,7 @@ export function PrivacySettingsPanel() {
         />
       ) : null}
       <AdvancedSettings>
-        {state.kind === "ready" ? (
-          // Its form is filled once, so a worker chosen above starts it again.
-          <WorkerSection
-            key={`${state.status.worker?.kind}|${state.status.worker?.address}|${state.status.worker?.model}`}
-            status={state.status}
-          />
-        ) : null}
+        {state.kind === "ready" ? <WorkerSection status={state.status} /> : null}
         {state.kind === "ready" ? <EgressSection status={state.status} /> : null}
         {state.kind === "ready" ? <ProviderMaskingSection status={state.status} /> : null}
         {state.kind === "ready" ? <ImageHandlingSection status={state.status} /> : null}

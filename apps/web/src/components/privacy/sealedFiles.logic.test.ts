@@ -14,7 +14,6 @@ import {
   sealingOffered,
   sealReaderHost,
 } from "./sealedFiles.logic";
-import { workerChoicesFor } from "./SealedWorker.logic";
 import {
   accountRegionExplained,
   answerRouteLabel,
@@ -306,16 +305,9 @@ describe("who the confirmation says will read the files", () => {
     expect(managedWorkerNote(none)).toMatch(
       /^DoeDesk Cloud's worker is not available in your region yet\./,
     );
-    expect(workerChoicesFor(none).map((choice) => choice.value)).toEqual(["custom", "off"]);
     expect(accountRegionExplained(none, "eu")).toMatch(
       /^DoeDesk Cloud's worker for sealed files is not available in the European Union region yet\./,
     );
-    // An account whose region has one is offered it as before.
-    expect(
-      workerChoicesFor({ ...hosted("sa"), hostedWorkerEntitled: true }).map(
-        (choice) => choice.value,
-      ),
-    ).toContain("cloud");
     // The record names the worker that gave each answer.
     expect(answerRouteLabel("eu")).toBe("Answered by DoeDesk Cloud's worker, European Union");
     expect(answerRouteLabel("custom:localhost:11434")).toBe(

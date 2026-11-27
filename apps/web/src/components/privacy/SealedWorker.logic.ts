@@ -30,32 +30,6 @@ const NO_WORKER: PrivacyWorkerStatus = {
 export const workerOf = (status: PrivacyStatus): PrivacyWorkerStatus => status.worker ?? NO_WORKER;
 
 /**
- * Who can read sealed files: the person's own server, DoeDesk Cloud's worker, or nobody. The own
- * server leads: with it, each sealed file is read on hardware the person controls.
- */
-export const WORKER_CHOICES: ReadonlyArray<{
-  readonly value: PrivacyWorkerKind;
-  readonly label: string;
-}> = [
-  { value: "custom", label: msg("My own server") },
-  // oxlint-disable-next-line t3code/no-untranslated-copy -- the service's name
-  { value: "cloud", label: "DoeDesk Cloud" },
-  { value: "off", label: msg("None", { $context: "no worker model is connected" }) },
-];
-
-/**
- * DoeDesk Cloud's worker is offered only to a signed-in account that has it: an organization
- * takes it under an agreement. Everyone else chooses between their own server and none.
- */
-export const workerChoicesFor = (status: PrivacyStatus): typeof WORKER_CHOICES =>
-  // Not offered where DoeDesk Cloud has no worker in the account's region yet.
-  status.mode === "cloud" &&
-  status.hostedWorkerEntitled === true &&
-  !hostedWorkerNotInRegion(status)
-    ? WORKER_CHOICES
-    : WORKER_CHOICES.filter((choice) => choice.value !== "cloud");
-
-/**
  * Where sealed documents go, said plainly: the worker receives them whole and unmasked, which
  * is the one thing a person has to know before choosing an address.
  */

@@ -1,5 +1,4 @@
 import type { PrivacyEgressPolicy, PrivacyStatus, PrivacyWorkerKind } from "@t3tools/contracts";
-import { serverSentence } from "@t3tools/shared/serverSentencesCopy";
 import { useClientSettings } from "~/hooks/useSettings";
 import { formatRecordTimestamp } from "~/timestampFormat";
 import { msg, useGT, useLocale, useMessages } from "gt-react";
@@ -9,7 +8,6 @@ import { useState } from "react";
 import { SEALED_ARTICLE_URL } from "~/branding";
 import {
   changeSealedDocuments,
-  configurePrivacyWorker,
   setPrivacyPreference,
   useSealedAnswers,
   useSealedDocuments,
@@ -39,178 +37,74 @@ import {
   EGRESS_CHOICES,
   egressOf,
   parseHosts,
-  WORKER_CHOICES,
-  workerChoicesFor,
   workerDisclosure,
-  type WorkerForm,
   workerOf,
-  workerRequest,
 } from "./SealedWorker.logic";
-import { WorkerServerFields } from "./WorkerServerFields";
 
 const SECOND_CHECK = msg(
   "The worker also reads each message before it is masked, to catch case numbers, districts and other details that point to a person. Messages reach the worker unmasked, and replies start later.",
 );
 
-/** Who runs the model that reads sealed documents, and where those documents go. */
+/**
+ * Status, account region, and second-pass check for the sealed files model chosen above.
+ * Model selection itself lives in DeidentificationProvidersSection so there is only one picker.
+ */
 export function WorkerSection({ status }: { readonly status: PrivacyStatus }) {
   const gt = useGT();
   const resolve = useMessages();
   const searchableSetting = useSearchableSetting();
   const worker = workerOf(status);
-  const [form, setForm] = useState<WorkerForm>({
-    kind: worker.kind,
-    apiKey: "",
-    baseUrl: worker.address ?? "",
-    model: worker.model ?? "",
-    driver: worker.driver ?? "chatCompletions",
-    reasoningEffort: worker.reasoningEffort ?? "",
-  });
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
   const regionChange = useAccountRegionChange(status);
-  const signedIn = status.mode === "cloud";
-  const choices = workerChoicesFor(status);
-  // A choice that stopped being offered while this was open reads as what is in use.
-  const kind = choices.some((choice) => choice.value === form.kind) ? form.kind : worker.kind;
-  const chosen = WORKER_CHOICES.find((choice) => choice.value === kind);
   const note = managedWorkerNote(status, resolve);
-  const set = (change: Partial<WorkerForm>) => setForm((current) => ({ ...current, ...change }));
-  // Promise chains rather than try/finally, which React Compiler cannot optimize.
-  const connect = () => {
-    const made = workerRequest({ ...form, kind });
-    if ("problem" in made) {
-      setProblem(resolve(made.problem));
-      return;
-    }
-    setBusy(true);
-    setProblem(null);
-    void configurePrivacyWorker(made.request)
-      .then((result) => {
-        if (!result.ok) {
-          setProblem(
-            result.message === null
-              ? gt("The worker could not be connected.")
-              : serverSentence(result.message, resolve),
-          );
-          return;
-        }
-        // A server may refuse the reasoning setting typed and be connected with another.
-        set({ apiKey: "", reasoningEffort: result.status.worker?.reasoningEffort ?? "" });
-      })
-      .catch(() => setProblem(gt("The worker could not be connected.")))
-      .finally(() => setBusy(false));
-  };
   return (
     <SettingsSection {...searchableSetting("privacy-worker")} title={gt("Who reads sealed files")}>
-      <SettingsRow
-        title={gt("Reading model", { $context: "the model that reads sealed files" })}
-        description={gt(
-          "A separate model reads sealed files so DoeDesk does not send them to your AI company; yes-or-no answers and choices from a list still reach it. Run it on your own computer or company server and each file is read on hardware you control.",
-        )}
-        control={
-          <Select
-            value={kind}
-            disabled={busy}
-            onValueChange={(value) => {
-              if (value === null) return;
-              setProblem(null);
-              set({ kind: value as WorkerForm["kind"] });
-            }}
-          >
-            <SelectTrigger aria-label={gt("Who reads sealed files")} className="w-44" size="sm">
-              <SelectValue>{chosen === undefined ? null : resolve(chosen.label)}</SelectValue>
-            </SelectTrigger>
-            <SelectPopup>
-              {choices.map((choice) => (
-                <SelectItem key={choice.value} value={choice.value}>
-                  {resolve(choice.label)}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        }
-      />
       <div className="grid gap-2 px-4 py-3">
-        <p className="text-sm">{workerDisclosure({ ...worker, kind }, status, resolve)}</p>
-        {kind === "custom" ? (
-          <form
-            className="grid gap-2 sm:max-w-sm"
-            onSubmit={(event) => {
-              event.preventDefault();
-              connect();
-            }}
-          >
-            <p className="text-xs text-muted-foreground">
-              {gt(
-                "Any server that supports the Chat Completions or Responses format works, including a hosted service you have a key for.",
-              )}
-            </p>
-            <WorkerServerFields form={form} onChange={set} />
-            {signedIn ? (
-              <p className="text-xs text-muted-foreground">
-                {gt(
-                  "Your DoeDesk Cloud region is not used while My own server is selected. PDFs and images are still read by DoeDesk Cloud in Saudi Arabia when sealed.",
-                )}
-              </p>
-            ) : null}
-          </form>
-        ) : null}
-        {problem !== null ? <p className="text-sm text-destructive">{problem}</p> : null}
-        <div className="flex flex-wrap items-center gap-3">
-          {kind === worker.kind && kind !== "custom" ? null : (
-            <Button size="sm" disabled={busy} onClick={connect}>
-              {busy ? gt("Checking…") : kind === "off" ? gt("Disconnect") : gt("Connect")}
-            </Button>
-          )}
-          {worker.kind !== "off" ? (
-            <p className="flex flex-wrap gap-x-1 text-xs text-muted-foreground">
-              {worker.kind === "cloud" && worker.region != null ? (
-                <span>
-                  {gt("Region: {regionLabel}.", {
-                    regionLabel: accountRegionLabel(worker.region, resolve),
-                  })}
-                </span>
-              ) : null}
+        <p className="text-sm">{workerDisclosure(worker, status, resolve)}</p>
+        {worker.kind !== "off" ? (
+          <p className="flex flex-wrap gap-x-1 text-xs text-muted-foreground">
+            {worker.kind === "cloud" && worker.region != null ? (
               <span>
-                {worker.available && worker.busy != null
-                  ? gt(
-                      "{count, plural, one {Busy, {count} waiting.} other {Busy, {count} waiting.}}",
-                      {
-                        count: worker.busy.waiting,
-                        $context: "the worker model is answering other people first",
-                      },
-                    )
-                  : worker.available
-                    ? gt("Connected.", { $context: "the worker model answers" })
-                    : worker.kind === "cloud" && hostedWorkerNotInRegion(status)
-                      ? gt("Not available in this region yet.", {
-                          $context: "DoeDesk Cloud offers no worker model in the account's region",
-                        })
-                      : worker.kind === "cloud"
-                        ? gt(
-                            "Not answering. DoeDesk does not route sealed files to another region.",
-                          )
-                        : gt("Not answering.", { $context: "the worker model does not answer" })}
+                {gt("Region: {regionLabel}.", {
+                  regionLabel: accountRegionLabel(worker.region, resolve),
+                })}
               </span>
-              {worker.model === null ? null : (
-                <span>{gt("Model: {model}.", { model: worker.model })}</span>
-              )}
-              {worker.servedFrom === null ? null : worker.kind === "cloud" ? (
-                <span>
-                  {gt("Last answer came from {servedFrom}.", {
-                    servedFrom: servedFromLabel(worker.servedFrom, resolve),
-                  })}
-                </span>
-              ) : (
-                <span>
-                  {gt("Its last answer came from region {region}.", { region: worker.servedFrom })}
-                </span>
-              )}
-            </p>
-          ) : null}
-        </div>
-        {worker.kind === "cloud" && kind === "cloud" ? (
+            ) : null}
+            <span>
+              {worker.available && worker.busy != null
+                ? gt(
+                    "{count, plural, one {Busy, {count} waiting.} other {Busy, {count} waiting.}}",
+                    {
+                      count: worker.busy.waiting,
+                      $context: "the worker model is answering other people first",
+                    },
+                  )
+                : worker.available
+                  ? gt("Connected.", { $context: "the worker model answers" })
+                  : worker.kind === "cloud" && hostedWorkerNotInRegion(status)
+                    ? gt("Not available in this region yet.", {
+                        $context: "DoeDesk Cloud offers no worker model in the account's region",
+                      })
+                    : worker.kind === "cloud"
+                      ? gt("Not answering. DoeDesk does not route sealed files to another region.")
+                      : gt("Not answering.", { $context: "the worker model does not answer" })}
+            </span>
+            {worker.model === null ? null : (
+              <span>{gt("Model: {model}.", { model: worker.model })}</span>
+            )}
+            {worker.servedFrom === null ? null : worker.kind === "cloud" ? (
+              <span>
+                {gt("Last answer came from {servedFrom}.", {
+                  servedFrom: servedFromLabel(worker.servedFrom, resolve),
+                })}
+              </span>
+            ) : (
+              <span>
+                {gt("Its last answer came from region {region}.", { region: worker.servedFrom })}
+              </span>
+            )}
+          </p>
+        ) : null}
+        {worker.kind === "cloud" ? (
           <div className="grid gap-2">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span>{gt("Account region")}</span>

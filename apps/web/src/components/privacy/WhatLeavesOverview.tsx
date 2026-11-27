@@ -14,6 +14,15 @@ export function WhatLeavesOverview({ status }: { readonly status: PrivacyStatus 
   const gt = useGT();
   const resolve = useMessages();
   const masking = status.mode === "cloud" || status.mode === "selfHosted";
+  const cloudDetect =
+    status.providers !== undefined
+      ? status.providers.detect.provider === "doedeskCloud"
+      : status.mode === "cloud";
+  const localOnlyDetect = status.providers?.detect.provider === "localOnly";
+  const cloudOcr =
+    status.providers !== undefined
+      ? status.providers.ocr.provider === "doedeskCloud"
+      : status.mode === "cloud";
   const maskingLines = masking
     ? [
         gt(
@@ -22,9 +31,11 @@ export function WhatLeavesOverview({ status }: { readonly status: PrivacyStatus 
         gt(
           "Amounts, dates and the wording of your documents still reach your AI company as written, so your AI works as it normally does.",
         ),
-        status.mode === "cloud"
-          ? gt("Names are found by DoeDesk Cloud in Saudi Arabia.")
-          : gt("Names are found by your own detection service."),
+        localOnlyDetect
+          ? gt("Names are not masked.")
+          : cloudDetect
+            ? gt("Names are found by DoeDesk Cloud in Saudi Arabia.")
+            : gt("Names are found by your own detection service."),
       ]
     : [
         status.mode === "off"
@@ -39,7 +50,7 @@ export function WhatLeavesOverview({ status }: { readonly status: PrivacyStatus 
       "The whole file goes only to the model that reads sealed files. On your own computer or company server, it is read on hardware you control. Organizations without their own model hardware yet can use a managed in-region worker by agreement.",
     ),
     ...sealedReaderSentences(status, resolve),
-    status.mode === "cloud"
+    cloudOcr
       ? gt(
           "PDFs and images are first read by DoeDesk Cloud in Saudi Arabia, without storing them, to get their text.",
         )

@@ -80,4 +80,32 @@ describe("what leaves your computer", () => {
       )
       .toBeInTheDocument();
   });
+
+  it("reflects decoupled non-Cloud OCR and detection even while signed in", async () => {
+    await using screen = await render(
+      <WhatLeavesOverview
+        status={status({
+          mode: "cloud",
+          worker: OWN_SERVER,
+          providers: {
+            ocr: { provider: "azureDocIntel", ready: true },
+            detect: { provider: "presidio", ready: true },
+            worker: { provider: "openaiCompatible", ready: true },
+          },
+        })}
+      />,
+      { router: false },
+    );
+    await expect
+      .element(screen.getByText("Names are found by your own detection service."))
+      .toBeInTheDocument();
+    await expect
+      .element(
+        screen.getByText(
+          "PDFs and images are first read by your reading service to get their text.",
+        ),
+      )
+      .toBeInTheDocument();
+    expect(screen.getByText(/DoeDesk Cloud in Saudi Arabia/).query()).toBeNull();
+  });
 });

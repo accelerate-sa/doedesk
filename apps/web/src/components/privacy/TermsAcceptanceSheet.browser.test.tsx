@@ -4,7 +4,7 @@ import { type Locator, page } from "vite-plus/test/browser";
 
 import { CLOUD_MESSAGES } from "~/doedesk/privacyMessages";
 import { render } from "../../../test/render";
-import { TermsAcceptanceSheet } from "./TermsAcceptanceSheet";
+import { TermsAcceptanceSheet, termsAcceptanceDue } from "./TermsAcceptanceSheet";
 
 const client = vi.hoisted(() => ({
   accountAction: vi.fn(),
@@ -145,5 +145,28 @@ describe("TermsAcceptanceSheet", () => {
     await expect.element(page.getByRole("alert")).toHaveTextContent(CLOUD_MESSAGES.terms_outdated!);
     await expect.element(page.getByRole("checkbox")).not.toBeChecked();
     expect(client.accountAction.mock.calls[0]?.[0].acceptance.locale).toBe("ar");
+  });
+
+  it("does not prompt or block when a signed-in account uses non-Cloud services for all three roles", () => {
+    expect(
+      termsAcceptanceDue({
+        ...status({ blocked: true }),
+        providers: {
+          ocr: { provider: "azureDocIntel", ready: true },
+          detect: { provider: "presidio", ready: true },
+          worker: { provider: "off", ready: true },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      termsAcceptanceDue({
+        ...status({ blocked: true }),
+        providers: {
+          ocr: { provider: "doedeskCloud", ready: true },
+          detect: { provider: "presidio", ready: true },
+          worker: { provider: "off", ready: true },
+        },
+      }),
+    ).toBe(true);
   });
 });
