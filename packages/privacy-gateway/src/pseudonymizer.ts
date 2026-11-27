@@ -36,6 +36,76 @@ export interface MaskStats {
   readonly replaced: ReadonlyArray<string>;
 }
 
+/**
+ * What is done with a value that was found. `mask`: a stand-in is written and the value kept in
+ * the vault, to be put back on this computer. `redact`: `[REDACTED]` is written, nothing is kept
+ * anywhere, and nothing can put the value back. `keep`: the value is left as it is.
+ */
+export type DeidentificationAction = "mask" | "redact" | "keep";
+
+/** The action a whole document takes for what is found in it, unless an item says otherwise. */
+export type DeidentificationMode = Exclude<DeidentificationAction, "keep">;
+
+/** What stands where a value was redacted. Not a stand-in: `unmask` never touches it. */
+export const REDACTED_LABEL = "[REDACTED]";
+
+/** A span `find` reports: where it is, what it is, and its stand-in if the vault had one. */
+export interface FoundSpan extends DetectedEntity {
+  /** Found because the vault already held the value, not by the detector. */
+  readonly known: boolean;
+  /** The stand-in the vault already holds for the value. None is ever made by `find`. */
+  readonly token?: string;
+}
+
+/** A span `deidentify` acted on, with what was written in its place. */
+export interface DeidentifiedSpan extends DetectedEntity {
+  readonly action: DeidentificationAction;
+  /** The value as it stood in the text. */
+  readonly surface: string;
+  /** What stands there now: a stand-in, `[REDACTED]`, or the value itself when it was kept. */
+  readonly replacement: string;
+}
+
+export interface DeidentifyOptions {
+  readonly mode: DeidentificationMode;
+  /** The action for one span, where it differs from the document's. */
+  readonly actionFor?:
+    | ((span: FoundSpan, surface: string) => DeidentificationAction | undefined)
+    | undefined;
+  readonly neverMask?: ReadonlyArray<string> | undefined;
+}
+
+/**
+ * Where else the given values stand in a text, whole and outside the spans already taken. A
+ * detector that found a name once may miss it three lines on; a value is hidden everywhere or
+ * it is not hidden.
+ */
+export const otherOccurrences = (
+  text: string,
+  values: ReadonlyArray<{ readonly surface: string; readonly kind: EntityKind }>,
+  taken: ReadonlyArray<{ readonly start: number; readonly end: number }>,
+): ReadonlyArray<DetectedEntity> => {
+  const found: Array<DetectedEntity> = [];
+  const free = (start: number, end: number): boolean =>
+    [...taken, ...found].every((other) => end <= other.start || start >= other.end);
+  // The longest first: a full name before the given name inside it.
+  const distinct = new Map(values.map((value) => [value.surface, value.kind]));
+  for (const [surface, kind] of [...distinct].toSorted(
+    ([left], [right]) => right.length - left.length,
+  )) {
+    if (surface.trim().length < 3) continue;
+    let from = text.indexOf(surface);
+    while (from !== -1) {
+      const end = from + surface.length;
+      const joined =
+        /[\p{L}\p{N}]/u.test(text[from - 1] ?? "") || /[\p{L}\p{N}]/u.test(text[end] ?? "");
+      if (!joined && free(from, end)) found.push({ start: from, end, kind });
+      from = text.indexOf(surface, end);
+    }
+  }
+  return found.toSorted((left, right) => left.start - right.start);
+};
+
 /** Names of the tools themselves. A detector that flags these would confuse the agent. */
 const DEFAULT_NEVER_MASK = [
   "Claude",
@@ -751,6 +821,103 @@ export class Pseudonymizer {
     });
   }
 
+  /**
+   * Finds what `locate` would, and makes no stand-in: nothing is written to the vault, so a
+   * value that is then redacted leaves no trace of itself on this computer. A value the vault
+   * already holds is reported with the stand-in it has.
+   */
+  async find(
+    texts: ReadonlyArray<string>,
+    neverMask: ReadonlyArray<string> = [],
+    /** Asked in place of this pseudonymizer's own: for a text only the local rules should see. */
+    detector: Detector = this.#detector,
+  ): Promise<ReadonlyArray<ReadonlyArray<FoundSpan>>> {
+    const batchNeverMask = new Set(neverMask.map(normalizeForVault));
+    const toDetect = texts.flatMap((text, index) => (text.trim().length > 0 ? [index] : []));
+    const detected =
+      toDetect.length === 0
+        ? []
+        : await detector.detect(toDetect.map((index) => texts[index] ?? ""));
+    const batch = toDetect.map((textIndex, position) => ({
+      index: textIndex,
+      text: texts[textIndex] ?? "",
+      detected: detected[position] ?? [],
+    }));
+    const found = this.#spansToMask(
+      batch,
+      batchNeverMask,
+      await this.#workspaceFilesIn(batch),
+      false,
+    );
+    return texts.map((text, index) => {
+      const spans = (found.get(index) ?? []).map((entity): FoundSpan => {
+        // Looked up, never made: the stand-in of a value the vault holds in this spelling.
+        const surface = text.slice(entity.start, entity.end);
+        const held = this.vault
+          .findKnown(surface)
+          .find((span) => span.start === 0 && span.end === surface.length);
+        return { ...entity, known: false, ...(held === undefined ? {} : { token: held.token }) };
+      });
+      const known = this.vault
+        .findKnown(text)
+        .filter((span) =>
+          spans.every((other) => span.end <= other.start || span.start >= other.end),
+        )
+        .map((span) => ({ ...span, kind: kindOfPlaceholder(span.token), known: true }));
+      return [...spans, ...known].toSorted((left, right) => left.start - right.start);
+    });
+  }
+
+  /**
+   * De-identifies one text. Each value found is masked, redacted or kept: as `actionFor` says
+   * for it, else as the document's mode says. Only a masked value reaches the vault. A value
+   * found once is treated the same wherever else it stands in the text.
+   */
+  async deidentify(
+    text: string,
+    options: DeidentifyOptions,
+  ): Promise<{ readonly text: string; readonly spans: ReadonlyArray<DeidentifiedSpan> }> {
+    const [found = []] = await this.find([text], options.neverMask ?? []);
+    const decided = found.map((span) => {
+      const surface = text.slice(span.start, span.end);
+      return { span, surface, action: options.actionFor?.(span, surface) ?? options.mode };
+    });
+    const actionOf = new Map(decided.map((entry) => [entry.surface, entry.action]));
+    const repeated = otherOccurrences(
+      text,
+      decided.map((entry) => ({ surface: entry.surface, kind: entry.span.kind })),
+      found,
+    ).map((span) => {
+      const surface = text.slice(span.start, span.end);
+      return { span: { ...span, known: false }, surface, action: actionOf.get(surface) ?? "keep" };
+    });
+    const spans: Array<DeidentifiedSpan> = [];
+    let rewritten = "";
+    let cursor = 0;
+    for (const { span, surface, action } of [...decided, ...repeated].toSorted(
+      (left, right) => left.span.start - right.span.start,
+    )) {
+      if (span.start < cursor) continue;
+      const replacement =
+        action === "keep"
+          ? surface
+          : action === "redact"
+            ? REDACTED_LABEL
+            : this.vault.tokenFor(span.kind, surface);
+      rewritten += text.slice(cursor, span.start) + replacement;
+      cursor = span.end;
+      spans.push({
+        start: span.start,
+        end: span.end,
+        kind: span.kind,
+        action,
+        surface,
+        replacement,
+      });
+    }
+    return { text: rewritten + text.slice(cursor), spans };
+  }
+
   unmask(text: string, jsonFragment = false): string {
     return this.vault.unmask(text, jsonFragment);
   }
@@ -764,6 +931,8 @@ export class Pseudonymizer {
     batch: Detected,
     batchNeverMask: ReadonlySet<string>,
     workspaceFiles: ReadonlySet<string>,
+    /** False to only find: no stand-in is made, and the vault is left exactly as it was. */
+    mint = true,
   ): Map<number, ReadonlyArray<DetectedEntity>> {
     const checked = batch.map(({ index, text, detected }) => {
       // Found once for the text, not once for each span in it.
@@ -829,8 +998,10 @@ export class Pseudonymizer {
       const split = splitSpans.filter(
         (entity) => !this.vault.isReleased(text.slice(entity.start, entity.end)),
       );
-      for (const entity of split) {
-        this.vault.tokenFor(entity.kind, text.slice(entity.start, entity.end));
+      if (mint) {
+        for (const entity of split) {
+          this.vault.tokenFor(entity.kind, text.slice(entity.start, entity.end));
+        }
       }
       spansByIndex.set(index, split);
     }
@@ -844,8 +1015,10 @@ export class Pseudonymizer {
       const initials = findInitials(text, people, spans).filter((entity) =>
         this.#shouldMask(text, entity, batchNeverMask),
       );
-      for (const entity of initials) {
-        this.vault.tokenFor(entity.kind, text.slice(entity.start, entity.end));
+      if (mint) {
+        for (const entity of initials) {
+          this.vault.tokenFor(entity.kind, text.slice(entity.start, entity.end));
+        }
       }
       if (initials.length > 0) spansByIndex.set(index, [...spans, ...initials]);
     }

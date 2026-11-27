@@ -60,7 +60,23 @@ export { DEFAULT_BLOCKED_HOSTS, DEFAULT_INSPECTED_HOSTS } from "./gateway.ts";
 export type { EgressPolicy, GatewayRecord } from "./gateway.ts";
 export { ENTITY_KINDS } from "./placeholders.ts";
 export type { EntityKind } from "./placeholders.ts";
-export { Pseudonymizer } from "./pseudonymizer.ts";
+export { Pseudonymizer, REDACTED_LABEL } from "./pseudonymizer.ts";
+export type {
+  DeidentificationAction,
+  DeidentificationMode,
+  DeidentifiedSpan,
+  FoundSpan,
+} from "./pseudonymizer.ts";
+export * from "./deidentify/index.ts";
+export { detectCodes, inspectCodePayload, parseZatcaTlv } from "./redaction/barcodes.ts";
+export type {
+  CodeFinding,
+  CodeInspection,
+  DetectedCode,
+  ZatcaInvoice,
+} from "./redaction/barcodes.ts";
+export type { LayoutReader, RedactedRegion } from "./redaction/redactImage.ts";
+export { findLabelledValues } from "./labelDetector.ts";
 export { Vault } from "./vault.ts";
 export type { VaultEntry } from "./vault.ts";
 export { makeRemoteReader } from "./reader.ts";

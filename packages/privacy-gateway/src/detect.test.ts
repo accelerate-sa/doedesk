@@ -243,6 +243,115 @@ describe("IBANs", () => {
   });
 });
 
+describe("what a bank's letter and a ministry's certificate carry", () => {
+  it("masks an establishment's unified national number as it masks an ID, with or without a label", async () => {
+    const cases: ReadonlyArray<readonly [string, ReadonlyArray<ReadonlyArray<string>>]> = [
+      ["الرقم الوطني الموحد: 7012345678", [["7012345678", "ID"]]],
+      // Nothing says what it is: ten digits starting with 70 are enough.
+      ["المنشأة (7012345678) لم تستكمل الطلب.", [["7012345678", "ID"]]],
+      ["ID 7012345678", [["7012345678", "ID"]]],
+      // Ten digits starting with 7 and another digit are as often anything else.
+      ["Ticket 7312345678 was closed.", [["7312345678", "ID"]]],
+      ["Build 7312345678 finished.", []],
+      // An amount is an amount whatever it starts with.
+      ["بلغت القيمة الإجمالية للعقد 7012345678 ريال سعودي.", []],
+    ];
+    for (const [text, expected] of cases) {
+      expect(await masked(text), text).toEqual(expected);
+    }
+  });
+
+  it("masks a bank account number named as one, before or after the number", async () => {
+    const cases: ReadonlyArray<readonly [string, ReadonlyArray<ReadonlyArray<string>>]> = [
+      ["Account Number at SNB 12345678901234", [["12345678901234", "ACCOUNT"]]],
+      ["Account No: 123-4567-8901234", [["123-4567-8901234", "ACCOUNT"]]],
+      ["رقم الحساب في البنك الأهلي 12345678901234", [["12345678901234", "ACCOUNT"]]],
+      ["الحساب البنكي: 1234567890123456", [["1234567890123456", "ACCOUNT"]]],
+      // An Arabic line read left to right: the number stands before its label.
+      ["12345678901234 رقم الحساب في البنك", [["12345678901234", "ACCOUNT"]]],
+      // A table: the column's header decides.
+      [
+        "Branch\tAccount Number\tOpened\nOlaya\t12345678901234\t2021",
+        [["12345678901234", "ACCOUNT"]],
+      ],
+      // A short one is an account where the words before it say so, as a customer's is.
+      ["Customer account number 123456", [["123456", "ACCOUNT"]]],
+      ["123456 رقم الحساب", []],
+      // Nothing names it: fourteen digits alone are as often a timestamp.
+      ["Started at 20261127203000 and finished.", []],
+    ];
+    for (const [text, expected] of cases) {
+      expect(await masked(text), text).toEqual(expected);
+    }
+  });
+
+  it("masks a serial of letters and ten digits or more with no hyphen, and leaves standards and short codes", async () => {
+    const cases: ReadonlyArray<readonly [string, ReadonlyArray<ReadonlyArray<string>>]> = [
+      ["Serial Number IB09876543210987654321098", [["IB09876543210987654321098", "ID"]]],
+      ["الرقم التسلسلي TRX1234567890", [["TRX1234567890", "ID"]]],
+      // An IBAN is an IBAN, not a serial.
+      ["SA4420000001234567891234", [["SA4420000001234567891234", "IBAN"]]],
+      ["Model AB123456 ships in March.", []],
+      ["Conforms to ISO1234567890123.", []],
+      ["Open src/AB3456789012.ts and run it.", []],
+    ];
+    for (const [text, expected] of cases) {
+      expect(await masked(text), text).toEqual(expected);
+    }
+  });
+
+  it("masks a Saudi IBAN a scan misread, and one that stands against Arabic letters", async () => {
+    const cases: ReadonlyArray<readonly [string, ReadonlyArray<ReadonlyArray<string>>]> = [
+      // O for 0, l for 1, 5A for SA: what a reader of pictures writes.
+      ["IBAN SA44 2000 OOO1 2345 6789 l234", [["SA44 2000 OOO1 2345 6789 l234", "IBAN"]]],
+      ["5A4420000001234567891234", [["5A4420000001234567891234", "IBAN"]]],
+      ["رقم الآيبانSA4420000001234567891234هو", [["SA4420000001234567891234", "IBAN"]]],
+      // A word in capitals with a few digits is not an account.
+      ["SALESBOOSTDOZZLOOSSBILLS", []],
+    ];
+    for (const [text, expected] of cases) {
+      expect(await masked(text), text).toEqual(expected);
+    }
+  });
+
+  it("masks a link that verifies a document, and leaves other links to the detection service", async () => {
+    const cases: ReadonlyArray<readonly [string, ReadonlyArray<ReadonlyArray<string>>]> = [
+      [
+        "To verify the letter, scan the QR code above or visit https://alah.li/7Xk2PqR",
+        [["https://alah.li/7Xk2PqR", "URL"]],
+      ],
+      // A shortened link says nothing of where it leads: masked with no word beside it.
+      ["alah.li/7Xk2PqR", [["alah.li/7Xk2PqR", "URL"]]],
+      // Arabic written straight after the link is not part of it.
+      ["الرابط https://alah.li/7Xk2PqRهذه الوثيقة معتمدة", [["https://alah.li/7Xk2PqR", "URL"]]],
+      [
+        "https://qr.saudibusiness.gov.sa/viewcr?nCrNumber=AbCde1FgHiJkLmnO2pQrSt==",
+        [["https://qr.saudibusiness.gov.sa/viewcr?nCrNumber=AbCde1FgHiJkLmnO2pQrSt==", "URL"]],
+      ],
+      [
+        "mc.gov.sa/ar/eservices/Pages/CR.aspx?id=7712345",
+        [["mc.gov.sa/ar/eservices/Pages/CR.aspx?id=7712345", "URL"]],
+      ],
+      [
+        "للتحقق من صحة الوثيقة: https://example.sa/d/9f3k2",
+        [["https://example.sa/d/9f3k2", "URL"]],
+      ],
+      [
+        "https://bank.example/documents/verify?ref=88213377",
+        [["https://bank.example/documents/verify?ref=88213377", "URL"]],
+      ],
+      // A ministry's front page, a page of documentation, a pull request: none names anyone.
+      ["Visit https://mc.gov.sa/ for more.", []],
+      ["See https://docs.github.com/en/actions/12345678 for details.", []],
+      ["Fixed in https://github.com/acme/app/pull/12345/checks", []],
+      ["https://example.com/docs/verify-email", []],
+    ];
+    for (const [text, expected] of cases) {
+      expect(await masked(text), text).toEqual(expected);
+    }
+  });
+});
+
 describe("the detection service", () => {
   type Step = number | "offline" | "timeout" | (() => Response);
   /** A service that answers each call with the next step: a status, or a failure to connect. */

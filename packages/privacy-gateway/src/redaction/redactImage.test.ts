@@ -7,6 +7,8 @@ import { Pseudonymizer } from "../pseudonymizer.ts";
 import { Vault } from "../vault.ts";
 import { makeImageRedactor, type RedactionResult, UNREADABLE_LABEL } from "./redactImage.ts";
 import {
+  codePixels,
+  darkShare,
   layoutAnswer,
   makePseudonymizer,
   paintPage,
@@ -14,6 +16,7 @@ import {
   plantedReader,
   pngOf,
   shows,
+  stampOn,
 } from "./testkit.ts";
 
 const WIDTH = 1000;
@@ -706,5 +709,200 @@ describe("labels", () => {
     );
     expect(result.legend).toBe("");
     expect(result.stats.coveredShare).toBe(0);
+  });
+});
+
+describe("redacting instead of masking", () => {
+  it("covers the same words, says [REDACTED], and writes nothing to the vault", async () => {
+    const words = [
+      ...line(80, ["Contract", "of", "Khalid", "Al-Otaibi", "ends", "in", "March"]),
+      ...line(140, ["Call", "0551234567", "after", "noon"]),
+    ];
+    const pseudonymizer = makePseudonymizer(["Khalid Al-Otaibi"]);
+    const result = redacted(
+      await makeImageRedactor({ reader: plantedReader(WIDTH, words), pseudonymizer }).redact(
+        await pngOf(paintPage(WIDTH, HEIGHT, words)),
+        [],
+        "redact",
+      ),
+    );
+    for (const word of words) {
+      const sensitive = ["Khalid", "Al-Otaibi", "0551234567"].includes(word.text);
+      expect(await shows(result.image.bytes, WIDTH, word), word.text).toBe(
+        sensitive ? "hidden" : "shown",
+      );
+    }
+    expect(result.maskedText).toBe(
+      "Contract of [REDACTED] ends in March\nCall [REDACTED] after noon",
+    );
+    expect(result.maskedText.match(placeholderPattern())).toBeNull();
+    expect(result.legend).toContain("[REDACTED]");
+    expect(result.legend.match(placeholderPattern())).toBeNull();
+    expect(result.stats).toMatchObject({ valueBoxes: 2, tokens: 0 });
+    expect(pseudonymizer.vault.entries()).toEqual([]);
+    expect(pseudonymizer.vault.spellingCount).toBe(0);
+    // Each box still says what it hides, for this computer alone.
+    expect(
+      result.regions.map((region) => [region.source, region.kind, region.surface, region.token]),
+    ).toEqual([
+      ["value", "PERSON", "Khalid Al-Otaibi", undefined],
+      ["value", "PHONE", "0551234567", undefined],
+    ]);
+  });
+
+  it("keeps a masked and a redacted copy of one picture apart", async () => {
+    const words = line(80, ["Khalid", "Al-Otaibi", "signed"]);
+    const pseudonymizer = makePseudonymizer(["Khalid Al-Otaibi"]);
+    const redactor = makeImageRedactor({ reader: plantedReader(WIDTH, words), pseudonymizer });
+    const bytes = await pngOf(paintPage(WIDTH, HEIGHT, words));
+    const gone = redacted(await redactor.redact(bytes, [], "redact"));
+    expect(pseudonymizer.vault.entries()).toEqual([]);
+    const masked = redacted(await redactor.redact(bytes));
+    expect(masked.maskedText).toMatch(/^\[PERSON_\w{5}\] signed$/);
+    expect(gone.maskedText).toBe("[REDACTED] signed");
+  });
+});
+
+describe("QR codes and barcodes", () => {
+  const VERIFY = "https://alah.li/7Xk2PqR";
+  const at = { x: 620, y: 260 };
+
+  const pageWith = async (payload: string, words: ReadonlyArray<Planted>) => {
+    const page = paintPage(WIDTH, HEIGHT, words);
+    const code = await codePixels(payload);
+    stampOn(page, code, at.x, at.y);
+    // The symbol itself, inside the quiet zone the stamp carries around it.
+    const symbol = { x: at.x + 20, y: at.y + 20, width: code.width - 40, height: code.height - 40 };
+    return { bytes: await pngOf(page), symbol };
+  };
+
+  it("covers a code that opens the document, with the stand-in of what it held", async () => {
+    const words = line(80, ["Scan", "the", "code", "below"]);
+    const { bytes, symbol } = await pageWith(VERIFY, words);
+    const pseudonymizer = makePseudonymizer();
+    const result = redacted(
+      await makeImageRedactor({ reader: plantedReader(WIDTH, words), pseudonymizer }).redact(bytes),
+    );
+    expect(await darkShare(result.image.bytes, symbol)).toBeGreaterThan(0.85);
+    for (const word of words) expect(await shows(result.image.bytes, WIDTH, word)).toBe("shown");
+    expect(result.stats).toMatchObject({ codeBoxes: 1, unreadInkBoxes: 0 });
+    expect(result.legend).toContain("QR code");
+    const [entry] = pseudonymizer.vault.entries();
+    expect(entry).toMatchObject({ kind: "URL", value: VERIFY });
+    expect(result.regions).toEqual([
+      expect.objectContaining({
+        source: "code",
+        kind: "URL",
+        covered: true,
+        token: entry?.token,
+        surface: VERIFY,
+        code: expect.objectContaining({
+          format: "QRCode",
+          inspection: expect.objectContaining({ findings: ["verification-link"] }),
+        }),
+      }),
+    ]);
+    // What the code held is never said beside the picture.
+    expect(result.legend).not.toContain("7Xk2PqR");
+  });
+
+  it("redacts a code to a plain box that holds nothing, and keeps no trace of its payload", async () => {
+    const { bytes, symbol } = await pageWith(VERIFY, []);
+    const pseudonymizer = makePseudonymizer();
+    const result = redacted(
+      await makeImageRedactor({ reader: plantedReader(WIDTH, []), pseudonymizer }).redact(
+        bytes,
+        [],
+        "redact",
+      ),
+    );
+    expect(await darkShare(result.image.bytes, symbol)).toBeGreaterThan(0.85);
+    expect(pseudonymizer.vault.entries()).toEqual([]);
+  });
+
+  it("leaves a code that names nobody open, reports it, and covers it when every code is to be", async () => {
+    const { bytes, symbol } = await pageWith("https://www.example.com/", []);
+    const pseudonymizer = makePseudonymizer();
+    const open = redacted(
+      await makeImageRedactor({ reader: plantedReader(WIDTH, []), pseudonymizer }).redact(bytes),
+    );
+    // Still a code: half dark, half light, and not taken for marks nobody could read.
+    expect(await darkShare(open.image.bytes, symbol)).toBeLessThan(0.7);
+    expect(open.stats).toMatchObject({ codeBoxes: 0, unreadInkBoxes: 0 });
+    expect(open.regions).toEqual([
+      expect.objectContaining({
+        source: "code",
+        covered: false,
+        surface: "https://www.example.com/",
+      }),
+    ]);
+    expect(pseudonymizer.vault.entries()).toEqual([]);
+
+    const all = redacted(
+      await makeImageRedactor({
+        reader: plantedReader(WIDTH, []),
+        pseudonymizer,
+        policy: { codes: "all" },
+      }).redact(bytes),
+    );
+    expect(await darkShare(all.image.bytes, symbol)).toBeGreaterThan(0.85);
+  });
+});
+
+describe("a form's rows", () => {
+  it("covers the value beside a label the reader gave as a line of its own", async () => {
+    // Three cells of one row, far apart: label, value, the label again in Arabic.
+    const words: Array<Planted> = [
+      ...line(80, ["Full", "Name"], 60),
+      ...line(80, ["esrablishment", "alwaha"], 380),
+      ...line(80, ["اسم", "الشخص"], 800),
+      ...line(160, ["Bank", "Name"], 60),
+      ...line(160, ["Example", "Bank"], 380),
+    ];
+    // Each cell comes back as its own line, as a reader gives a table.
+    const cells = [
+      words.slice(0, 2),
+      words.slice(2, 4),
+      words.slice(4, 6),
+      words.slice(6, 8),
+      words.slice(8),
+    ];
+    const reader = plantedReader(WIDTH, words, {
+      alter: (answer) => {
+        const page = answer.layout.pages[0];
+        if (page === undefined) return answer;
+        const lines = cells.flatMap((cell) => {
+          const members = page.words.filter((word) =>
+            cell.some((planted) => planted.text === word.text),
+          );
+          const first = members[0];
+          const last = members.at(-1);
+          if (first === undefined || last === undefined) return [];
+          return [
+            {
+              polygon: first.polygon,
+              offset: first.offset as number,
+              length: (last.offset as number) + (last.length as number) - (first.offset as number),
+            },
+          ];
+        });
+        return { ...answer, layout: { ...answer.layout, pages: [{ ...page, lines }] } };
+      },
+    });
+    const pseudonymizer = makePseudonymizer();
+    const result = redacted(
+      await makeImageRedactor({ reader, pseudonymizer }).redact(
+        await pngOf(paintPage(WIDTH, HEIGHT, words)),
+      ),
+    );
+    for (const word of words) {
+      const sensitive = ["esrablishment", "alwaha"].includes(word.text);
+      expect(await shows(result.image.bytes, WIDTH, word), word.text).toBe(
+        sensitive ? "hidden" : "shown",
+      );
+    }
+    expect(pseudonymizer.vault.entries().map((entry) => [entry.kind, entry.value])).toEqual([
+      ["PERSON", "esrablishment alwaha"],
+    ]);
   });
 });

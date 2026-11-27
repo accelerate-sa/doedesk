@@ -792,3 +792,107 @@ describe("characters a tool printed apart", () => {
     expect(texts[0]?.replace(STAND_IN, "[X]")).toBe("Digits: 2 0 2 5 9 7\nRecord: [X]");
   });
 });
+
+describe("mask, redact and keep", () => {
+  const TEXT =
+    "Noura Alqahtani pays from SA4420000001234567891234. Call Noura Alqahtani on 0551234567.";
+  const detector = finds([
+    // Reported once: a detector that saw the name in the first sentence and missed the second.
+    ["^Noura Alqahtani", "PERSON"],
+    ["SA4420000001234567891234", "IBAN"],
+    ["0551234567", "PHONE"],
+  ]);
+  const nameOnce: Detector = {
+    detect: async (texts) =>
+      (await detector.detect(texts)).map((spans) =>
+        spans.map((span) => (span.kind === "PERSON" ? { ...span, end: span.start + 15 } : span)),
+      ),
+  };
+
+  it("redacts with no stand-in, nothing in the vault, and nothing to restore", async () => {
+    const folder = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "doedesk-redact-"));
+    try {
+      const vaultFile = NodePath.join(folder, "vault.json");
+      const vault = new Vault(vaultFile);
+      const pseudonymizer = new Pseudonymizer(vault, nameOnce);
+      const result = await pseudonymizer.deidentify(TEXT, { mode: "redact" });
+
+      // The name is redacted where the detector missed it too.
+      expect(result.text).toBe("[REDACTED] pays from [REDACTED]. Call [REDACTED] on [REDACTED].");
+      expect(result.spans.map((span) => span.action)).toEqual([
+        "redact",
+        "redact",
+        "redact",
+        "redact",
+      ]);
+      expect(result.text.match(STAND_IN)).toBeNull();
+      expect(vault.entries()).toEqual([]);
+      expect(vault.spellingCount).toBe(0);
+      vault.flush();
+      expect(JSON.parse(NodeFS.readFileSync(vaultFile, "utf8")).entries).toEqual([]);
+      // Nothing was kept, so nothing comes back.
+      expect(pseudonymizer.unmask(result.text)).toBe(result.text);
+    } finally {
+      NodeFS.rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it("masks with stand-ins the vault restores, the same value the same stand-in", async () => {
+    const pseudonymizer = new Pseudonymizer(new Vault(), nameOnce);
+    const result = await pseudonymizer.deidentify(TEXT, { mode: "mask" });
+    const tokens = result.text.match(STAND_IN) ?? [];
+    expect(tokens).toHaveLength(4);
+    expect(tokens[0]).toBe(tokens[2]);
+    expect(result.text).not.toContain("[REDACTED]");
+    expect(
+      pseudonymizer.vault
+        .entries()
+        .map((entry) => entry.value)
+        .toSorted(),
+    ).toEqual(["0551234567", "Noura Alqahtani", "SA4420000001234567891234"]);
+    expect(pseudonymizer.unmask(result.text)).toBe(TEXT);
+  });
+
+  it("lets one item differ from its document: redacted in a masked one, kept in a redacted one", async () => {
+    const masked = new Pseudonymizer(new Vault(), nameOnce);
+    const mixed = await masked.deidentify(TEXT, {
+      mode: "mask",
+      actionFor: (span) => (span.kind === "IBAN" ? "redact" : undefined),
+    });
+    expect(mixed.text).toMatch(
+      /^\[PERSON_\w{5}\] pays from \[REDACTED\]\. Call \[PERSON_\w{5}\] on \[PHONE_\w{5}\]\.$/,
+    );
+    // The redacted account is nowhere in the vault; the rest is.
+    expect(
+      masked.vault
+        .entries()
+        .map((entry) => entry.kind)
+        .toSorted(),
+    ).toEqual(["PERSON", "PHONE"]);
+    expect(masked.unmask(mixed.text)).toBe(TEXT.replace("SA4420000001234567891234", "[REDACTED]"));
+
+    const redacted = new Pseudonymizer(new Vault(), nameOnce);
+    const kept = await redacted.deidentify(TEXT, {
+      mode: "redact",
+      actionFor: (_span, surface) => (surface === "Noura Alqahtani" ? "keep" : undefined),
+    });
+    expect(kept.text).toBe(
+      "Noura Alqahtani pays from [REDACTED]. Call Noura Alqahtani on [REDACTED].",
+    );
+    expect(redacted.vault.entries()).toEqual([]);
+  });
+
+  it("finds without making a stand-in, and says which values the vault already holds", async () => {
+    const pseudonymizer = new Pseudonymizer(new Vault(), nameOnce);
+    const known = pseudonymizer.vault.tokenFor("PHONE", "0551234567");
+    const before = pseudonymizer.vault.spellingCount;
+    const [found = []] = await pseudonymizer.find([TEXT]);
+    expect(found.map((span) => [TEXT.slice(span.start, span.end), span.kind])).toEqual([
+      ["Noura Alqahtani", "PERSON"],
+      ["SA4420000001234567891234", "IBAN"],
+      ["0551234567", "PHONE"],
+    ]);
+    expect(found.find((span) => span.kind === "PHONE")?.token).toBe(known);
+    expect(pseudonymizer.vault.spellingCount).toBe(before);
+  });
+});

@@ -236,3 +236,60 @@ export const shows = async (
   const share = inkLeft(data, info.width, info.height, info.channels, info.width / pageWidth, word);
   return share < 0.15 ? "hidden" : share > 0.95 ? "shown" : share;
 };
+
+interface Pixels {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Buffer;
+}
+
+/** A QR code or barcode holding `text`, as black and white pixels with its quiet zone. */
+export const codePixels = async (
+  text: string,
+  format: "QRCode" | "Code128" | "DataMatrix" = "QRCode",
+  scale = 5,
+): Promise<Pixels> => {
+  const { writeBarcode } = await import("zxing-wasm/writer");
+  const written = await writeBarcode(text, { format, scale, addQuietZones: true });
+  if (written.image === null) throw new Error(`The code could not be drawn: ${written.error}`);
+  const { data, info } = await sharp(Buffer.from(await written.image.arrayBuffer()))
+    .flatten({ background: "#ffffff" })
+    .removeAlpha()
+    .toColourspace("srgb")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return { width: info.width, height: info.height, data };
+};
+
+/** Paints `stamp` onto `page` with its top left corner at `x`, `y`. */
+export const stampOn = (page: Pixels, stamp: Pixels, x: number, y: number): void => {
+  for (let row = 0; row < stamp.height; row += 1) {
+    stamp.data.copy(
+      page.data,
+      ((y + row) * page.width + x) * 3,
+      row * stamp.width * 3,
+      (row + 1) * stamp.width * 3,
+    );
+  }
+};
+
+/** The share of dark pixels in a rectangle of an encoded picture. 1 for a solid black box. */
+export const darkShare = async (
+  image: Buffer,
+  box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+): Promise<number> => {
+  const { data, info } = await sharp(image)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let dark = 0;
+  let total = 0;
+  for (let y = box.y; y < box.y + box.height; y += 1) {
+    for (let x = box.x; x < box.x + box.width; x += 1) {
+      if (x < 0 || y < 0 || x >= info.width || y >= info.height) continue;
+      total += 1;
+      if ((data[(y * info.width + x) * info.channels] as number) < 64) dark += 1;
+    }
+  }
+  return total === 0 ? 0 : dark / total;
+};

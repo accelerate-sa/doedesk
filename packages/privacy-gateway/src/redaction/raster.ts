@@ -200,6 +200,30 @@ export const encodeRaster = async (raster: Raster, maxPngBytes: number): Promise
   return { bytes: jpeg, mediaType: "image/jpeg" };
 };
 
+/**
+ * Pixels as a file of a named format, for a result that must stay the kind of file it was: a
+ * picture inside a document is found by its name and type. Written from the raster alone.
+ */
+export const encodeRasterAs = async (
+  raster: Raster,
+  format: "png" | "jpeg" | "webp" | "gif" | "tiff",
+): Promise<Buffer> => {
+  const sharp = await loadSharp();
+  const image = sharp(raster.data, rawOptions(raster));
+  switch (format) {
+    case "png":
+      return image.png({ compressionLevel: 6, palette: false }).toBuffer();
+    case "jpeg":
+      return image.jpeg({ quality: 92, chromaSubsampling: "4:4:4" }).toBuffer();
+    case "webp":
+      return image.webp({ quality: 92 }).toBuffer();
+    case "gif":
+      return image.gif().toBuffer();
+    case "tiff":
+      return image.tiff({ compression: "lzw" }).toBuffer();
+  }
+};
+
 /** Paints every covered pixel black. */
 export const paintCoverage = (raster: Raster, coverage: Coverage): void => {
   const { data } = coverage;

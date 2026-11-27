@@ -265,7 +265,13 @@ class TextBuilder {
   }
 
   gap(): this {
-    if (this.text.length > 0 && !this.text.endsWith(" ")) this.text += " ";
+    if (this.text.length > 0 && !/[ \t]$/u.test(this.text)) this.text += " ";
+    return this;
+  }
+
+  /** The edge between two cells of a row. */
+  tab(): this {
+    if (this.text.length > 0) this.text = `${this.text.trimEnd()}\t`;
     return this;
   }
 
@@ -448,8 +454,70 @@ const hyphenatedLines = (
   return variants;
 };
 
+/** A gap this many times the row's writing height is the edge of a cell, not a space. */
+const CELL_GAP = 1.5;
+/**
+ * How far from a row's middle a word may stand and still be on it, in writing heights. Wide
+ * enough for a value centred beside a label of two lines, which stands between them; lines of a
+ * paragraph are a whole height apart and stay apart.
+ */
+const ROW_REACH = 0.7;
+
+/**
+ * The page as the rows of a form: words at one height, left to right, a tab where a gap is a
+ * cell's edge. A reader gives each cell of a table as its own line, so a label and its value
+ * are never on one line as read. Rows of two cells or more only; a turned page forms no row.
+ */
+export const tableRows = (
+  page: PageWords,
+  textOf: (word: Word) => string = (word) => word.text,
+): MappedText => {
+  const seen = page.lines.flatMap((line) => line.map((index) => page.words[index] as Word));
+  const placed = seen
+    .map((word) => ({ word, bounds: boundsOf(word) }))
+    .filter(({ bounds }) => bounds.bottom > bounds.top)
+    .toSorted((left, right) => left.bounds.y - right.bounds.y);
+  const rows: Array<{ y: number; height: number; members: typeof placed }> = [];
+  for (const entry of placed) {
+    const height = entry.bounds.bottom - entry.bounds.top;
+    const row = rows.findLast(
+      (candidate) =>
+        Math.abs(candidate.y - entry.bounds.y) < ROW_REACH * Math.min(candidate.height, height),
+    );
+    if (row === undefined) {
+      rows.push({ y: entry.bounds.y, height, members: [entry] });
+      continue;
+    }
+    row.members.push(entry);
+    row.y = row.members.reduce((sum, member) => sum + member.bounds.y, 0) / row.members.length;
+    row.height = median(row.members.map((member) => member.bounds.bottom - member.bounds.top));
+  }
+  const variants: Array<MappedText> = [];
+  for (const row of rows) {
+    const ordered = row.members.toSorted((left, right) => left.bounds.left - right.bounds.left);
+    const cells: Array<Array<Word>> = [];
+    let edge = -Infinity;
+    for (const { word, bounds } of ordered) {
+      if (cells.length === 0 || bounds.left - edge > CELL_GAP * row.height) cells.push([]);
+      cells.at(-1)?.push(word);
+      edge = Math.max(edge, bounds.right);
+    }
+    if (cells.length < 2) continue;
+    const builder = new TextBuilder();
+    cells.forEach((cell, position) => {
+      if (position > 0) builder.tab();
+      // Inside a cell the reader's own order stands: it is the order the words are read in.
+      for (const word of cell.toSorted((left, right) => left.index - right.index)) {
+        builder.gap().word(word.index, textOf(word));
+      }
+    });
+    variants.push(builder.done());
+  }
+  return asLines(variants);
+};
+
 /** Several mapped texts as one, a line each. Detection never joins a value across lines. */
-const asLines = (texts: ReadonlyArray<MappedText>): MappedText => {
+function asLines(texts: ReadonlyArray<MappedText>): MappedText {
   let text = "";
   const spans: Array<{ start: number; end: number; word: number }> = [];
   for (const mapped of texts) {
@@ -461,7 +529,7 @@ const asLines = (texts: ReadonlyArray<MappedText>): MappedText => {
     text += mapped.text;
   }
   return { text, spans };
-};
+}
 
 /**
  * Every text the detector is shown for a page: the page line by line, the page as one line (so
