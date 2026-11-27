@@ -14,7 +14,13 @@ import type {
 import { useNavigate } from "@tanstack/react-router";
 import { formatCommaList } from "@t3tools/client-runtime/list-format";
 import { useGT, useMessages } from "gt-react";
-import { ShieldAlertIcon, ShieldCheckIcon, ShieldOffIcon, ShieldQuestionIcon } from "lucide-react";
+import {
+  FileLock2Icon,
+  ShieldAlertIcon,
+  ShieldCheckIcon,
+  ShieldOffIcon,
+  ShieldQuestionIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { fileNameInText } from "~/lib/fileNameText";
@@ -30,6 +36,7 @@ import { usePrimaryEnvironmentId } from "~/state/environments";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Dialog, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "../ui/dialog";
+import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 import { describeClearAnswer } from "./SealedWorker.logic";
 import { SentLabel } from "./SentLabel";
 import { answerRouteLabel } from "./sealReader";
@@ -45,25 +52,47 @@ const HEADLINE_ICONS = {
   unseen: ShieldQuestionIcon,
 } as const;
 
-/** The one sentence a turn's line says. Each count is something the gateway did. */
+/** The badge under a turn: an outcome in a word or two, with the count where there is one. */
+const badgeText = (headline: TurnPrivacyHeadline, gt: Translate): string => {
+  switch (headline.kind) {
+    case "replaced":
+      return gt("De-identified · {count}", { count: headline.count });
+    case "nothingFound":
+      return gt("Checked", {
+        $context: "badge under a reply: it was checked and held no personal details",
+      });
+    case "notSent":
+      return gt("Held · {count}", { count: headline.count });
+    case "unmasked":
+      return gt("Unprotected", {
+        $context: "badge under a reply: it was sent as written, without de-identification",
+      });
+    case "unseen":
+      return gt("Unconfirmed", {
+        $context: "badge under a reply: its de-identification could not be confirmed",
+      });
+  }
+};
+
+/** What the badge means, as one sentence: its tooltip, and its name for a screen reader. */
 const headlineText = (headline: TurnPrivacyHeadline, gt: Translate): string => {
   switch (headline.kind) {
     case "replaced":
       return gt(
-        "{count, plural, one {{count} value replaced with a stand-in before sending} other {{count} values replaced with stand-ins before sending}}",
+        "{count, plural, one {{count} value de-identified before sending} other {{count} values de-identified before sending}}",
         { count: headline.count },
       );
     case "nothingFound":
-      return gt("DoeDesk checked this turn and found nothing to replace");
+      return gt("Checked: nothing to de-identify");
     case "notSent":
       return gt(
-        "{count, plural, one {{count} request was not sent because DoeDesk could not check it} other {{count} requests were not sent because DoeDesk could not check them}}",
+        "{count, plural, one {{count} request held: DoeDesk could not check it} other {{count} requests held: DoeDesk could not check them}}",
         { count: headline.count },
       );
     case "unmasked":
-      return gt("Sent without masking");
+      return gt("Sent as written, without de-identification");
     case "unseen":
-      return gt("DoeDesk did not see this turn's requests");
+      return gt("DoeDesk could not confirm this turn was de-identified");
   }
 };
 
@@ -98,8 +127,8 @@ const sealedText = (
 };
 
 /**
- * One muted line under a turn's final answer: what the gateway did for the turn, and the way
- * into the detail. Nothing is shown for a turn without a record.
+ * A quiet badge under a turn's final answer: the outcome in a word or two, the sentence on
+ * hover, and the detail on click. Nothing is shown for a turn without a record.
  */
 export function TurnPrivacyLine({
   threadRef,
@@ -115,7 +144,7 @@ export function TurnPrivacyLine({
   const [inspecting, setInspecting] = useState(false);
   const record = useThreadRunPrivacy(threadRef).find((turn) => turn.runId === runId)?.privacy;
   const sealedFiles = record?.sealedFiles;
-  // The files' names are on the computer that holds them. Anywhere else the line names handles.
+  // The files' names are on the computer that holds them. Anywhere else the badge names handles.
   const local = usePrimaryEnvironmentId() === environmentId;
   const projectId = useQuietThreadShell(threadRef)?.projectId ?? null;
   const listing = useSealedDocuments(local && sealedFiles !== undefined ? projectId : null);
@@ -123,29 +152,37 @@ export function TurnPrivacyLine({
   const headline = turnPrivacyHeadline(record);
   const Icon = HEADLINE_ICONS[headline.kind];
   const calm = headline.kind === "replaced" || headline.kind === "nothingFound";
+  const asked = sealedFiles === undefined ? 0 : sealedFiles.askedCount;
+  const sentence =
+    sealedFiles === undefined || asked === 0
+      ? headlineText(headline, gt)
+      : `${headlineText(headline, gt)} · ${sealedText(sealedFiles, listing, gt, resolve)}`;
   return (
-    <>
-      <button
-        type="button"
-        data-turn-privacy={headline.kind}
-        className={cn(
-          "mt-1.5 flex max-w-full items-center gap-1.5 rounded-sm text-start text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-          calm ? "text-muted-foreground" : "text-warning-foreground",
-        )}
-        onClick={() => setInspecting(true)}
+    <div className="mt-1.5 flex">
+      <SharedTooltipTrigger
+        render={
+          <button
+            type="button"
+            data-turn-privacy={headline.kind}
+            aria-label={sentence}
+            className={cn(
+              "-ms-1.5 inline-flex h-6 max-w-full items-center gap-1.5 rounded-md px-1.5 text-xs outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none",
+              calm ? "text-muted-foreground hover:text-foreground" : "text-warning-foreground",
+            )}
+            onClick={() => setInspecting(true)}
+          />
+        }
+        label={sentence}
       >
         <Icon aria-hidden className="size-3.5 shrink-0" />
-        {/* The space is for a screen reader: the two parts are one name. */}
-        <span className="min-w-0">
-          {headlineText(headline, gt)}
-          {sealedFiles === undefined || sealedFiles.askedCount === 0
-            ? null
-            : ` · ${sealedText(sealedFiles, listing, gt, resolve)}`}
-        </span>{" "}
-        <span className="shrink-0 underline underline-offset-2">
-          {gt("Inspect", { $context: "button, opens the detail of what was masked in a turn" })}
-        </span>
-      </button>
+        <span className="truncate tabular-nums">{badgeText(headline, gt)}</span>
+        {asked === 0 ? null : (
+          <span data-turn-sealed-asked className="flex shrink-0 items-center gap-1 tabular-nums">
+            <FileLock2Icon aria-hidden className="size-3.5" />
+            <bdi dir="ltr">{asked}</bdi>
+          </span>
+        )}
+      </SharedTooltipTrigger>
       {inspecting ? (
         <TurnPrivacyInspect
           record={record}
@@ -155,7 +192,7 @@ export function TurnPrivacyLine({
           onClose={() => setInspecting(false)}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -185,7 +222,7 @@ function Note({ children }: { readonly children: React.ReactNode }) {
   return <p className="text-muted-foreground text-sm">{children}</p>;
 }
 
-/** What was replaced, by kind, with the stand-in beside the value once the person asks for it. */
+/** What was de-identified, by kind, with what was sent beside each value once the person asks. */
 function ReplacedSection({
   record,
   runId,
@@ -208,23 +245,14 @@ function ReplacedSection({
   };
   const listed = values.kind === "shown" && values.values !== null ? values.values : null;
   return (
-    <Section title={gt("Replaced with stand-ins")}>
+    <Section title={gt("De-identified values")}>
       {count === 0 ? (
-        <Note>{gt("DoeDesk found nothing to replace in this turn.")}</Note>
+        <Note>{gt("Nothing to de-identify in this turn.")}</Note>
       ) : (
         <>
-          <Note>
-            {gt("DoeDesk found these values and sent stand-ins in their place.")}{" "}
-            {gt(
-              "Each turn sends the chat history again, so values from earlier messages appear here too.",
-            )}
-          </Note>
+          <Note>{gt("Includes earlier messages, which are sent again with each turn.")}</Note>
           {record.attribution === "time" ? (
-            <Note>
-              {gt(
-                "This AI tool does not identify which chat a request belongs to, so this list may include values from other chats running at the same time.",
-              )}
-            </Note>
+            <Note>{gt("May include values from other chats running at the same time.")}</Note>
           ) : null}
           {listed === null ? (
             <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -277,17 +305,9 @@ function ReplacedSection({
             ))
           )}
           {!local ? (
-            <Note>
-              {gt(
-                "The real values are kept on the computer this chat runs on. Open DoeDesk there to see them.",
-              )}
-            </Note>
+            <Note>{gt("The real values stay on the computer this chat runs on.")}</Note>
           ) : values.kind === "shown" && values.values === null ? (
-            <Note>
-              {gt(
-                "The list for this turn is no longer kept on this computer. The counts were recorded when the turn ended.",
-              )}
-            </Note>
+            <Note>{gt("This turn's values are no longer kept on this computer.")}</Note>
           ) : values.kind === "failed" ? (
             <Note>{gt("The values could not be read from this computer.")}</Note>
           ) : (
@@ -302,9 +322,7 @@ function ReplacedSection({
               </Button>
               <span className="text-muted-foreground text-xs">
                 {listed?.some((entry) => entry.sealed) === true
-                  ? gt(
-                      "The real values are read from this computer. Those marked Sealed file came from a sealed file.",
-                    )
+                  ? gt("Read from this computer. Sealed file: from a sealed file.")
                   : gt("The real values stay on this computer.")}
               </span>
             </div>
@@ -334,14 +352,13 @@ function SentSections({
   const gt = useGT();
   const files = [
     record.redacted > 0
-      ? gt(
-          "{count, plural, one {{count} image sent with the details DoeDesk found covered} other {{count} images sent with the details DoeDesk found covered}}",
-          { count: record.redacted },
-        )
+      ? gt("{count, plural, one {{count} image redacted} other {{count} images redacted}}", {
+          count: record.redacted,
+        })
       : null,
     record.read > 0
       ? gt(
-          "{count, plural, one {{count} image or file sent as masked text} other {{count} images or files sent as masked text}}",
+          "{count, plural, one {{count} image or file sent as de-identified text} other {{count} images or files sent as de-identified text}}",
           { count: record.read },
         )
       : null,
@@ -355,7 +372,7 @@ function SentSections({
       : null,
     record.sealed > 0
       ? gt(
-          "{count, plural, one {{count} excerpt withheld because it matched a sealed file} other {{count} excerpts withheld because they matched a sealed file}}",
+          "{count, plural, one {{count} excerpt of a sealed file withheld} other {{count} excerpts of sealed files withheld}}",
           { count: record.sealed },
         )
       : null,
@@ -378,11 +395,7 @@ function SentSections({
         </Section>
       )}
       <Section title={gt("Sent as written")}>
-        <Note>
-          {gt(
-            "Everything DoeDesk did not replace was sent as written. DoeDesk can only replace what it finds, so any detail it did not recognize was sent too.",
-          )}
-        </Note>
+        <Note>{gt("Anything DoeDesk did not recognize was sent as written.")}</Note>
       </Section>
     </>
   );
@@ -429,7 +442,7 @@ function SealedFilesSection({
   const asked = turn?.asked ?? sealedFiles.asked.map((handle) => ({ handle, name: "" }));
   const unlisted = sealedFiles.askedCount - asked.length;
   return (
-    <Section title={gt("Sealed files asked in this turn")}>
+    <Section title={gt("Sealed files asked")}>
       <ul className="divide-y divide-border/60">
         {asked.map((document) => (
           <li key={document.handle} className="grid gap-0.5 py-1.5 text-sm">
@@ -459,17 +472,13 @@ function SealedFilesSection({
         </Note>
       ) : null}
       <h4 className="pt-1 text-muted-foreground text-xs">
-        {gt("Answers that reached your AI as they are")}{" "}
+        {gt("Answers sent as they are")}{" "}
         <bdi dir="ltr" className="tabular-nums">
           {sealedFiles.clear}
         </bdi>
       </h4>
       {sealedFiles.clear === 0 ? (
-        <Note>
-          {gt(
-            "None. Every answer in this turn reached your AI as a stand-in, or said the file does not state it.",
-          )}
-        </Note>
+        <Note>{gt("None. Every answer was de-identified or not stated.")}</Note>
       ) : turn !== null ? (
         <ul className="grid gap-2">
           {turn.answers.map((answer) => (
@@ -492,23 +501,15 @@ function SealedFilesSection({
         </ul>
       ) : null}
       {!local ? (
-        <Note>
-          {gt(
-            "The file names and the answers are kept on the computer this chat runs on. Open DoeDesk there to see them.",
-          )}
-        </Note>
+        <Note>{gt("File names and answers stay on the computer this chat runs on.")}</Note>
       ) : state.kind === "failed" ? (
         <Note>{gt("The answers could not be read from this computer.")}</Note>
       ) : state.kind === "shown" && state.turn === null ? (
-        <Note>
-          {gt(
-            "The names and answers for this turn are no longer kept on this computer. Every answer the folder's sealed files gave is listed in Settings, under Privacy.",
-          )}
-        </Note>
+        <Note>{gt("No longer kept here. Every answer is listed in Settings, under Privacy.")}</Note>
       ) : (
         <Note>
           {gt(
-            'A yes or no, a choice from a list and "Not stated" reach your AI as they are. Numbers, dates and reference numbers reach it as stand-ins.',
+            'A yes or no, a choice from a list and "Not stated" are sent as they are. Numbers, dates and reference numbers are de-identified.',
           )}
         </Note>
       )}
@@ -542,7 +543,7 @@ function TurnPrivacyInspect({
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>{gt("What DoeDesk did in this turn")}</DialogTitle>
+          <DialogTitle>{gt("Privacy in this turn")}</DialogTitle>
         </DialogHeader>
         <DialogPanel className="text-start">
           {record.state === "masked" ? (
@@ -551,17 +552,18 @@ function TurnPrivacyInspect({
               <SentSections record={record} />
             </>
           ) : record.state === "unmasked" ? (
-            <Section title={gt("Sent without masking")}>
+            <Section title={gt("Sent as written")}>
               <Note>
                 {record.reason === "off"
-                  ? gt("This turn was sent without masking because masking was turned off.")
+                  ? gt(
+                      "De-identification was off, so your messages and files were sent as they are.",
+                    )
                   : gt(
-                      "This turn was sent without masking because masking was turned off for the AI tool this chat used.",
-                    )}{" "}
-                {gt("The AI company received your messages and files as they are.")}
+                      "De-identification was off for this AI tool, so your messages and files were sent as they are.",
+                    )}
               </Note>
               {local ? (
-                <div>
+                <div className="-ms-2.5">
                   <Button
                     variant="link"
                     size="sm"
@@ -576,10 +578,14 @@ function TurnPrivacyInspect({
               ) : null}
             </Section>
           ) : (
-            <Section title={gt("DoeDesk did not see this turn's requests")}>
+            <Section
+              title={gt("Unconfirmed", {
+                $context: "heading: a reply whose de-identification could not be confirmed",
+              })}
+            >
               <Note>
                 {gt(
-                  "The AI tool was started behind DoeDesk's masking service, but the service rewrote no request that it could tie to this turn. If the tool sent this turn somewhere DoeDesk does not check, it was sent as written.",
+                  "DoeDesk could not confirm this turn was de-identified. The AI tool may have sent it as written.",
                 )}
               </Note>
             </Section>
@@ -593,7 +599,7 @@ function TurnPrivacyInspect({
             />
           ) : sealedDocuments > 0 ? (
             <p className="text-muted-foreground text-xs" data-sealed-answers-record>
-              {gt("This turn asked nothing of the folder's sealed files.")}
+              {gt("No sealed file was asked in this turn.")}
             </p>
           ) : null}
         </DialogPanel>

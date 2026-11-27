@@ -62,6 +62,7 @@ import {
   PullRequestChip,
   UnresolvedChip,
 } from "./contextChipParts";
+import { ComposerFileChipActions } from "./privacy/ComposerFileActions";
 import { SharedTooltipTrigger } from "./ui/shared-tooltip";
 
 export interface ComposerImageContextAttachment extends Omit<ComposerImageAttachment, "file"> {
@@ -273,6 +274,8 @@ function ImageContextChip(props: {
 function FileContextChip(props: {
   record: ComposerFileAttachment;
   upload: AttachmentUploadState | undefined;
+  /** In the unsent draft, and not an attachment of a queued message that is already uploaded. */
+  draft: boolean;
 }) {
   const gt = useGT();
   const messages = useMessages();
@@ -283,43 +286,50 @@ function FileContextChip(props: {
   const suffix = needsReattach ? gt("attach again") : uploadSuffix;
   const size = formatAttachmentSize(props.record.sizeBytes, messages);
   const isVideo = videoMimeType(props.record) !== null;
+  // One wrapper, so the actions center on the chip and the pair sits on the text's baseline.
   return (
-    <FileChip
-      name={props.record.name}
-      svgPreview={
-        isSvgAttachment(props.record)
-          ? {
-              file: props.record.file,
-              environmentId: props.record.uploadEnvironmentId,
-              attachmentId: props.record.uploadedAttachmentId,
-            }
-          : undefined
-      }
-      size={size}
-      isVideo={isVideo}
-      theme={resolvedTheme}
-      error={props.upload?.status === "failed"}
-      unresolved={needsReattach}
-      suffix={suffix}
-      accessibleLabel={
-        isVideo && !needsReattach
-          ? gt("Preview video attachment, {name}, {size}", { name: props.record.name, size })
-          : gt("File attachment, {name}, {size}", { name: props.record.name, size })
-      }
-      onOpen={
-        !needsReattach
-          ? () =>
-              isVideo ? actions.expandVideo(props.record.id) : actions.openFile(props.record.id)
-          : undefined
-      }
-      tooltip={
-        needsReattach
-          ? gt("{name} was not saved with this draft. Attach it again to send it.", {
-              name: props.record.name,
-            })
-          : attachmentTooltip(props.record, props.upload, messages)
-      }
-    />
+    <span
+      data-composer-file-chip
+      className="inline-flex max-w-full min-w-0 items-center gap-[0.2em]"
+    >
+      <FileChip
+        name={props.record.name}
+        svgPreview={
+          isSvgAttachment(props.record)
+            ? {
+                file: props.record.file,
+                environmentId: props.record.uploadEnvironmentId,
+                attachmentId: props.record.uploadedAttachmentId,
+              }
+            : undefined
+        }
+        size={size}
+        isVideo={isVideo}
+        theme={resolvedTheme}
+        error={props.upload?.status === "failed"}
+        unresolved={needsReattach}
+        suffix={suffix}
+        accessibleLabel={
+          isVideo && !needsReattach
+            ? gt("Preview video attachment, {name}, {size}", { name: props.record.name, size })
+            : gt("File attachment, {name}, {size}", { name: props.record.name, size })
+        }
+        onOpen={
+          !needsReattach
+            ? () =>
+                isVideo ? actions.expandVideo(props.record.id) : actions.openFile(props.record.id)
+            : undefined
+        }
+        tooltip={
+          needsReattach
+            ? gt("{name} was not saved with this draft. Attach it again to send it.", {
+                name: props.record.name,
+              })
+            : attachmentTooltip(props.record, props.upload, messages)
+        }
+      />
+      {props.draft ? <ComposerFileChipActions file={props.record} /> : null}
+    </span>
   );
 }
 
@@ -558,7 +568,11 @@ const composerContextPresentationRegistry = createContextPresentationRegistry<
       canRender: (entry) => entry.kind === "file",
       render: (entry, context) =>
         entry.kind === "file" ? (
-          <FileContextChip record={entry.record} upload={entry.upload} />
+          <FileContextChip
+            record={entry.record}
+            upload={entry.upload}
+            draft={entry.contextId === undefined}
+          />
         ) : (
           <UnresolvedContextChip label={context.label} />
         ),

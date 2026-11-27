@@ -160,7 +160,7 @@ describe("RTL layout and i18n direction", () => {
           router: false,
         },
       );
-      await expect.element(screen.getByText(/Choose your language for DoeDesk/)).toBeVisible();
+      await expect.element(screen.getByText(/Choose your language\./)).toBeVisible();
       expect(document.documentElement.dir).toBe("ltr");
 
       await userEvent.click(screen.getByRole("radio", { name: "العربية" }));
@@ -170,7 +170,7 @@ describe("RTL layout and i18n direction", () => {
       expect(getClientSettings().language).toBe("ar");
 
       await userEvent.click(screen.getByRole("radio", { name: "English" }));
-      await expect.element(screen.getByText(/Choose your language for DoeDesk/)).toBeVisible();
+      await expect.element(screen.getByText(/Choose your language\./)).toBeVisible();
       expect(document.documentElement.dir).toBe("ltr");
       expect(document.documentElement.lang).toBe("en");
       expect(getClientSettings().language).toBe("en");

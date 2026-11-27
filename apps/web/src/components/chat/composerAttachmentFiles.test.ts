@@ -222,7 +222,7 @@ describe("composer attachment files", () => {
     expect(released.map((attachment) => attachment.id)).toEqual(["image-1", "file-uploading"]);
   });
 
-  it("lists a file that has a chip in the text only where its row offers to seal it", () => {
+  it("lists only the files without a chip in the text, so an attached file shows once", () => {
     const environmentId = EnvironmentId.make("environment-1");
     const attached = (id: string, file: File | null): ComposerFileAttachment => ({
       type: "file",
@@ -232,16 +232,14 @@ describe("composer attachment files", () => {
       sizeBytes: 12,
       file,
     });
+    // Sealable from here, and still left to its chip: the chip carries Seal.
     const picked = attached("picked", new File(["name,iban"], "picked.csv"));
     const listed = attached("listed", new File(["a,b"], "listed.csv"));
-    // Restored from an earlier session: no bytes are held here, so there is nothing to seal.
     const restored = attached("restored", null);
     const files = [picked, listed, restored];
     const inline = new Set(["picked", "restored"]);
-    expect(composerOtherFilesForPresentation(files, environmentId, inline)).toEqual([listed]);
-    expect(composerOtherFilesForPresentation(files, environmentId, inline, true)).toEqual([
-      picked,
-      listed,
-    ]);
+    const shown = composerOtherFilesForPresentation(files, environmentId, inline);
+    expect(shown).toEqual([listed]);
+    expect(shown.filter((file) => inline.has(file.id))).toEqual([]);
   });
 });

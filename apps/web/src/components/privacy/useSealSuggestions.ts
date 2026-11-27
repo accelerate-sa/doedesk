@@ -57,3 +57,20 @@ export function useSealSuggestions(
   }, [files]);
   return suggestions;
 }
+
+/** Whether one attached file looks like one to seal. Null until it is read, and where it does not. */
+export function useSealSuggestion(name: string, file: File | null): SealSuggestion | null {
+  const [found, setFound] = useState<{ file: File; suggestion: SealSuggestion } | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- an attached file's text comes from the browser's File API, which answers later
+  useEffect(() => {
+    if (file === null || !readableForSuggestion(name)) return;
+    let current = true;
+    void decide(name, file).then((suggestion) => {
+      if (current && suggestion !== null) setFound({ file, suggestion });
+    });
+    return () => {
+      current = false;
+    };
+  }, [name, file]);
+  return found !== null && found.file === file ? found.suggestion : null;
+}

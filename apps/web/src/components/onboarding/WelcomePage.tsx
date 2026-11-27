@@ -639,13 +639,13 @@ const STEP_TITLES: Readonly<Record<OnboardingStep, readonly [title: string, lead
     welcome: [
       msg("Welcome to DoeDesk"),
       msg(
-        "Use your AI tools on confidential work. DoeDesk replaces personal details it finds with stand-ins before they reach the AI, then restores them in the replies.",
+        "Use your AI tools on confidential work. DoeDesk replaces personal details before they reach the AI, then restores them in the replies.",
       ),
     ],
     masking: [
       msg("Choose how personal details are detected"),
       msg(
-        "Details with fixed formats (phone numbers, IDs, IBANs, emails) are checked on this computer. Names, organizations, and addresses need a detection service. The list linking stand-ins to your real details never leaves this computer.",
+        "Numbers and emails are checked on this computer. Names and addresses need one of these. Your real details never leave this computer.",
       ),
     ],
     account: [

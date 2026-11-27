@@ -297,7 +297,7 @@ describe("PrivacySetup", () => {
     await expect.element(screen.getByRole("alert")).toHaveTextContent(notice);
     await expect.element(screen.getByLabelText("Mobile number")).toBeVisible();
 
-    await press(screen.getByRole("button", { name: "Use DoeDesk without masking" }));
+    await press(screen.getByRole("button", { name: "Use DoeDesk without de-identification" }));
     await vi.waitFor(() => expect(client.configurePrivacy).toHaveBeenCalledWith({ mode: "off" }));
   });
 
@@ -363,7 +363,7 @@ describe("PrivacySetup", () => {
     await using _ = screen;
     client.configurePrivacy.mockResolvedValue({ ok: true, message: null, status: status() });
 
-    await expect.element(screen.getByText("Masking is on")).toBeVisible();
+    await expect.element(screen.getByText("De-identification is on")).toBeVisible();
     await expect.element(screen.getByText("sara@example.com")).toBeVisible();
     await press(screen.getByRole("button", { name: "Sign out" }));
 

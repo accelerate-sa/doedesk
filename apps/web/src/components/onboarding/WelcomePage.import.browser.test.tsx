@@ -1014,10 +1014,14 @@ it("commits own detection service and no-masking choices with a single Continue 
   await vi.waitFor(() => expect(heading()).toBe("Choose how personal details are detected"));
   await act(async () => {
     (
-      screen.getByRole("radio", { name: /Use DoeDesk without masking/ }).element() as HTMLElement
+      screen
+        .getByRole("radio", { name: /Use DoeDesk without de-identification/ })
+        .element() as HTMLElement
     ).click();
   });
-  expect(screen.getByRole("button", { name: "Use DoeDesk without masking" }).query()).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Use DoeDesk without de-identification" }).query(),
+  ).toBeNull();
   state.configurePrivacy.mockResolvedValueOnce({
     ok: true,
     message: null,

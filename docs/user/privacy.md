@@ -67,17 +67,19 @@ results checked in full as well, switch on **Settings → Privacy → Web pages 
 
 ## Seeing it in a chat
 
-- Beside the message box, a small shield says where this chat stands: **Masked**, **Not masked**
-  (masking is off, or off for this AI tool), **Masking not confirmed** (DoeDesk has not been
-  tested with this AI tool, or rewrote nothing in the chat's last turn), or **Not sending**
-  (requests are held back, for example until masking is set up). Click it for the reason.
-- Under each answer, one line says what DoeDesk did for that turn, such as how many values it
-  replaced. **Inspect** lists them by kind, and **Show real values** puts each real value beside
-  its stand-in. The real values are read from the vault on the computer the chat runs on.
-- When the AI asked about sealed files in a turn, the same line names them and says how many
-  answers reached the AI as they are. **Inspect** lists each of those files with its handle, and
-  each such answer with the question that was asked. On another computer the files show by handle
-  only: their names and the answers stay on the computer that holds them.
+- Beside the message box, a small shield says where this chat stands: **De-identified**,
+  **Unprotected** (de-identification is off, or off for this AI tool), **Unconfirmed** (DoeDesk
+  has not been tested with this AI tool, or could not confirm the chat's last turn), or **Held**
+  (requests are held back, for example until de-identification is set up). Click it for the
+  reason.
+- Under each answer, a small badge says what DoeDesk did for that turn, such as **De-identified
+  · 4** for four values replaced. Rest the pointer on it for the sentence, and click it for the
+  values by kind. **Show real values** puts each real value beside its stand-in. The real values
+  are read from the vault on the computer the chat runs on.
+- When the AI asked about sealed files in a turn, the badge adds a lock and their number. Click
+  it for each of those files with its handle, and each answer that reached the AI as it is with
+  the question that was asked. On another computer the files show by handle only: their names
+  and the answers stay on the computer that holds them.
 - The counts are of what DoeDesk found and replaced. They say nothing about a detail it did not
   recognize, which was sent as written. Each turn sends the whole chat again, so a value from an
   earlier message is counted in later turns too.
@@ -264,19 +266,19 @@ asked about yet. All of that reaches your AI company. The file's own name does n
   turns up in a sealed folder later. Nothing in a sealed folder is copied for undo at all.
 - Sealing cannot take back what was already sent. If chats ran in the folder while the file
   could be opened, DoeDesk says so before you confirm.
-- While a folder has sealed files, a line above the message box states what sealing costs: work
-  that uses them is slower, weaker for drafting long text, and closed to shell commands. It
-  shows once in each chat until you dismiss it.
+- Work that uses sealed files is slower, weaker for drafting long text, and closed to shell
+  commands. While a folder has sealed files, the shield beside the message box says so when you
+  click it.
 
 To seal several files at once, select them in the file list and choose **Seal N files**, in the
 bar under the list or in the menu of one of the selected rows. One confirmation covers them all
 and says how many files your server will read, and how many are sealed without being read.
 
 When you attach a text file or a table that holds many ID numbers, IBANs or phone numbers, or
-whose header row names payroll or identity columns, DoeDesk asks under the attachment whether to
-seal it instead. It decides on your computer, from the file itself, and sends nothing anywhere
-to do so. A PDF or an image is not checked this way, because reading one needs your reading
-service. The question never blocks sending.
+whose header row names payroll or identity columns, the lock on the attachment is tinted and
+reads **Seal**. Rest the pointer on it for the reason. DoeDesk decides on your computer, from
+the file itself, and sends nothing anywhere to do so. A PDF or an image is not checked this way,
+because reading one needs your reading service. The suggestion never blocks sending.
 
 Only you can seal or unseal. Agents have no tool for either.
 

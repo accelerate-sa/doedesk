@@ -1205,10 +1205,18 @@ it("offers to seal a file however it was attached, and suggests it for a payroll
   using _uploads = acceptAttachmentUploads();
   await expect.element(page.getByText(`Answer 0 for ${thread.id}.`)).toBeVisible();
   const editor = page.getByRole("textbox", { name: `Message ${thread.title}`, exact: true });
-  const sealButtons = page.getByRole("button", { name: "Seal", exact: true });
-  const suggestions = page.getByRole("note");
+  const sealButton = (name: string) =>
+    page.getByRole("button", { name: `Seal ${name}`, exact: true });
+  // Seal is on the file's own chip, so there is one for each file and none anywhere else.
+  const sealActions = (state?: "suggested") =>
+    document.querySelectorAll(state ? `[data-seal-action="${state}"]` : "[data-seal-action]");
+  const expectSealActions = (count: number, suggested: number) =>
+    vi.waitFor(() => {
+      expect(sealActions()).toHaveLength(count);
+      expect(sealActions("suggested")).toHaveLength(suggested);
+    });
 
-  // Through the picker. The file becomes a chip in the text, and keeps a row that offers Seal.
+  // Through the picker. The file becomes a chip in the text, and the chip offers Seal.
   await userEvent.click(editor);
   await expect.element(page.getByRole("button", { name: "Attach files" })).toBeVisible();
   const picker = document.querySelector<HTMLInputElement>('input[type="file"]');
@@ -1220,23 +1228,20 @@ it("offers to seal a file however it was attached, and suggests it for a payroll
   await expect
     .element(editor.getByRole("button", { name: /File attachment, payroll_full_2026\.csv/ }))
     .toBeVisible();
-  // One on the file's row, one beside the suggestion.
-  await expect.element(sealButtons.first()).toBeVisible();
-  await expect
-    .element(
-      suggestions.getByText(
-        "This file has payroll or identity columns. Seal it instead? Checked on this computer; nothing was sent.",
-      ),
-    )
-    .toBeVisible();
-  await expect.element(sealButtons).toHaveLength(2);
+  // The file shows once: its chip, with no second row under the message and no sentence
+  // beside it. A payroll file's Seal is marked, and why is on hover.
+  await expect.element(sealButton("payroll_full_2026.csv")).toBeVisible();
+  await expectSealActions(1, 1);
+  expect(document.querySelectorAll("[data-composer-file-pill]")).toHaveLength(0);
+  expect(page.getByRole("note").elements()).toHaveLength(0);
+  expect(page.getByText("payroll_full_2026.csv", { exact: true }).elements()).toHaveLength(1);
 
   // Sealed, the file leaves the message: its chip would name it, and the handle stands for it.
   // It was all the message held, so the draft itself goes and comes back with the handle alone.
   const draftText = () =>
     useComposerDraftStore.getState().getComposerDraft(scopeThreadRef(ENVIRONMENT_ID, thread.id))
       ?.prompt ?? "";
-  await sealButtons.nth(0).click();
+  await sealButton("payroll_full_2026.csv").click();
   // The dialog's own backdrop takes pointer events in the test page, so the button is pressed directly.
   const confirm = page.getByRole("alertdialog").getByRole("button", { name: "Seal", exact: true });
   // Enabled once the server has said what the folder holds of the attached file.
@@ -1244,7 +1249,7 @@ it("offers to seal a file however it was attached, and suggests it for a payroll
   await act(() => (confirm.element() as HTMLElement).click());
   await vi.waitFor(() => expect(draftText()).toBe("DOC_7 "));
   await expect.element(editor).toHaveTextContent("DOC_7");
-  await expect.element(sealButtons).toHaveLength(0);
+  await expectSealActions(0, 0);
   // What the editor writes back once it has caught up is still the handle alone.
   await userEvent.click(editor);
   await insertText("and ");
@@ -1258,7 +1263,7 @@ it("offers to seal a file however it was attached, and suggests it for a payroll
   await expect
     .element(editor.getByRole("button", { name: /File attachment, payroll_full_2026\.csv/ }))
     .toBeVisible();
-  await expect.element(sealButtons).toHaveLength(2);
+  await expectSealActions(1, 1);
 
   // Pasted. A spreadsheet's text cannot be read here, so it gets Seal and no suggestion.
   await userEvent.click(editor);
@@ -1274,23 +1279,31 @@ it("offers to seal a file however it was attached, and suggests it for a payroll
   await expect
     .element(editor.getByRole("button", { name: /File attachment, bonuses\.xlsx/ }))
     .toBeVisible();
-  await expect.element(sealButtons).toHaveLength(3);
-  await expect.element(suggestions).toHaveLength(1);
+  await expectSealActions(2, 1);
 
-  // Mentioned. The agent would read the folder's file itself, so it is offered the same.
+  // Mentioned, as the path picker and a paste write it: a chip. The agent would read the
+  // folder's file itself, so its chip offers the same.
   await userEvent.click(editor);
-  await insertText(" [register.csv](hr/register.csv) ");
-  await expect.element(suggestions).toHaveLength(2);
-  await expect.element(sealButtons).toHaveLength(5);
+  const mention = new DataTransfer();
+  mention.setData("text/plain", "[register.csv](hr/register.csv)");
+  editor
+    .element()
+    .dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData: mention, bubbles: true, cancelable: true }),
+    );
+  await vi.waitFor(() =>
+    expect(document.querySelectorAll("[data-composer-mention-chip]")).toHaveLength(1),
+  );
+  await expectSealActions(3, 2);
 
   // Seal asks first, naming the file; the mention is sealed where it lies in the folder.
-  await sealButtons.nth(0).click();
+  await sealButton("payroll_full_2026.csv").click();
   expect(useSealPrompt.getState()).toMatchObject({
     open: true,
     prompt: { kind: "seal", request: { projectId: PROJECT_ID, name: "payroll_full_2026.csv" } },
   });
   await act(() => closeSealPrompt());
-  await sealButtons.nth(4).click();
+  await sealButton("register.csv").click();
   expect(useSealPrompt.getState()).toMatchObject({
     open: true,
     prompt: {

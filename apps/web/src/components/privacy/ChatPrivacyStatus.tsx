@@ -33,18 +33,23 @@ const ICONS = {
 type Translate = ReturnType<typeof useGT>;
 type Words = ReturnType<typeof resolveProviderWords>;
 
+/** The pill's one word. What it means is in the popover. */
 const labelOf = (state: ChatMaskingState, gt: Translate): string => {
   switch (state.kind) {
     case "masked":
-      return state.sealed > 0
-        ? gt("Masked · {count} sealed", { count: state.sealed })
-        : gt("Masked", { $context: "status of a chat: personal details in it are masked" });
+      return gt("De-identified", {
+        $context: "status of a chat: personal details in it are replaced before sending",
+      });
     case "notMasked":
-      return gt("Not masked", { $context: "status of a chat: it is sent without masking" });
+      return gt("Unprotected", {
+        $context: "status of a chat: it is sent as written, without de-identification",
+      });
     case "unconfirmed":
-      return gt("Masking not confirmed");
+      return gt("Unconfirmed", {
+        $context: "status of a chat: its de-identification could not be confirmed",
+      });
     case "notSending":
-      return gt("Not sending", { $context: "status of a chat: its requests are held back" });
+      return gt("Held", { $context: "status of a chat: its requests are held back, not sent" });
   }
 };
 
@@ -54,71 +59,56 @@ const sentencesOf = (state: ChatMaskingState, words: Words, gt: Translate): Arra
   switch (state.kind) {
     case "masked":
       return [
-        gt(
-          "Before this chat's requests reach {company}, DoeDesk replaces the personal details it finds with stand-ins.",
-          { company },
-        ),
+        gt("Personal details are replaced before this chat reaches {company}.", { company }),
         ...(state.sealed > 0
           ? [
               gt(
-                "{count, plural, one {This folder has {count} sealed file.} other {This folder has {count} sealed files.}}",
+                "{count, plural, one {{count} sealed file here. Work on it is slower and runs no commands.} other {{count} sealed files here. Work on them is slower and runs no commands.}}",
                 { count: state.sealed },
               ),
             ]
           : [
-              // Said only without sealed files, so masking is not taken for sealing.
-              gt(
-                "Amounts, dates and the wording of your documents still reach {company}. To keep a file's contents away from it, seal the file.",
-                { company },
-              ),
+              // Said only without sealed files, so de-identification is not taken for sealing.
+              gt("Amounts, dates and wording still reach {company}. Seal a file to keep it away.", {
+                company,
+              }),
             ]),
       ];
     case "notMasked":
       return [
         state.reason === "off"
-          ? gt(
-              "Masking is turned off. Your messages and files in this chat reach {company} as they are.",
-              { company },
-            )
-          : gt(
-              "Masking is turned off for {name}. Your messages and files in this chat reach {company} as they are.",
-              { name, company },
-            ),
+          ? gt("De-identification is off. This chat reaches {company} as written.", { company })
+          : gt("De-identification is off for {name}. This chat reaches {company} as written.", {
+              name,
+              company,
+            }),
       ];
     case "unconfirmed":
       return [
         state.reason === "unseen"
-          ? gt(
-              "DoeDesk rewrote no request of this chat's last turn. If {tool} sent that turn somewhere DoeDesk does not check, it was sent as written.",
-              { tool },
-            )
-          : gt(
-              "DoeDesk has not been tested with {tool}. If {tool} sends requests in a format DoeDesk does not recognize, they are sent as written.",
-              { tool },
-            ),
+          ? gt("DoeDesk could not confirm the last turn. {tool} may have sent it as written.", {
+              tool,
+            })
+          : gt("DoeDesk is not tested with {tool}. It may send this chat as written.", { tool }),
       ];
     case "notSending":
       switch (state.reason) {
         case "notSetUp":
           return [
-            gt("Masking is not set up yet, so DoeDesk sends nothing to {company}.", { company }),
+            gt("Nothing is sent to {company} until de-identification is set up.", { company }),
           ];
         case "terms":
-          return [
-            gt(
-              "DoeDesk Cloud checks requests only after you accept the current Terms of Use, so nothing is sent.",
-            ),
-          ];
+          return [gt("Nothing is sent until you accept the current Terms of Use.")];
         case "stopped":
           return [
-            gt("DoeDesk's masking service is not running, so nothing is sent to {company}.", {
+            gt("Nothing is sent to {company} while de-identification is not running.", {
               company,
             }),
           ];
         case "blocked":
           return [
             gt(
-              "DoeDesk cannot mask what {tool} sends, so nothing is sent. To use {name} without masking, open Privacy settings.",
+              "DoeDesk cannot de-identify {tool}, so nothing is sent. To use {name} as written, open Privacy settings.",
               { tool, name },
             ),
           ];
@@ -127,8 +117,9 @@ const sentencesOf = (state: ChatMaskingState, words: Words, gt: Translate): Arra
 };
 
 /**
- * The state of this chat's protection, beside the composer: masked, not masked and why, not
- * confirmed, or held back. It reads what the app already holds and asks the server nothing.
+ * The state of this chat's protection, beside the composer: de-identified, unprotected,
+ * unconfirmed, or held. One word on the pill, the reasons in its popover. It reads what the app
+ * already holds and asks the server nothing.
  */
 export function ChatPrivacyStatus({
   environmentId,
@@ -178,7 +169,6 @@ export function ChatPrivacyStatus({
       <PopoverTrigger
         render={
           <ComposerControl
-            size="xs"
             aria-label={gt("Privacy of this chat: {label}", { label })}
             data-chat-privacy-status={state.kind}
             className={cn(
@@ -190,8 +180,9 @@ export function ChatPrivacyStatus({
       >
         <ComposerControlIcon
           icon={ICONS[state.kind]}
-          size="xs"
-          className={state.kind === "notSending" ? "text-warning" : undefined}
+          className={
+            exposed ? "text-current" : state.kind === "notSending" ? "text-warning" : undefined
+          }
         />
         {/* Only the calm state gives up its words where the composer is narrow. */}
         {compact && state.kind === "masked" ? null : (
@@ -213,7 +204,7 @@ export function ChatPrivacyStatus({
             </p>
           ))}
           {local ? (
-            <div>
+            <div className="-ms-2.5">
               <PopoverClose
                 render={<Button variant="link" size="sm" />}
                 onClick={() => void navigate({ to: "/settings/privacy" })}
@@ -223,7 +214,7 @@ export function ChatPrivacyStatus({
             </div>
           ) : (
             <p className="text-muted-foreground text-xs">
-              {gt("This chat runs on another computer. Its privacy settings are set there.")}
+              {gt("Runs on another computer. Change its privacy settings there.")}
             </p>
           )}
         </div>

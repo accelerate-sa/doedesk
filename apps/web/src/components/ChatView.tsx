@@ -1443,7 +1443,6 @@ export default function ChatView(props: ChatViewProps) {
   const privacyComposerBannerItems = usePrivacyComposerBanners(
     activeThreadEnvironmentId ?? null,
     activeThreadProjectId ?? null,
-    routeThreadKey,
     isServerThread && activeActivityRun?.status === "starting",
   );
   const providerInstanceEntries = providerInstanceEntriesFor(

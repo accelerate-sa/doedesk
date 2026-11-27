@@ -74,9 +74,7 @@ export function LanguageStep({
   return (
     <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
-        {gt(
-          "Choose your language for DoeDesk. Setup takes a few steps, and you can change this later in Settings.",
-        )}
+        {gt("Choose your language. You can change it later in Settings.")}
       </p>
       <div
         role="radiogroup"
@@ -109,7 +107,7 @@ export interface OwnServiceDraft {
 
 /**
  * How names and numbers are found: a DoeDesk account, a detection service of one's own, or no
- * masking, worded as in Settings. The step footer's Continue button commits the choice and
+ * de-identification, worded as in Settings. The step footer's Continue button commits the choice and
  * advances in one step. Once configured, the step shows it until signed out or disconnected.
  */
 export function MaskingStep({
@@ -145,26 +143,22 @@ export function MaskingStep({
 
   return (
     <div className="grid gap-4">
-      <div role="radiogroup" aria-label={gt("Detection service")} className="grid gap-2">
+      <div role="radiogroup" aria-label={gt("De-identification")} className="grid gap-2">
         <ChoiceCard
           selected={selected === "account"}
           title={gt("Use a DoeDesk account")}
-          detail={gt(
-            "Recommended. Text and files are checked on DoeDesk's server in Saudi Arabia and are not stored. Sign in or create an account in the next step.",
-          )}
+          detail={gt("Recommended. Checked in Saudi Arabia and never stored.")}
           onSelect={() => onChoice("account")}
         />
         <ChoiceCard
           selected={selected === "ownService"}
           title={gt("Use my own detection service")}
-          detail={gt(
-            "For teams or organizations that host their own detection server. Text and files are sent only to the address you enter.",
-          )}
+          detail={gt("For teams with their own server. Sent only to the address you enter.")}
           onSelect={() => onChoice("ownService")}
         />
         <ChoiceCard
           selected={selected === "off"}
-          title={gt("Use DoeDesk without masking")}
+          title={gt("Use DoeDesk without de-identification")}
           detail={gt("Your messages and files reach the AI as written.")}
           onSelect={() => onChoice("off")}
         />
@@ -185,9 +179,7 @@ export function MaskingStep({
               <bdi dir="ltr">
                 <code>POST /v1/detect</code>
               </bdi>
-              : DoeDesk sends the text to check and expects back where each personal detail starts
-              and ends. The full format is in the DoeDesk user guide, under “Running your own
-              service”.
+              . See “Running your own service” in the user guide.
             </T>
           </p>
         </>
