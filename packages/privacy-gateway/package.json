@@ -11,6 +11,10 @@
     "./fixedFormats": {
       "types": "./src/fixedFormats.ts",
       "import": "./src/fixedFormats.ts"
+    },
+    "./providers": {
+      "types": "./src/providers/index.ts",
+      "import": "./src/providers/index.ts"
     }
   },
   "scripts": {
