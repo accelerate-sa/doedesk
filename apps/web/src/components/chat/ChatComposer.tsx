@@ -227,6 +227,8 @@ import {
   ComposerRestingImagePreviews,
 } from "./ComposerAttachmentStrip";
 import { CollapsedComposerStopAction, ComposerPrimaryActions } from "./ComposerPrimaryActions";
+import { PreSendDeidentificationHost } from "../deidentify/PreSendDeidentificationHost";
+import { usePreSendDeidentification } from "../deidentify/usePreSendDeidentification";
 import { useFolderSealing } from "../privacy/useFolderSealing";
 import { fileNameOf } from "../privacy/sealedFiles.logic";
 import { replaceMentionedPath } from "./composerMentionedPaths";
@@ -750,6 +752,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     isPreviewableComposerVideo(file, environmentId),
   );
   const sealing = useFolderSealing(environmentId, activeProjectId);
+  const preSendDeidentification = usePreSendDeidentification({
+    environmentId,
+    projectId: activeProjectId,
+    attachments: [...composerImages, ...composerFiles],
+  });
   const composerOtherFiles = composerOtherFilesForPresentation(
     composerFiles,
     environmentId,
@@ -2441,6 +2448,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (isSendBusy || environmentUnavailable !== null) return false;
       onResume();
       return true;
+    }
+    // Attachments wait for their review where the folder asks for one; Send comes back here.
+    if (
+      !preSendDeidentification.guardSend(() =>
+        submitComposerRef.current(dispatchMode, submissionIntent),
+      )
+    ) {
+      event?.preventDefault();
+      return false;
     }
     const submission = submitComposerDraft({
       prompt: promptRef.current,
@@ -4281,6 +4297,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           </div>
         </ComposerSurface.Main>
       </div>
+      <PreSendDeidentificationHost controller={preSendDeidentification} />
     </form>
   );
 });

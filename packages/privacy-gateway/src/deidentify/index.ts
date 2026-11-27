@@ -234,4 +234,12 @@ export { UnreadableDocumentError } from "./formats/shared.ts";
 export { CSV_SHEET, readSpreadsheet } from "./formats/spreadsheet.ts";
 export type { SheetModel } from "./formats/spreadsheet.ts";
 export { openPdf, PagePdfBuilder, UnreadablePdfError } from "./pdfPages.ts";
+export {
+  previewContextOf,
+  previewPageSizes,
+  previewPicture,
+  PreviewPlaceError,
+  readOfficeDocument,
+} from "./preview.ts";
+export type { OfficeDocumentModel, PreviewPicture, PreviewPlace } from "./preview.ts";
 export type { OpenedPdf, PdfRenderOptions, RenderedPage } from "./pdfPages.ts";

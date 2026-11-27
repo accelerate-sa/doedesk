@@ -39,6 +39,10 @@ export interface RenderedPage {
 
 export interface OpenedPdf {
   readonly pageCount: number;
+  /** One page's size in points, turned as it is shown, without drawing it. */
+  readonly pageSize: (
+    index: number,
+  ) => Promise<{ readonly width: number; readonly height: number }>;
   /** Draws one page: its contents, its form fields and its annotations, as a viewer shows it. */
   readonly renderPage: (index: number) => Promise<RenderedPage>;
   readonly close: () => Promise<void>;
@@ -121,6 +125,15 @@ export const openPdf = async (
   const factory = (document as unknown as { readonly canvasFactory: CanvasFactory }).canvasFactory;
   return {
     pageCount: document.numPages,
+    pageSize: async (index) => {
+      const page = await document.getPage(index + 1);
+      try {
+        const size = page.getViewport({ scale: 1 });
+        return { width: size.width, height: size.height };
+      } finally {
+        page.cleanup();
+      }
+    },
     renderPage: async (index) => {
       const page = await document.getPage(index + 1);
       try {

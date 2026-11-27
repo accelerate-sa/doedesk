@@ -14,6 +14,7 @@ import type {
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
@@ -21,6 +22,7 @@ import { annotateEnvironmentRequest, requireEnvironmentScope } from "../auth/htt
 import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
 import * as Project from "../project/ProjectService.ts";
 import * as UsageDataConsent from "../telemetry/UsageDataConsent.ts";
+import * as DeidentifyHttp from "./deidentifyHttp.ts";
 import * as PrivacyGateway from "./PrivacyGateway.ts";
 
 /** A record as the app shows it: no reason text, which is for the model and the log. */
@@ -572,4 +574,4 @@ export const layer = HttpApiBuilder.group(
         }),
       );
   }),
-);
+).pipe(Layer.merge(DeidentifyHttp.layer));

@@ -1,7 +1,7 @@
-import { makeOfficeHandler } from "./office.ts";
+import { makeOfficeHandler, type OfficeFormat } from "./office.ts";
 
 /** PowerPoint files: every slide, the speaker's notes under each, and every embedded picture. */
-export const pptxHandler = makeOfficeHandler({
+export const pptxFormat: OfficeFormat = {
   family: "pptx",
   extension: ".pptx",
   mediaType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -17,4 +17,6 @@ export const pptxHandler = makeOfficeHandler({
     row: "a:tr",
     cell: "a:tc",
   },
-});
+};
+
+export const pptxHandler = makeOfficeHandler(pptxFormat);

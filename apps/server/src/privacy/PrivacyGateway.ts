@@ -98,6 +98,8 @@ export class PrivacyGateway extends Context.Service<
       bytes: Buffer,
       mediaType: string,
     ) => Effect.Effect<PrivacyReadMaskedResult>;
+    /** What de-identifying a file works with. Undefined when the gateway could not start. */
+    readonly deidentifyContext: Effect.Effect<ReturnType<PrivacyController["deidentifyContext"]>>;
     /** What was sent in place of recent images and documents, newest first. */
     readonly redactions: Effect.Effect<ReturnType<PrivacyController["redactions"]>>;
     readonly redactionFile: (
@@ -459,6 +461,7 @@ export const serviceOver = (
     readMasked: Effect.fn("PrivacyGateway.readMasked")((bytes: Buffer, mediaType: string) =>
       Effect.promise(() => controller.readMasked(bytes, mediaType)),
     ),
+    deidentifyContext: Effect.sync(() => controller.deidentifyContext()),
     redactions: Effect.sync(() => controller.redactions()),
     redactionFile: Effect.fn("PrivacyGateway.redactionFile")((id: string, part: "image" | "text") =>
       Effect.sync(() => controller.redactionFile(id, part)),

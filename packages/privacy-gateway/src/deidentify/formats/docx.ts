@@ -1,10 +1,10 @@
-import { makeOfficeHandler } from "./office.ts";
+import { makeOfficeHandler, type OfficeFormat } from "./office.ts";
 
 /**
  * Word documents: the body, headers, footers, footnotes, endnotes and comments, text that was
  * deleted with changes tracked (it is still in the file), and every embedded picture.
  */
-export const docxHandler = makeOfficeHandler({
+export const docxFormat: OfficeFormat = {
   family: "docx",
   extension: ".docx",
   mediaType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -20,4 +20,6 @@ export const docxHandler = makeOfficeHandler({
     row: "w:tr",
     cell: "w:tc",
   },
-});
+};
+
+export const docxHandler = makeOfficeHandler(docxFormat);
