@@ -84,7 +84,7 @@ const BOOT_ERROR_COPY: Readonly<Record<"en" | "ar", BootErrorCopy>> = {
     reinstallNightly: "تنزيل أحدث إصدار ليلي وإعادة تثبيته",
     reinstallStable: "تنزيل DoeDesk وإعادة تثبيته",
     triageHelp:
-      "شغّل هذا الأمر على الجهاز الذي يعمل عليه DoeDesk لجمع السجلات المحلية ومساعدتك في الإبلاغ عن المشكلة.",
+      "شغّل هذا الأمر على الحاسوب الذي يعمل عليه DoeDesk لجمع السجلات المحلية ومساعدتك في الإبلاغ عن المشكلة.",
     privacyNotice: "قد تتضمن التفاصيل مسارات وأسماء ملفات محلية. راجعها قبل المشاركة.",
     contactSupport: "مراسلة دعم DoeDesk",
   },
