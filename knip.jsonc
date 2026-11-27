@@ -77,11 +77,16 @@
       // The Vite+ web build prerequisite.
       // Native and disk-loaded provider packages stay external to the bundle; the
       // CLI archive and desktop sidecar stage them from this manifest.
-      // sharp is the privacy gateway's image library, staged from here as the other natives are.
+      // sharp, @napi-rs/canvas, pdfjs-dist, zxing-wasm, and jszip are privacy-gateway's
+      // native/wasm/format libraries, staged from here as the other runtime externals are.
       "ignoreDependencies": [
         "@effect/platform-node-shared",
         "@t3tools/web",
+        "@napi-rs/canvas",
+        "jszip",
+        "pdfjs-dist",
         "sharp",
+        "zxing-wasm",
         "ffi-rs",
         "transcribe-cpp",
       ],
