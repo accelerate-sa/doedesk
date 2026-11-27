@@ -174,12 +174,54 @@ writes the value's stand-in on the box, reads the result again, and sends it onl
 that should be hidden is legible. Anything else ends in the masked text of the image or in the
 withheld note, never in the image as it came.
 
+QR codes and barcodes are decoded on this computer (`src/redaction/barcodes.ts`) and covered
+when what they hold names someone or opens the document: a verification link, a link to a
+record, an identifier, a ZATCA invoice. A code that decodes and holds none of that is left open,
+and reported. If the decoder cannot be loaded the image is not sent.
+
 The rules, the measurements behind each number in `DEFAULT_REDACTION_POLICY`, what still leaks
-and what is not covered at all (faces, signatures, codes, PDFs) are in
+and what is not covered at all (faces, signatures) are in
 [docs/operations/image-redaction.md](../../docs/operations/image-redaction.md).
 `src/redaction/fixtures/` holds recorded answers of the real reading and detection services for
 made-up documents; `scripts/redaction-corpus.ts` records them and `scripts/redaction-live.ts`
 checks real provider sessions.
+
+## De-identifying files
+
+`src/deidentify/` makes a de-identified copy of a file a person chose: `.txt`, `.md`, `.png`,
+`.jpg`, `.jpeg`, `.webp`, `.pdf`, `.csv`, `.xlsx`, `.docx`, `.pptx`. Legacy `.doc` is refused.
+
+- **Two steps, a person between them.** `deidentifyFile` finds what is in a file and returns a
+  layer (`layer.ts`): one item for each value found, with where it is and what is to be done
+  about it. `applyLayer` and `exportDeidentified` write the copy. The file itself is never
+  written to. A layer holds real values, like the vault, and stays on this computer.
+- **Mask or redact.** A masked value gets a stand-in and goes to the vault; a redacted one
+  becomes `[REDACTED]` or a black box and goes nowhere. Finding makes no stand-in
+  (`Pseudonymizer.find`): the vault is written only when a layer is applied, and only for
+  masked items, so a redacted document leaves nothing behind. The document has a mode and each
+  item may differ from it, `keep` included.
+- **A PDF is its pages as pictures** (`pdfPages.ts`). A PDF's own text is not what a person
+  sees: Arabic is stored in drawing order and a filled form keeps its answers in annotations.
+  Each page is drawn here with pdf.js, read like any picture, and the copy is a new PDF made of
+  the painted pages only: no text layer, annotation, link or metadata is carried over.
+- **Office files are edited in place** (`formats/ooxml.ts`): only the characters that change are
+  rewritten in the XML, so layout and styles come out as they went in. Embedded pictures go
+  through the same reading and painting as any picture. An `.xlsx` cell is rewritten in the
+  cell and its old shared string blanked.
+- **An edited file makes its layer stale** (`reconcileLayerOnFileChange`): the layer is kept by
+  project and path, compared by content hash, and a person's choices and marks are carried over
+  where they still hold.
+
+Three things to know before wiring it in:
+
+- `pdfjs-dist`, `@napi-rs/canvas`, `zxing-wasm` and `jszip` are loaded on first use and read
+  files from their own packages (fonts, WebAssembly). A packaged server has to ship them as it
+  ships `sharp`.
+- Every picture and every PDF page is one call to the reading service (`verify` is off here: a
+  person reviews the result). Without a reader, pictures and pages are checked for codes only
+  and hidden whole until a person opens them.
+- A layer's `warnings` name what was not checked: drawings that are not pixels in Office files,
+  and an `.xlsx` file's comments, drawings, pictures and pivot tables.
 
 ## Sealed documents and the worker
 

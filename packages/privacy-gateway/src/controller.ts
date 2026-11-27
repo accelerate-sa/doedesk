@@ -1222,7 +1222,8 @@ export const startPrivacyController = async (
           text: result.maskedText,
           width: result.width,
           height: result.height,
-          valueBoxes: result.stats.valueBoxes,
+          // A covered QR code or barcode hides a value like any other box.
+          valueBoxes: result.stats.valueBoxes + result.stats.codeBoxes,
           unreadableBoxes: result.stats.unreadableBoxes + result.stats.unreadInkBoxes,
         });
       },

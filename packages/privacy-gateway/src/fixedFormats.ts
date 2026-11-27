@@ -63,7 +63,7 @@ const SAUDI_IBAN_SLACK = 2;
  * lower case, Latin or Arabic-Indic digits; "SA" may stand apart from its check digits.
  */
 const IBAN_CANDIDATE = new RegExp(
-  `(?<![\\p{L}\\p{N}])(?=((?:[Ss][Aa][ \\u00A0-]?|[A-Za-z]{2})${DIGIT}{2}[0-9٠-٩A-Za-z]{0,30}(?:[ \\u00A0-][0-9٠-٩A-Za-z]{1,30}){0,12}(?![\\p{L}\\p{N}])))`,
+  `(?<![\\p{Script=Latin}\\p{N}])(?=((?:[Ss][Aa][ \\u00A0-]?|[A-Za-z]{2})${DIGIT}{2}[0-9٠-٩A-Za-z]{0,30}(?:[ \\u00A0-][0-9٠-٩A-Za-z]{1,30}){0,12}(?![\\p{Script=Latin}\\p{N}])))`,
   "gu",
 );
 /** Letters only where a bank's code stands: what tells a mistyped IBAN from a part number or a key. */
@@ -131,7 +131,53 @@ const findIbans = (text: string): ReadonlyArray<DetectedEntity> => {
       );
     if (iban !== undefined) found.push({ start: match.index, end: iban.end, kind: "IBAN" });
   }
-  return found;
+  return [...found, ...findMisreadSaudiIbans(text, found)];
+};
+
+/** What a reader of pictures takes a digit for: O for 0, l for 1, S for 5, B for 8, Z for 2. */
+const MISREAD_DIGITS: Readonly<Record<string, string>> = {
+  O: "0",
+  o: "0",
+  D: "0",
+  Q: "0",
+  I: "1",
+  l: "1",
+  "|": "1",
+  S: "5",
+  s: "5",
+  B: "8",
+  Z: "2",
+  z: "2",
+};
+const MISREAD = "[0-9٠-٩OoDQIl|SsBZz]";
+/** "SA", or "5A" as a reader writes it, then twenty-two digits whole or in groups. */
+const MISREAD_SAUDI_IBAN = new RegExp(
+  `(?<![\\p{Script=Latin}\\p{N}])[Ss5][Aa][ \\u00A0-]?${MISREAD}{2}(?:[ \\u00A0-]?${MISREAD}){20}(?![\\p{Script=Latin}\\p{N}])`,
+  "gu",
+);
+/** Fewer true digits than this and the run is a word in capitals, not an account. */
+const MIN_TRUE_DIGITS = 16;
+
+/**
+ * Saudi IBANs as a scan gives them, a few digits read as the letters they look like. Only the
+ * exact length counts here: with letters allowed among the digits, slack would take in words.
+ */
+const findMisreadSaudiIbans = (
+  text: string,
+  found: ReadonlyArray<DetectedEntity>,
+): ReadonlyArray<DetectedEntity> => {
+  const misread: Array<DetectedEntity> = [];
+  for (const match of text.matchAll(MISREAD_SAUDI_IBAN)) {
+    const end = match.index + match[0].length;
+    if (found.some((iban) => match.index < iban.end && end > iban.start)) continue;
+    const digits = toLatinDigits(match[0].slice(2)).replace(/[ \u00A0-]/g, "");
+    const trueDigits = digits.match(/[0-9]/g)?.length ?? 0;
+    const read = [...digits].map((character) => MISREAD_DIGITS[character] ?? character).join("");
+    if (trueDigits >= MIN_TRUE_DIGITS && /^[0-9]{22}$/.test(read)) {
+      misread.push({ start: match.index, end, kind: "IBAN" });
+    }
+  }
+  return misread;
 };
 
 /*
@@ -254,6 +300,11 @@ const READABLE_WORDS = joinWords([
 ]);
 /** Between an amount word and the reference it is the amount of, in Arabic: "إجمالي الفاتورة". */
 const AMOUNT_OF_REFERENCE_GAP = /^\s+(?:ال|لل)?$/u;
+/** Words that name a bank account: the long number beside them is the account. */
+const ACCOUNT_WORDS =
+  /رقم\s+ال?حساب|ال?حساب\s+ال?بنكي|(?<![a-z])(?:account\s*(?:number|num|no|#)|bank\s+account|a\/c|acct)(?![a-z])/giu;
+/** The same words standing after the number, as an Arabic line read left to right has them. */
+const ACCOUNT_WORDS_AFTER = /^\s{0,3}(?:رقم\s+ال?حساب|ال?حساب\s+ال?بنكي)/u;
 /** Words for a way to reach someone: the number after them is a phone number, never readable. */
 const CONTACT_WORDS =
   /جوال|هاتف|تواصل|اتصال|واتس|فاكس|(?<![a-z])(?:phone|mobile|tel|call|fax|whatsapp|contact)(?![a-z])/giu;
@@ -262,9 +313,10 @@ const CONTEXT_REACH = 48;
 
 /**
  * "readable" is an amount or a reference left readable; "reference" is one whose bare number of
- * five digits or more is masked, while a shorter one (an ordinal, a year) stays readable.
+ * five digits or more is masked, while a shorter one (an ordinal, a year) stays readable;
+ * "account" is a bank account's own number.
  */
-type NumberContext = "identifier" | "contact" | "readable" | "reference" | undefined;
+type NumberContext = "identifier" | "contact" | "readable" | "reference" | "account" | undefined;
 
 const lastMatch = (pattern: RegExp, text: string): { start: number; end: number } => {
   let found = { start: -1, end: -1 };
@@ -280,6 +332,7 @@ const contextOfWords = (words: string): NumberContext => {
     [
       ["identifier", lastMatch(IDENTIFIER_WORDS, words).end],
       ["contact", lastMatch(CONTACT_WORDS, words).end],
+      ["account", lastMatch(ACCOUNT_WORDS, words).end],
       ["readable", lastMatch(READABLE_WORDS, words).end],
       ["reference", reference.end],
     ] as const
@@ -360,6 +413,8 @@ const REFERENCE_DIGITS = new RegExp(
   "gu",
 );
 export const isReferenceNumber = (surface: string): boolean => /^[0-9٠-٩]{5,}$/u.test(surface);
+/** How long a bank's own account numbers run. Only the text's words make a shorter one an account. */
+const isAccountLength = (digits: number): boolean => digits >= 10 && digits <= 20;
 const TEN_DIGITS = new RegExp(`(?<!${DIGIT})${DIGIT}{10}(?!${DIGIT})`, "gu");
 const FIFTEEN_DIGITS = new RegExp(`(?<!${DIGIT})${DIGIT}{15}(?!${DIGIT})`, "gu");
 /** Digits in groups split by single spaces or dashes ("1087-654-321", "300 123 456 789 003"). */
@@ -369,24 +424,37 @@ const GROUPED_DIGITS = new RegExp(
 );
 
 /**
- * National IDs and iqamas, commercial registration numbers (ten digits, any first digit, named
- * as such), VAT numbers (fifteen digits starting and ending with 3), ten-digit numbers after a
- * phone word, and bare references of five digits or more. None is held to a check digit: the
- * words around a number say what it is, and they say the same of a mistyped one.
+ * National IDs and iqamas, registration numbers named as such, VAT numbers (fifteen digits, 3
+ * first and last), ten digits after a phone word, references of five digits or more, and the
+ * number called a bank account. No check digit is used: the words say what a mistyped one is too.
  */
 const findIdentifiers = (text: string): ReadonlyArray<DetectedEntity> => {
   const found: Array<DetectedEntity> = [];
   const contextOfNumber = numberContexts(text);
+  const lineAfter = (end: number): string => {
+    const lineBreak = text.indexOf("\n", end);
+    return text.slice(end, lineBreak === -1 ? text.length : lineBreak);
+  };
   for (const match of text.matchAll(REFERENCE_DIGITS)) {
     const end = match.index + match[0].length;
-    if (contextOfNumber(match.index, end) === "reference") {
+    const context = contextOfNumber(match.index, end);
+    if (context === "reference") {
       found.push({ start: match.index, end, kind: "ID" });
+    } else if (
+      context === "account" ||
+      // An Arabic line read left to right: the number stands before the words that name it.
+      (context === undefined &&
+        isAccountLength(match[0].length) &&
+        ACCOUNT_WORDS_AFTER.test(lineAfter(end)))
+    ) {
+      found.push({ start: match.index, end, kind: "ACCOUNT" });
     }
   }
   for (const match of text.matchAll(TEN_DIGITS)) {
     const end = match.index + match[0].length;
     const context = contextOfNumber(match.index, end);
-    const idShaped = /^[12]/.test(toLatinDigits(match[0]));
+    // 1 and 2 start a person's ID or iqama; 70 starts an establishment's unified national number.
+    const idShaped = /^(?:[12]|70)/.test(toLatinDigits(match[0]));
     if (context === "identifier" || (context === undefined && idShaped)) {
       found.push({ start: match.index, end, kind: "ID" });
     } else if (context === "contact") {
@@ -398,8 +466,11 @@ const findIdentifiers = (text: string): ReadonlyArray<DetectedEntity> => {
   for (const match of text.matchAll(GROUPED_DIGITS)) {
     const digits = match[0].replace(/[ -]/g, "").length;
     const end = match.index + match[0].length;
-    if ((digits === 10 || digits === 15) && contextOfNumber(match.index, end) === "identifier") {
+    const context = contextOfNumber(match.index, end);
+    if ((digits === 10 || digits === 15) && context === "identifier") {
       found.push({ start: match.index, end, kind: "ID" });
+    } else if (isAccountLength(digits) && context === "account") {
+      found.push({ start: match.index, end, kind: "ACCOUNT" });
     }
   }
   for (const match of text.matchAll(FIFTEEN_DIGITS)) {
@@ -430,12 +501,119 @@ const findLetteredRecords = (text: string): ReadonlyArray<DetectedEntity> =>
       : [{ start: match.index, end: match.index + match[0].length, kind: "ID" as const }],
   );
 
-/** Every fixed-format identifier in a text: IBANs, identity and record numbers, phones, emails. */
+/**
+ * A bank's or a document's serial: two to four capitals and ten digits or more, no hyphen
+ * (`IB09876543210987654321098`). Ten digits is longer than a model number or a version runs.
+ */
+const LETTERED_SERIAL = new RegExp(
+  `(?<![\\p{L}\\p{N}_/.-])([A-Z]{2,4})${DIGIT}{10,}(?![\\p{L}\\p{N}_]|[-/.][\\p{L}\\p{N}])`,
+  "gu",
+);
+
+const findLetteredSerials = (
+  text: string,
+  ibans: ReadonlyArray<DetectedEntity>,
+): ReadonlyArray<DetectedEntity> =>
+  [...text.matchAll(LETTERED_SERIAL)].flatMap((match) => {
+    const end = match.index + match[0].length;
+    return STANDARDS.has(match[1] ?? "") ||
+      ibans.some((iban) => match.index < iban.end && end > iban.start)
+      ? []
+      : [{ start: match.index, end, kind: "ID" as const }];
+  });
+
+/** Hosts that only shorten a link: where one leads cannot be told from the link itself. */
+const SHORTLINK_HOSTS = new Set(
+  "alah.li bit.ly tinyurl.com t.co goo.gl is.gd ow.ly rb.gy cutt.ly t.ly qrco.de s.id shorturl.at".split(
+    " ",
+  ),
+);
+const VERIFY_IN_ADDRESS =
+  /verif|validat|authenti|certificat|attest|inquir|e-?service|(?<![a-z])qr(?![a-z])/iu;
+/** A part of an address that points at one record: a number, a long code, a parameter's value. */
+const RECORD_IN_ADDRESS = /[0-9]{5,}|[A-Za-z0-9_-]*[0-9][A-Za-z0-9_-]{5,}|[?&][^=&#]+=[^&#]{4,}/u;
+/** Words that say a link is there to check the document it is printed on. */
+const VERIFY_WORDS =
+  /التحقق|للتحقق|تحقق|توثيق|للتأكد|(?<![a-z])(?:verify|verification|verified|verifying|validate|validation|authenticity|scan the qr)(?![a-z])/iu;
+const VERIFY_REACH = 96;
+
+/** The host and the rest of a web address, read without a URL parser: clients share this file. */
+const partsOfAddress = (address: string): { readonly host: string; readonly rest: string } => {
+  const bare = address.replace(/^[a-z][a-z0-9+.-]*:\/\//iu, "");
+  const cut = bare.search(/[/?#]/u);
+  const host = (cut === -1 ? bare : bare.slice(0, cut)).replace(/:\d+$/u, "").toLowerCase();
+  return { host: host.replace(/^www\./u, ""), rest: cut === -1 ? "" : bare.slice(cut) };
+};
+
+const hostIs = (host: string, domain: string): boolean =>
+  host === domain || host.endsWith(`.${domain}`);
+
+/**
+ * True for a link that opens the document it stands on, or a record of it, as issued: a bank's
+ * or a ministry's verification link, a shortened link, a link with "verify" and a record in it.
+ * Whoever opens it reads the unmasked original, so it is personal data whatever it looks like.
+ */
+export const isVerificationUrl = (address: string): boolean => {
+  const { host, rest } = partsOfAddress(address.trim());
+  if (!host.includes(".")) return false;
+  const path = rest.replace(/^\/+$/u, "");
+  if (path === "") return false;
+  if ([...SHORTLINK_HOSTS].some((domain) => hostIs(host, domain))) return true;
+  if (/^(?:qr|verify|verification|validate)\./u.test(host)) return true;
+  const record = RECORD_IN_ADDRESS.test(path);
+  const verifies = VERIFY_IN_ADDRESS.test(`${host}${path}`);
+  // A ministry's link to a record or to a service about one; its front page names nobody.
+  if (hostIs(host, "gov.sa")) return record || verifies;
+  return record && verifies;
+};
+
+const ADDRESS_CHARACTERS = "[^\\s<>\"'`()\\[\\]{}|\\u0600-\\u06FF]";
+/** A web address: with its scheme, or without one on a host that is known to carry records. */
+const WEB_ADDRESS = new RegExp(
+  `(?<![\\p{L}\\p{N}@./-])(?:https?:\\/\\/${ADDRESS_CHARACTERS}+|(?:[a-z0-9-]+\\.)*(?:gov\\.sa|${[
+    ...SHORTLINK_HOSTS,
+  ]
+    .map((host) => host.replace(".", "\\."))
+    .join("|")})\\/${ADDRESS_CHARACTERS}+)`,
+  "giu",
+);
+
+/**
+ * Links that verify a document: by where they point (`isVerificationUrl`), or by the words
+ * beside them ("To verify the letter … visit", "للتحقق"). Other links are left to the detection
+ * service: a page of documentation is full of links that name nobody.
+ */
+const findVerificationUrls = (text: string): ReadonlyArray<DetectedEntity> => {
+  const found: Array<DetectedEntity> = [];
+  for (const match of text.matchAll(WEB_ADDRESS)) {
+    const address = match[0].replace(/[.,;:!?،؛]+$/u, "");
+    const end = match.index + address.length;
+    const lineStart = text.lastIndexOf("\n", match.index - 1) + 1;
+    const lineBreak = text.indexOf("\n", end);
+    const around =
+      text.slice(Math.max(lineStart, match.index - VERIFY_REACH), match.index) +
+      " " +
+      text.slice(end, Math.min(lineBreak === -1 ? text.length : lineBreak, end + VERIFY_REACH));
+    const pointsSomewhere = partsOfAddress(address).rest.replace(/^\/+$/u, "") !== "";
+    if (isVerificationUrl(address) || (pointsSomewhere && VERIFY_WORDS.test(around))) {
+      found.push({ start: match.index, end, kind: "URL" });
+    }
+  }
+  return found;
+};
+
+/**
+ * Every fixed-format identifier in a text: IBANs, account, identity, record and serial numbers,
+ * phones, emails, and the links that verify a document.
+ */
 export const findFixedFormats = (text: string): ReadonlyArray<DetectedEntity> => {
+  const ibans = findIbans(text);
   const entities: Array<DetectedEntity> = [
-    ...findIbans(text),
+    ...ibans,
     ...findIdentifiers(text),
     ...findLetteredRecords(text),
+    ...findLetteredSerials(text, ibans),
+    ...findVerificationUrls(text),
   ];
   for (const { kind, source } of PATTERNS) {
     for (const match of text.matchAll(new RegExp(source, "gu"))) {

@@ -7,6 +7,7 @@ import {
   numberContexts,
   toLatinDigits,
 } from "./fixedFormats.ts";
+import { findLabelledValues } from "./labelDetector.ts";
 import { isEntityKind } from "./placeholders.ts";
 import { ProxyError } from "./upstream.ts";
 
@@ -44,12 +45,14 @@ export class DetectorUnavailableError extends Error {
 }
 
 /**
- * Structured identifiers that follow a fixed format. Runs on the machine, with no network.
- * Payment card numbers have no rule here, with a right check digit or a wrong one: they are left
- * to the detection service, as thirteen to nineteen digits alone are as often a timestamp or a key.
+ * Structured identifiers that follow a fixed format, and the values a form's labels point at.
+ * Runs on the machine, with no network. Payment card numbers have no rule here, with a right
+ * check digit or a wrong one: they are left to the detection service, as thirteen to nineteen
+ * digits alone are as often a timestamp or a key.
  */
 export const patternDetector: Detector = {
-  detect: (texts) => Promise.resolve(texts.map(findFixedFormats)),
+  detect: (texts) =>
+    Promise.resolve(texts.map((text) => [...findFixedFormats(text), ...findLabelledValues(text)])),
 };
 
 export interface RemoteDetectorOptions {

@@ -1,8 +1,10 @@
 import * as NodeCrypto from "node:crypto";
 
 import { patternDetector } from "../detect.ts";
-import { placeholderPattern } from "../placeholders.ts";
-import type { Pseudonymizer } from "../pseudonymizer.ts";
+import { type EntityKind, placeholderPattern } from "../placeholders.ts";
+import { type DeidentificationMode, type Pseudonymizer, REDACTED_LABEL } from "../pseudonymizer.ts";
+import { normalizeForVault } from "../vault.ts";
+import { type CodeInspection, type DetectedCode, detectCodes } from "./barcodes.ts";
 import {
   convexHull,
   type Coverage,
@@ -10,6 +12,7 @@ import {
   expandQuad,
   fillConvex,
   frameOf,
+  insideConvex,
   makeCoverage,
   type Point,
   shareOutsideBoxes,
@@ -24,6 +27,7 @@ import {
   encodeRaster,
   padRaster,
   paintCoverage,
+  type Raster,
   resizeRaster,
   UnreadableImageError,
 } from "./raster.ts";
@@ -37,6 +41,7 @@ import {
   pageWords,
   spacedRuns,
   spreadOverRuns,
+  tableRows,
   type Word,
   wordsIn,
 } from "./words.ts";
@@ -105,6 +110,18 @@ export interface RedactionPolicy {
   /** Covers text-like marks the reader returned no word for. */
   readonly coverUnreadInk: boolean;
   readonly ink: UnreadInkOptions;
+  /**
+   * Which QR codes and barcodes are covered. `identifying`: those whose payload names someone
+   * or leads to a record of them (see `barcodes.ts`). `all`: every code that decodes. `off`:
+   * codes are not looked for.
+   */
+  readonly codes: "identifying" | "all" | "off";
+  /**
+   * Reads the redacted picture again and covers what is still legible. Always on for a picture
+   * that is sent without a person seeing it. Off, the reader is asked once a picture: for a
+   * caller whose result a person reviews before it goes anywhere.
+   */
+  readonly verify: boolean;
 }
 
 export const DEFAULT_REDACTION_POLICY: RedactionPolicy = {
@@ -129,6 +146,8 @@ export const DEFAULT_REDACTION_POLICY: RedactionPolicy = {
   maxPngBytes: 3_500_000,
   coverUnreadInk: true,
   ink: { minCluster: 4 },
+  codes: "identifying",
+  verify: true,
 };
 
 /** The label of a box over text that could not be read. Never derived from the text. */
@@ -144,6 +163,8 @@ export interface RedactionStats {
   readonly unreadableBoxes: number;
   /** Boxes over text-like marks the reader returned no word for. */
   readonly unreadInkBoxes: number;
+  /** Boxes over QR codes and barcodes. */
+  readonly codeBoxes: number;
   /** Distinct stand-ins on the image. */
   readonly tokens: number;
   /** Times the image was redacted: 1 when the first re-read was clean. */
@@ -153,6 +174,24 @@ export interface RedactionStats {
   /** Share of the image that is covered. */
   readonly coveredShare: number;
   readonly milliseconds: number;
+}
+
+/**
+ * One thing found in an image: a value, a stretch that could not be read, a QR code. Where it
+ * is and what it is, for a caller that lets a person choose what happens to each.
+ */
+export interface RedactedRegion {
+  readonly source: "value" | "unreadable" | "ink" | "code";
+  /** Its outline in the pixels of the image that was returned. */
+  readonly polygon: ReadonlyArray<Point>;
+  readonly kind: EntityKind;
+  /** False only for a code that decoded and was left open: it holds nothing personal. */
+  readonly covered: boolean;
+  /** The stand-in on the box, when the value was masked. */
+  readonly token?: string | undefined;
+  /** The value as it was read. A real value: for this computer only, never for a request. */
+  readonly surface?: string | undefined;
+  readonly code?: { readonly format: string; readonly inspection: CodeInspection } | undefined;
 }
 
 export type RedactionResult =
@@ -168,6 +207,8 @@ export type RedactionResult =
       readonly stats: RedactionStats;
       /** The pixels that were painted, for measurement. */
       readonly coverage: Coverage;
+      /** Everything that was found, covered or not, in the returned image's pixels. */
+      readonly regions: ReadonlyArray<RedactedRegion>;
     }
   | {
       readonly kind: "withheld";
@@ -181,7 +222,15 @@ export type RedactionResult =
     };
 
 export interface ImageRedactor {
-  readonly redact: (bytes: Buffer, neverMask?: ReadonlyArray<string>) => Promise<RedactionResult>;
+  /**
+   * `mode` is `mask` unless said otherwise. In `redact` every box says `[REDACTED]`, no
+   * stand-in is made, and nothing is written to the vault.
+   */
+  readonly redact: (
+    bytes: Buffer,
+    neverMask?: ReadonlyArray<string>,
+    mode?: DeidentificationMode,
+  ) => Promise<RedactionResult>;
 }
 
 export interface ImageRedactorOptions {
@@ -208,21 +257,47 @@ export interface RedactionRound {
   }>;
 }
 
-/** What a box hides: a value with its token, or text that could not be read. */
-type Mark = { readonly token: string } | { readonly unreadable: true };
+/** A value that is hidden: what it is and how it was read. */
+interface ValueMark {
+  readonly kind: EntityKind;
+  readonly surface: string;
+}
+
+/**
+ * What a box hides: a value with its token, a value that is redacted for good (told from
+ * another by `redacted`, which is never shown), or text that could not be read.
+ */
+type Mark =
+  | (ValueMark & { readonly token: string })
+  | (ValueMark & { readonly redacted: string })
+  | { readonly unreadable: true };
 
 interface Box {
   readonly mark: Mark;
   readonly hull: ReadonlyArray<Point>;
   /** The direction the covered text runs in. */
   readonly along: Point;
+  readonly source: RedactedRegion["source"];
+  readonly code?: DetectedCode | undefined;
 }
 
 const sameMark = (left: Mark | undefined, right: Mark | undefined): boolean => {
   if (left === undefined || right === undefined) return false;
   if ("token" in left) return "token" in right && left.token === right.token;
+  if ("redacted" in left) return "redacted" in right && left.redacted === right.redacted;
   return "unreadable" in right;
 };
+
+const isValue = (mark: Mark): mark is Exclude<Mark, { readonly unreadable: true }> =>
+  !("unreadable" in mark);
+
+/** What tells one mark from another: its stand-in, or the value it redacts. Never shown. */
+const identityOf = (mark: Mark): string =>
+  "token" in mark ? mark.token : "redacted" in mark ? `!${mark.redacted}` : "?";
+
+/** What a box says to whoever reads the image. */
+const shownAs = (mark: Mark): string =>
+  "token" in mark ? mark.token : "redacted" in mark ? REDACTED_LABEL : UNREADABLE_LABEL;
 
 const MIN_COMPACT_LENGTH = 8;
 /** A re-read word this much inside words already judged tells nothing new. */
@@ -246,6 +321,7 @@ class Redaction {
   readonly #options: ImageRedactorOptions;
   readonly #policy: RedactionPolicy;
   readonly #neverMask: ReadonlyArray<string>;
+  readonly #mode: DeidentificationMode;
   reads = 0;
   /** The text of the first reading: the image's own text, before any box. */
   firstText: string | undefined;
@@ -254,10 +330,27 @@ class Redaction {
     options: ImageRedactorOptions,
     policy: RedactionPolicy,
     neverMask: ReadonlyArray<string>,
+    mode: DeidentificationMode,
   ) {
     this.#options = options;
     this.#policy = policy;
     this.#neverMask = neverMask;
+    this.#mode = mode;
+  }
+
+  /**
+   * The mark for a value. Masked, it carries the value's stand-in, made here if the vault has
+   * none. Redacted, no stand-in is made or looked up: the vault is not written to.
+   */
+  valueMark(kind: EntityKind, surface: string, token?: string): Mark {
+    if (this.#mode === "redact") {
+      return { redacted: `${kind}:${normalizeForVault(surface)}`, kind, surface };
+    }
+    return {
+      token: token ?? this.#options.pseudonymizer.vault.tokenFor(kind, surface),
+      kind,
+      surface,
+    };
   }
 
   /** Reads a picture, given as the bytes it would be sent as and its size in pixels. */
@@ -288,6 +381,8 @@ class Redaction {
     page: PageWords,
     visible: (word: Word) => boolean,
     textOf: (word: Word) => string,
+    /** False on a re-read: with the values boxed, what is left of a row is not label and value. */
+    asForm = true,
   ): Promise<Map<number, Mark>> {
     const policy = this.#policy;
     const { pseudonymizer } = this.#options;
@@ -299,30 +394,48 @@ class Redaction {
     };
     const marks = new Map<number, Mark>();
     const texts = detectionTexts(seen, textOf);
-    const located = await pseudonymizer.locate(
-      texts.map((mapped) => mapped.text),
-      this.#neverMask,
-    );
+    const read = texts.map((mapped) => mapped.text);
+    const located: ReadonlyArray<
+      ReadonlyArray<{
+        readonly start: number;
+        readonly end: number;
+        readonly kind: EntityKind;
+        readonly token?: string;
+      }>
+    > =
+      this.#mode === "redact"
+        ? await pseudonymizer.find(read, this.#neverMask)
+        : await pseudonymizer.locate(read, this.#neverMask);
     // The same words are often found more than once: whole in a rewritten line and in pieces in
     // the page as read, or the other way round. A word shows the stand-in of the value written
     // in a known format (a whole IBAN, a phone number in order), then of the longest, then of
     // the rewritten line, which exists because the page as read has that line wrong.
     const candidates: Array<{
       words: ReadonlyArray<number>;
-      token: string;
+      kind: EntityKind;
+      token: string | undefined;
       surface: string;
       rewritten: boolean;
     }> = [];
-    texts.forEach((mapped, index) => {
-      for (const span of located[index] ?? []) {
+    const consider = (mapped: MappedText, spans: (typeof located)[number], rewritten: boolean) => {
+      for (const span of spans) {
         candidates.push({
           words: wordsIn(mapped, span.start, span.end),
+          kind: span.kind,
           token: span.token,
           surface: mapped.text.slice(span.start, span.end),
-          rewritten: index > 1,
+          rewritten,
         });
       }
-    });
+    };
+    texts.forEach((mapped, index) => consider(mapped, located[index] ?? [], index > 1));
+    // The page as rows of a form, for the local rules alone: a label names the value in the
+    // cell beside it. Found without a stand-in; one is made only for a value that is covered.
+    const rows = asForm ? tableRows(seen, textOf) : undefined;
+    if (rows !== undefined && rows.text.trim().length > 0) {
+      const [inRows = []] = await pseudonymizer.find([rows.text], this.#neverMask, patternDetector);
+      consider(rows, inRows, true);
+    }
     const formats = await patternDetector.detect(candidates.map((candidate) => candidate.surface));
     const wellFormed = candidates.map((candidate, index) =>
       (formats[index] ?? []).some(
@@ -340,10 +453,11 @@ class Redaction {
       );
     for (const index of order) {
       const candidate = candidates[index];
-      for (const word of candidate?.words ?? []) {
-        if (!marks.has(word) && candidate !== undefined)
-          marks.set(word, { token: candidate.token });
-      }
+      if (candidate === undefined) continue;
+      const open = candidate.words.filter((word) => !marks.has(word));
+      if (open.length === 0) continue;
+      const mark = this.valueMark(candidate.kind, candidate.surface, candidate.token);
+      for (const word of open) marks.set(word, mark);
     }
     // Identifiers the vault knows, however the image spaces or groups them.
     this.#knownCompact(texts, marks);
@@ -357,7 +471,7 @@ class Redaction {
         }
       }
     }
-    spreadOverRuns(spacedRuns(seen, textOf), marks, (mark) => "token" in mark);
+    spreadOverRuns(spacedRuns(seen, textOf), marks, isValue);
     // A piece with digits in it right beside a covered number is the rest of that number: the
     // "SA78" a detector left off an account it otherwise found, the last group of a card.
     const hasDigit = (index: number | undefined): boolean =>
@@ -395,7 +509,10 @@ class Redaction {
     const entries = this.#options.pseudonymizer.vault
       .entries()
       .flatMap((entry) =>
-        entry.surfaces.map((surface) => ({ token: entry.token, compact: compactOf(surface) })),
+        entry.surfaces.map((surface) => ({
+          mark: this.valueMark(entry.kind, entry.value, entry.token),
+          compact: compactOf(surface),
+        })),
       )
       .filter((entry) => entry.compact.length >= MIN_COMPACT_LENGTH && /\d{4}/.test(entry.compact));
     if (entries.length === 0) return;
@@ -405,7 +522,7 @@ class Redaction {
         let from = compact.text.indexOf(entry.compact);
         while (from !== -1) {
           for (const word of wordsIn(compact, from, from + entry.compact.length)) {
-            if (!marks.has(word)) marks.set(word, { token: entry.token });
+            if (!marks.has(word)) marks.set(word, entry.mark);
           }
           from = compact.text.indexOf(entry.compact, from + 1);
         }
@@ -452,13 +569,15 @@ class Redaction {
         });
         const along = frameOf(scaled(first)).along;
         const hull = convexHull(points);
+        const mark = marks.get(first.index) as Mark;
         boxes.push({
-          mark: marks.get(first.index) as Mark,
+          mark,
           hull:
             ink === undefined
               ? hull
               : convexHull(growToGaps(hull, along, ink, policy.maxGrowth * tallest)),
           along,
+          source: isValue(mark) ? "value" : "unreadable",
         });
         run = [];
       };
@@ -484,6 +603,8 @@ class Legend {
   readonly #unlabelled = new Set<string>();
   readonly #written = new Set<string>();
   unreadable = 0;
+  redacted = 0;
+  codes = 0;
   boxes = 0;
 
   /** A stand-in that was written out in full on a box. */
@@ -530,6 +651,18 @@ class Legend {
     if (this.#unlabelled.size > 0) {
       lines.push(`Boxes too small to label hide: ${[...this.#unlabelled].join(", ")}.`);
     }
+    if (this.redacted > 0) {
+      lines.push(
+        `Boxes marked ${REDACTED_LABEL}, and plain black boxes, hide personal data that was ` +
+          "removed for good. It has no stand-in and cannot be given back.",
+      );
+    }
+    if (this.codes > 0) {
+      lines.push(
+        "A box over a QR code or barcode hides what the code held: personal data, or a link " +
+          "that opens the document.",
+      );
+    }
     if (this.unreadable > 0) {
       lines.push(
         `Boxes marked ${UNREADABLE_MARK} or ${UNREADABLE_LABEL} hide text or marks DoeDesk ` +
@@ -570,11 +703,79 @@ const overlapping = (a: ReadonlyArray<Point>, b: ReadonlyArray<Point>): boolean 
 const signatureOf = (marks: ReadonlyMap<number, Mark>): string =>
   [...marks]
     .toSorted(([left], [right]) => left - right)
-    .map(([word, mark]) => `${word}:${"token" in mark ? mark.token : "?"}`)
+    .map(([word, mark]) => `${word}:${identityOf(mark)}`)
     .join(",");
+
+const centreOf = (quad: ReadonlyArray<Point>): Point => ({
+  x: quad.reduce((sum, point) => sum + point.x, 0) / Math.max(1, quad.length),
+  y: quad.reduce((sum, point) => sum + point.y, 0) / Math.max(1, quad.length),
+});
+
+/**
+ * Drops the marks of "words" that lie in a decoded code. A reader takes a code's modules for
+ * small unsure writing; the code's own box, or its being left open, is what decides there.
+ */
+const unmarkCodes = (
+  page: PageWords,
+  marks: Map<number, Mark>,
+  codes: ReadonlyArray<ReadonlyArray<Point>>,
+): void => {
+  if (codes.length === 0) return;
+  for (const index of Array.from(marks.keys())) {
+    const centre = centreOf((page.words[index] as Word).quad);
+    if (codes.some((hull) => insideConvex(hull, centre))) marks.delete(index);
+  }
+};
+
+const scaledPoints = (
+  points: ReadonlyArray<Point>,
+  scaleX: number,
+  scaleY: number,
+): ReadonlyArray<Point> => points.map((point) => ({ x: point.x * scaleX, y: point.y * scaleY }));
+
+/** A box to paint on a picture, its corners given as shares of the picture's width and height. */
+export interface PaintRegion {
+  readonly polygon: ReadonlyArray<Point>;
+  /** What the box says: a stand-in, or `[REDACTED]`. Left out, or too long to fit: plain black. */
+  readonly label?: string | undefined;
+}
+
+/**
+ * Paints solid black boxes on a copy of a picture, each with its label where it fits. For a
+ * caller that has decided, region by region, what is hidden: nothing is read and nothing is
+ * looked for here.
+ */
+export const paintRegions = (
+  raster: Raster,
+  regions: ReadonlyArray<PaintRegion>,
+  policy: Pick<RedactionPolicy, "minLabelScale" | "maxLabelScale"> = DEFAULT_REDACTION_POLICY,
+): { readonly raster: Raster; readonly coverage: Coverage } => {
+  const painted = copyRaster(raster);
+  const coverage = makeCoverage(raster.width, raster.height);
+  const hulls = regions.map((region) =>
+    convexHull(scaledPoints(region.polygon, raster.width, raster.height)),
+  );
+  for (const hull of hulls) fillConvex(coverage, hull);
+  paintCoverage(painted, coverage);
+  regions.forEach((region, index) => {
+    if (region.label === undefined) return;
+    // A page is larger than a picture sent to a model: the label may grow with its box.
+    const placement = fitLabel(
+      hulls[index] ?? [],
+      { x: 1, y: 0 },
+      region.label,
+      policy.minLabelScale,
+      Math.max(policy.maxLabelScale, raster.height / 500),
+    );
+    if (placement !== undefined) drawLabel(painted, coverage, placement);
+  });
+  return { raster: painted, coverage };
+};
 
 interface Kept {
   readonly page: PageWords;
+  /** Where the page's decoded codes are, in the pixels the reader saw. */
+  readonly codes: ReadonlyArray<ReadonlyArray<Point>>;
   readonly signature: string;
   readonly result: RedactionResult;
 }
@@ -590,12 +791,18 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
     const along = upright(box.along);
     const level = angleOf(along) <= policy.maxLabelAngle;
     const direction = level ? along : { x: 1, y: 0 };
+    if (box.source === "code") legend.codes += 1;
     if ("unreadable" in box.mark) {
       legend.unreadable += 1;
       return (
         (level ? fit(box, direction, UNREADABLE_LABEL) : undefined) ??
         fit(box, direction, UNREADABLE_MARK)
       );
+    }
+    if ("redacted" in box.mark) {
+      legend.redacted += 1;
+      // Too small for the word, it is a plain black box: the legend says what those are.
+      return level ? fit(box, direction, REDACTED_LABEL) : undefined;
     }
     const { token } = box.mark;
     const whole = level ? fit(box, direction, token) : undefined;
@@ -615,8 +822,9 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
   const run = async (
     bytes: Buffer,
     neverMask: ReadonlyArray<string>,
+    mode: DeidentificationMode,
   ): Promise<{ readonly kept?: Kept; readonly result: RedactionResult }> => {
-    const work = new Redaction(options, policy, neverMask);
+    const work = new Redaction(options, policy, neverMask, mode);
     try {
       return await attempt(bytes, work);
     } catch (cause) {
@@ -666,11 +874,44 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
     const scaleX = clean.width / readRaster.width;
     const scaleY = clean.height / readRaster.height;
 
+    // Codes are decoded from the picture as it came: a code scaled down may no longer decode.
+    const codes = policy.codes === "off" ? [] : await detectCodes(original);
+    const toClean = (code: DetectedCode): ReadonlyArray<Point> =>
+      convexHull(
+        scaledPoints(code.polygon, clean.width / original.width, clean.height / original.height),
+      );
+    const codeHulls = codes.map(toClean);
+    const isCovered = (code: DetectedCode): boolean =>
+      policy.codes === "all" || code.inspection.identifying;
+    const codeBoxes = codes.flatMap((code, index): ReadonlyArray<Box> =>
+      isCovered(code)
+        ? [
+            {
+              mark: work.valueMark(code.inspection.kind, code.text),
+              hull: codeHulls[index] ?? [],
+              along: { x: 1, y: 0 },
+              source: "code",
+              code,
+            },
+          ]
+        : [],
+    );
+
     const marks = await work.marks(
       page,
       () => true,
       (word) => word.text,
     );
+    const codesAsRead = codes.map((code) =>
+      convexHull(
+        scaledPoints(
+          code.polygon,
+          readRaster.width / original.width,
+          readRaster.height / original.height,
+        ),
+      ),
+    );
+    unmarkCodes(page, marks, codesAsRead);
     const signature = signatureOf(marks);
 
     const ink = inkOf(clean);
@@ -683,10 +924,13 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
       for (const box of work.boxes(page, everyWord, scaleX, scaleY, 1)) {
         fillConvex(accounted, box.hull);
       }
+      // A code that decoded is accounted for: covered by its own box, or known to be harmless.
+      for (const hull of codeHulls) fillConvex(accounted, hull);
       inkBoxes = unreadInkRegions(clean, ink, accounted, policy.ink).map((hull): Box => ({
         mark: { unreadable: true },
         hull,
         along: { x: 1, y: 0 },
+        source: "ink",
       }));
     }
 
@@ -694,10 +938,10 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
     const lateBoxes: Array<Box> = [];
     let widen = 1;
     /** The picture about to be drawn is one already read, with boxes added: it needs no reading. */
-    let settled = false;
+    let settled = !policy.verify;
     for (let round = 1; ; round += 1) {
       const wordBoxes = work.boxes(page, marks, scaleX, scaleY, widen, ink);
-      const boxes = [...wordBoxes, ...inkBoxes, ...lateBoxes];
+      const boxes = [...wordBoxes, ...codeBoxes, ...inkBoxes, ...lateBoxes];
       const coverage = makeCoverage(clean.width, clean.height);
       for (const box of boxes) fillConvex(coverage, box.hull);
       const raster = copyRaster(clean);
@@ -737,7 +981,8 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
           shareOf(word) > 0.1 ? withoutLabels(word.text) : word.text;
         const visible = (word: Word): boolean =>
           shareOf(word) < 0.9 && /[\p{L}\p{N}]/u.test(textOf(word));
-        found = await work.marks(reread, visible, textOf);
+        found = await work.marks(reread, visible, textOf, false);
+        unmarkCodes(reread, found, codeHulls);
         // Words the first reading read with confidence and the detector passed were judged then.
         // Beside a box and at the sent size they come back unsure or misspelt: that is not
         // news, and is dropped. A value the detector now finds in one of them is a second
@@ -765,7 +1010,7 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
               text: word.text,
               confidence: word.confidence,
               covered: shareOf(word),
-              mark: "token" in mark ? mark.token : "unreadable",
+              mark: "unreadable" in mark ? "unreadable" : shownAs(mark),
             };
           }),
         });
@@ -779,9 +1024,7 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
             for (const word of line) {
               const mark = marks.get(word.index);
               if (mark === undefined) parts.push(word.text);
-              else if (!sameMark(previous, mark)) {
-                parts.push("token" in mark ? mark.token : UNREADABLE_LABEL);
-              }
+              else if (!sameMark(previous, mark)) parts.push(shownAs(mark));
               previous = mark;
             }
             return parts.join(" ");
@@ -800,12 +1043,39 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
           legend: legend.text(decoded.frames),
           maskedText,
           coverage,
+          regions: [
+            ...boxes.map((box): RedactedRegion => ({
+              source: box.source,
+              polygon: box.hull,
+              kind: isValue(box.mark) ? box.mark.kind : "OTHER",
+              covered: true,
+              ...("token" in box.mark ? { token: box.mark.token } : {}),
+              ...(isValue(box.mark) ? { surface: box.mark.surface } : {}),
+              ...(box.code === undefined
+                ? {}
+                : { code: { format: box.code.format, inspection: box.code.inspection } }),
+            })),
+            ...codes.flatMap((code, index): ReadonlyArray<RedactedRegion> =>
+              isCovered(code)
+                ? []
+                : [
+                    {
+                      source: "code",
+                      polygon: codeHulls[index] ?? [],
+                      kind: code.inspection.kind,
+                      covered: false,
+                      surface: code.text,
+                      code: { format: code.format, inspection: code.inspection },
+                    },
+                  ],
+            ),
+          ],
           stats: {
             words: page.words.length,
-            valueBoxes: boxes.filter((box) => "token" in box.mark).length,
-            unreadableBoxes:
-              boxes.filter((box) => "unreadable" in box.mark).length - inkBoxes.length,
+            valueBoxes: boxes.filter((box) => box.source === "value").length,
+            unreadableBoxes: boxes.filter((box) => box.source === "unreadable").length,
             unreadInkBoxes: inkBoxes.length,
+            codeBoxes: codeBoxes.length,
             tokens: tokens.size,
             rounds: round,
             reads: work.reads,
@@ -813,7 +1083,7 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
             milliseconds: Math.round(performance.now() - started),
           },
         };
-        return { kept: { page, signature, result }, result };
+        return { kept: { page, codes: codesAsRead, signature, result }, result };
       }
       if (fresh > 0 && round >= policy.maxRounds) {
         return {
@@ -856,8 +1126,8 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
   const MAX_KEPT = 100;
 
   return {
-    redact: async (bytes, neverMask = []) => {
-      const key = `${NodeCrypto.createHash("sha256").update(bytes).digest("base64")}:${neverMask.join("\u0000")}`;
+    redact: async (bytes, neverMask = [], mode = "mask") => {
+      const key = `${NodeCrypto.createHash("sha256").update(bytes).digest("base64")}:${mode}:${neverMask.join("\u0000")}`;
       const running = pending.get(key);
       if (running !== undefined) return running;
       const promise = (async (): Promise<RedactionResult> => {
@@ -865,15 +1135,16 @@ export const makeImageRedactor = (options: ImageRedactorOptions): ImageRedactor 
           const before = kept.get(key);
           if (before !== undefined) {
             // A value learned since the last turn may be in this picture, unrecognised then.
-            const work = new Redaction(options, policy, neverMask);
+            const work = new Redaction(options, policy, neverMask, mode);
             const marks = await work.marks(
               before.page,
               () => true,
               (word) => word.text,
             );
+            unmarkCodes(before.page, marks, before.codes);
             if (signatureOf(marks) === before.signature) return before.result;
           }
-          const fresh = await run(bytes, neverMask);
+          const fresh = await run(bytes, neverMask, mode);
           // A picture that was withheld is tried again next time: the cause may have passed.
           kept.delete(key);
           if (fresh.kept !== undefined) kept.set(key, fresh.kept);
