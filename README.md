@@ -4,59 +4,72 @@
 
 <h1 align="center">DoeDesk</h1>
 
-<p align="center">Use AI on confidential files.</p>
+<p align="center">Use Claude, Codex, and Gemini on confidential files — without handing over client identities.</p>
 
 <p align="center">
   <a href="https://doedesk.com/download">Download</a> ·
   <a href="https://doedesk.com">Website</a> ·
-  <a href="./docs/user/privacy.md">How masking works</a>
+  <a href="./docs/user/privacy.md">How protection works</a> ·
+  <a href="./COMMERCIAL-LICENSE.md">Commercial licence</a>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="./.github/readme/welcome-dark.png">
-    <img src="./.github/readme/welcome-light.png" width="720" alt="The DoeDesk welcome screen: sign in, then connect an AI.">
+    <img src="./.github/readme/welcome-light.png" width="720" alt="DoeDesk desktop app for confidential AI workflows.">
   </picture>
 </p>
 
-DoeDesk replaces names, phone numbers and IDs with stand-ins such as `[PERSON_FBJD2]` before an
-AI model sees them, and puts the real values back on your screen and in the files it writes.
+DoeDesk sits between your confidential files and your AI provider. Before a prompt, PDF, scan, or Office document leaves your computer, DoeDesk detects sensitive identifiers locally and through your chosen provider, lets you review every item in **De-identification Studio**, and sends only protected output to your AI — restoring real values locally when the reply comes back.
 
-- **Your own AI subscription.** DoeDesk runs the agents you are already signed in to, such as
-  Claude and Codex.
-- **Real values stay on your computer.** The list that links each stand-in to a real value never
-  leaves it. A request that cannot be checked is not sent.
-- **Scans and images are masked too.** By default they are read and sent as masked text; you can
-  choose to send the image itself with a labelled box over each value.
-- **Your choice of detector.** Use DoeDesk Cloud ([server code](https://github.com/accelerate-sa/doedesk-server)),
-  or run the detection service yourself.
+## Three ways to protect sensitive files
+
+| Mode                      | How it works                                                                                                                                                                                       | Best for                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Mask (Reversible)**     | Replaces names, IDs, IBANs, phone numbers, and references with random stand-ins (`[PERSON_FBJD2]`) mapped in a local vault on your device, then restores real values in replies and written files. | Drafting contracts, analyzing client matters, summarizing financial & HR files with Claude, Codex, or Gemini. |
+| **Redact (Irreversible)** | Permanently strips detected identifiers with **zero vault writes** so nothing can be re-identified later.                                                                                          | Preparing sanitized copies for external sharing, audits, or non-reversible workflows.                         |
+| **Seal (Private Worker)** | Keeps ultra-sensitive documents off general AI providers altogether — processed exclusively by a sovereign regional worker or your organization's dedicated pool.                                  | Restricted legal, financial, or regulated records that cannot touch third-party AI APIs.                      |
+
+## What DoeDesk does today (`v2026.11.3`)
+
+- **De-identification Studio & Pre-send Review:** Inspect every detected identifier side by side before anything reaches AI. Toggle individual items, edit overrides, preview the exact payload leaving your machine, and enforce mandatory review before send (`Require review before AI`) across workspaces.
+- **Full document coverage:** Native handlers for `.txt`/`.md`, `.pdf` (rendered page-by-page), scanned images, `.docx`, `.xlsx`/`.csv`, and `.pptx` — plus **local QR and barcode detection** (including Saudi ZATCA e-invoice TLV payloads).
+- **Arabic, English & Saudi-native detection:** Built from the ground up for bilingual workspaces — detects Arabic and English names, Saudi national/resident IDs, 70-series Unified Numbers, IBANs, bank account numbers, serials, shortlinks, and Arabic-Indic digits.
+- **Fail-closed & local vault:** The mapping vault never leaves your computer. If a file or request cannot be inspected, DoeDesk blocks the send rather than leaking raw data.
+- **Decoupled enterprise providers (zero lock-in):** Independently choose **OCR (8 providers)**, **Entity Detection (8 providers)**, and **Sealed Worker (3 providers)** in Settings — use DoeDesk Cloud, your own Azure / AWS / Google Cloud endpoints, or a fully self-hosted stack without signing out.
+- **Your own AI subscription:** Works directly with your existing Claude, ChatGPT/Codex, Gemini, OpenCode, or Pi logins — no token reselling or API markup.
+- **Verifiable cloud infrastructure:** DoeDesk Cloud processes text and scans in stateless encrypted memory (AMD SEV-SNP confidential VM in Jeddah, Saudi Arabia), stores zero document content, publishes its server code at [accelerate-sa/doedesk-server](https://github.com/accelerate-sa/doedesk-server), and signs every production release into a public Sigstore transparency log (`https://api.doedesk.com/v1/release`).
 
 ## Install
 
-Download DoeDesk from [doedesk.com/download](https://doedesk.com/download), or from the
-[latest release](https://github.com/accelerate-sa/doedesk/releases/latest):
+Download DoeDesk from [doedesk.com/download](https://doedesk.com/download) or the [latest release](https://github.com/accelerate-sa/doedesk/releases/latest):
 
-- **Mac** (Apple silicon): open `DoeDesk-arm64.dmg` and drag DoeDesk to Applications.
-- **Windows** (x64): run `DoeDesk-x64.exe`. The installer is not code-signed yet, so Windows
-  SmartScreen warns about an unrecognised app: choose **More info**, then **Run anyway**.
-- **Linux** (x64 or arm64): make `DoeDesk-x86_64.AppImage` or `DoeDesk-arm64.AppImage`
-  executable and run it, or install `DoeDesk-amd64.deb` / `DoeDesk-arm64.deb` with `apt`.
+- **macOS (Apple Silicon):** Open `DoeDesk-arm64.dmg` (signed and Apple notarized) and drag DoeDesk to Applications.
+- **Windows (x64):** Run `DoeDesk-x64.exe`. The Windows installer is not code-signed yet, so SmartScreen warns on first launch: choose **More info**, then **Run anyway**.
+- **Linux (x64 or arm64):** Make `DoeDesk-x86_64.AppImage` or `DoeDesk-arm64.AppImage` executable and run it, or install `DoeDesk-amd64.deb` / `DoeDesk-arm64.deb` with `apt`.
 
-The Mac app, the Windows app and the AppImage update themselves. Sign in with a phone number in
-Saudi Arabia, or by email anywhere.
+macOS, Windows, and Linux AppImage builds update automatically. Sign in with a Saudi phone number, by email anywhere, or connect your own detection and OCR providers directly under **Settings → Privacy**.
 
-## Run your own detection
+## Bring your own detection & OCR
 
-DoeDesk needs one service to find names in text and, optionally, one to read documents. Any
-server that answers these two calls works:
+DoeDesk supports decoupled enterprise providers out of the box (Azure, AWS, Google Cloud, Presidio, Ollama, custom OpenAI-compatible workers, and self-hosted HTTP services). Any custom HTTP service answering these two endpoints works immediately:
 
-```
+```http
 POST /v1/detect   { "texts": ["..."] }  ->  { "results": [{ "entities": [{ "start", "end", "kind" }] }] }
 POST /v1/ocr      <image or PDF bytes>  ->  { "text": "..." }
 ```
 
-Choose **Use my own detection service** when you sign in, or later under Settings, Privacy.
-[docs/user/privacy.md](./docs/user/privacy.md) has the details and the limits.
+Configure providers independently in **Settings → Privacy**. See [docs/user/privacy.md](./docs/user/privacy.md) for architecture details and known boundaries.
+
+## Enterprise & teams
+
+For law firms, financial institutions, healthcare, and regulated organizations, DoeDesk offers:
+
+- **14-day Free Evaluation Pass** (up to 10 seats, with hosted regional worker access)
+- **Organization controls:** Pooled monthly allowances, domain onboarding, region locking (`sa` / `eu` / `global`), and dedicated isolated worker pools
+- **Customer-hosted & commercial licensing:** Deploy inside your own VPC or on-premise environment under a commercial licence ([COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md))
+
+Write to [hello@doedesk.com](mailto:hello@doedesk.com) to request an evaluation pass or our Security & PDPL Trust Pack.
 
 ## Build from source
 
@@ -66,42 +79,24 @@ vp i
 vp run dev
 ```
 
-`packages/privacy-gateway` holds the masking. It is plain Node with no dependency on the rest
-of the app.
+`packages/privacy-gateway` holds the de-identification engine, local detectors, QR/ZATCA scanner, PDF/Office handlers, and decoupled provider adapters as a standalone Node package with no dependency on the desktop shell.
 
 ## Contact
 
-This repository does not take issues or pull requests. Write to
-[hello@doedesk.com](mailto:hello@doedesk.com).
+This repository does not take public issues or pull requests. Write to [hello@doedesk.com](mailto:hello@doedesk.com).
 
 ## Credit
 
-DoeDesk is a fork of [T3 Code](https://github.com/pingdotgg/t3code) by T3 Tools Inc. The agent
-runtime, the interface and most of the code are theirs. DoeDesk adds the privacy gateway and
-removes what is only for programming.
+DoeDesk is built on [T3 Code](https://github.com/pingdotgg/t3code) by T3 Tools Inc. The agent runtime, core interface, and foundation are theirs; DoeDesk adds the privacy gateway, De-identification Studio, decoupled enterprise provider layer, and Saudi/bilingual confidentiality workflows.
 
 ## Licence
 
-DoeDesk is free software under the
-[GNU Affero General Public License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
+DoeDesk is free software under the [GNU Affero General Public License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
 
-- **DoeDesk as a whole, and what Accelerate Technology Establishment wrote for it**, including
-  `packages/privacy-gateway`, is under the AGPL.
-- **The code that comes from T3 Code** is released by T3 Tools Inc. under the MIT licence. Their
-  notice is kept in [LICENSE.T3-Code-MIT](./LICENSE.T3-Code-MIT), and that code remains available
-  under MIT from [their repository](https://github.com/pingdotgg/t3code).
-- **Versions up to and including `v2026.11.1`** were released under the MIT licence and remain
-  under it.
-- **An AI provider's own software** that DoeDesk loads or starts, such as the Claude Agent SDK
-  and the Cursor SDK, is not free software and keeps its own terms. An additional permission
-  under section 7 of the AGPL, in [NOTICE](./NOTICE), lets DoeDesk be shared together with it.
-- **A commercial licence** is available from Accelerate Technology Establishment for those who
-  cannot use the AGPL: see [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md) or write to
-  [hello@doedesk.com](mailto:hello@doedesk.com).
+- **DoeDesk as a whole, and what Accelerate Technology Establishment wrote for it**, including `packages/privacy-gateway`, is under the AGPL.
+- **The code that comes from T3 Code** is released by T3 Tools Inc. under the MIT licence ([LICENSE.T3-Code-MIT](./LICENSE.T3-Code-MIT)) and remains available under MIT from [their repository](https://github.com/pingdotgg/t3code).
+- **Versions up to and including `v2026.11.1`** were released under the MIT licence and remain under it.
+- **Third-party AI provider SDKs** loaded or started by DoeDesk keep their own terms, covered by the section 7 additional permission in [NOTICE](./NOTICE).
+- **A commercial licence** is available from Accelerate Technology Establishment for organizations that cannot adopt AGPL: see [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md) or write to [hello@doedesk.com](mailto:hello@doedesk.com).
 
-[NOTICE](./NOTICE) states this in full.
-
-The app links to the source of the version it is running under **Settings, About, Source code**.
-If you change DoeDesk and let other people use your version over a network, the AGPL (section 13)
-requires you to offer them your source: set `SOURCE_REPOSITORY_URL` in
-`packages/shared/src/sourceCode.ts` to where you publish it.
+The app links to the exact source of the running version under **Settings → About → Source code**. If you modify DoeDesk and offer it over a network, AGPL section 13 requires offering your modified source (`SOURCE_REPOSITORY_URL` in `packages/shared/src/sourceCode.ts`).
