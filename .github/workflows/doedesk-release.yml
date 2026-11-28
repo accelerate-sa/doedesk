@@ -9,11 +9,9 @@ name: Release
 #   gh workflow run doedesk-release.yml --ref doedesk -f version=2026.11.0
 #   (add -f upload=false to build and check without touching the release)
 
+# Release builds run locally on Mac and Windows PC (see AGENTS.md) rather than
+# hosted Blacksmith runners. Keep manual dispatch only as an explicit fallback.
 on:
-  # Calendar versions only (v2026.11.0); T3 Code's v0.x tags never trigger it.
-  push:
-    tags:
-      - "v2[0-9][0-9][0-9].*"
   workflow_dispatch:
     inputs:
       version:

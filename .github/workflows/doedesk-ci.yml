@@ -6,11 +6,10 @@ name: CI
 # pre-push hook refuses commits that bring T3 Code's workflows back (see
 # docs/operations/doedesk-release.md).
 
+# CI runs locally on Mac and Windows PC (see AGENTS.md) rather than hosted
+# Blacksmith runners. Keep manual dispatch only as an explicit fallback.
 on:
-  push:
-    branches:
-      - doedesk
-      - ci-blacksmith
+  workflow_dispatch:
 
 permissions:
   contents: read
